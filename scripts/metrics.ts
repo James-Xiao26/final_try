@@ -1,0 +1,127 @@
+import { CONFIG } from "./config.js";
+import type { ClosedPosition } from "./polymarket.js";
+
+export interface EquityPoint {
+  ts: string;
+  cumulativePnl: number;
+}
+
+export interface WalletMetrics {
+  horizonDays: number;
+  skillScore: number | null;
+  pctReturn: number;
+  winRate: number;
+  maxDrawdown: number;
+  totalPnlUsd: number;
+  totalVolumeUsd: number;
+  nTrades: number;
+  outlierFlag: boolean;
+  equityCurve: EquityPoint[];
+}
+
+function round(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+function toMillis(closeTime: string): number {
+  const parsed = Date.parse(closeTime);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildDailyCurve(sortedPositions: ClosedPosition[]): EquityPoint[] {
+  const byDate = new Map<string, number>();
+  let cumulative = 0;
+
+  sortedPositions.forEach((position) => {
+    cumulative += position.realizedPnl;
+    const date = new Date(toMillis(position.closeTime)).toISOString().slice(0, "YYYY-MM-DD".length);
+    byDate.set(date, cumulative);
+  });
+
+  return [...byDate.entries()].map(([ts, cumulativePnl]) => ({
+    ts,
+    cumulativePnl: round(cumulativePnl, 2)
+  }));
+}
+
+/**
+ * Computes realized performance over a trailing horizon.
+ * Return is total realized PnL divided by a capital proxy of shares times average entry price.
+ * Drawdown uses the realized cumulative PnL path and penalizes losses from the prior realized peak.
+ */
+export function computeMetrics(
+  closedPositions: ClosedPosition[],
+  horizonDays: number,
+  config: typeof CONFIG
+): WalletMetrics {
+  const cutoffMs = Date.now() - horizonDays * config.SECONDS_PER_DAY * config.MS_PER_SECOND;
+  const positions = closedPositions
+    .filter((position) => toMillis(position.closeTime) >= cutoffMs)
+    .sort((left, right) => toMillis(left.closeTime) - toMillis(right.closeTime));
+
+  const totalPnlUsd = positions.reduce((sum, position) => sum + position.realizedPnl, 0);
+  const totalVolumeUsd = positions.reduce((sum, position) => sum + position.size * position.avgPrice, 0);
+  const pctReturn = totalVolumeUsd > 0 ? totalPnlUsd / totalVolumeUsd : 0;
+  const wins = positions.filter((position) => position.realizedPnl > 0).length;
+  const winRate = positions.length > 0 ? wins / positions.length : 0;
+
+  let cumulativePnl = 0;
+  let peakSoFar = 0;
+  let maxDrawdown = 0;
+
+  positions.forEach((position) => {
+    cumulativePnl += position.realizedPnl;
+    peakSoFar = Math.max(peakSoFar, cumulativePnl);
+    const drawdown = peakSoFar === 0 ? 0 : (peakSoFar - cumulativePnl) / Math.abs(peakSoFar);
+    maxDrawdown = Math.max(maxDrawdown, drawdown);
+  });
+
+  const largestWin = positions.reduce(
+    (largest, position) => Math.max(largest, position.realizedPnl),
+    0
+  );
+  const outlierFlag = totalPnlUsd > 0 && largestWin / totalPnlUsd > config.OUTLIER_TRADE_FRACTION;
+  const metricsWithoutScore: WalletMetrics = {
+    horizonDays,
+    skillScore: null,
+    pctReturn: round(pctReturn, 4),
+    winRate: round(winRate, 4),
+    maxDrawdown: round(maxDrawdown, 4),
+    totalPnlUsd: round(totalPnlUsd, 2),
+    totalVolumeUsd: round(totalVolumeUsd, 2),
+    nTrades: positions.length,
+    outlierFlag,
+    equityCurve: buildDailyCurve(positions)
+  };
+
+  return {
+    ...metricsWithoutScore,
+    skillScore: computeSkillScore(metricsWithoutScore, config)
+  };
+}
+
+/**
+ * Skill Score blends return and win rate, subtracts excess drawdown, and applies a sample-size confidence multiplier.
+ * Ineligible wallets receive null when the sample is too small, volume is too low, or one win dominates PnL.
+ */
+export function computeSkillScore(metrics: WalletMetrics, config: typeof CONFIG): number | null {
+  if (
+    metrics.nTrades < config.MIN_TRADES ||
+    metrics.totalVolumeUsd < config.MIN_VOLUME_USD ||
+    metrics.outlierFlag
+  ) {
+    return null;
+  }
+
+  const weights = config.SKILL_WEIGHTS;
+  const drawdownPenalty = metrics.maxDrawdown > config.DRAWDOWN_PENALTY_THRESHOLD
+    ? (metrics.maxDrawdown - config.DRAWDOWN_PENALTY_THRESHOLD) / (1 - config.DRAWDOWN_PENALTY_THRESHOLD)
+    : 0;
+  const confidenceMultiplier = Math.min(1, metrics.nTrades / (config.MIN_TRADES * 3));
+  const rawScore = (metrics.pctReturn * weights.pctReturn)
+    + (metrics.winRate * weights.winRate)
+    - (drawdownPenalty * weights.drawdown);
+
+  return round(rawScore * confidenceMultiplier * 1000, 4);
+}
