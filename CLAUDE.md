@@ -20,9 +20,18 @@ pnpm dev          # next dev (web), http://localhost:3000
 pnpm build        # next build (web)
 pnpm typecheck    # tsc --noEmit across BOTH workspaces (recursive)
 pnpm ingest       # run the ingestion pipeline (scripts/ingest.ts via tsx)
+
+pnpm --filter edgeboard-scripts test   # run the unit tests (from repo root)
 ```
 
-There is **no test runner** (no jest/vitest, no test files). "Verifying a change" means `pnpm typecheck` and `pnpm build` pass — and for the pipeline, running `pnpm ingest` against a real Supabase + the live Polymarket API. There is no way to unit-test scoring in isolation today.
+**Unit tests** live in the `scripts/` workspace and run on Node's built-in test runner via tsx (`node --import tsx --test "**/*.test.ts"`, wired up as the `test` script in `scripts/package.json` — there is no root-level `test` script, so run it with `pnpm --filter edgeboard-scripts test` or `pnpm test` from inside `scripts/`). No jest/vitest. Current coverage:
+
+- `scripts/metrics.test.ts` — pure-function tests for scoring:
+  - `computeMetrics` derives `pctReturn`, `winRate`, `maxDrawdown`, `nTrades`, and volume from the realized PnL path; excludes positions older than the horizon; and handles an empty position set without dividing by zero.
+  - `computeSkillScore` returns `null` for ineligible wallets (below `MIN_TRADES`, below `MIN_VOLUME_USD`, or `outlierFlag` set), applies the sqrt sample-size confidence ramp with a 0.6 floor at `MIN_TRADES`, saturates confidence at `MIN_TRADES * 3`, and penalizes drawdown beyond the threshold. Expected scores are asserted as exact constants/approximations, so changing any weight or the ramp in `config.ts`/`metrics.ts` will require updating these.
+- `scripts/botDetection.test.ts` — tests for the bot heuristics.
+
+"Verifying a change" now means `pnpm typecheck`, `pnpm build`, and the unit tests all pass — and for the full pipeline, running `pnpm ingest` against a real Supabase + the live Polymarket API.
 
 Apply the DB schema with `supabase db push`, or paste `supabase/migrations/001_initial_schema.sql` into the Supabase SQL editor.
 
@@ -49,10 +58,9 @@ Bot detection (`scripts/botDetection.ts`): flags wallets exceeding trades/day, s
 - **The Supabase `Database` type is hand-maintained and duplicated.** It appears inline in `scripts/ingest.ts`, again in `web/lib/types.ts`, and must match `supabase/migrations/001_initial_schema.sql`. There is no codegen — if you change the schema, update all three by hand or things drift silently.
 - **`scripts/` is ESM (`NodeNext`) and imports use `.js` extensions** (e.g. `import { CONFIG } from "./config.js"` resolves to `config.ts`). Keep the `.js` suffix on relative imports there or `tsx`/`tsc` will fail. `web/` uses Bundler resolution and the `@/*` path alias — do not mix the styles.
 - **Two TypeScript configs with different rules.** Both enable `strict`, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes`, so optional props and indexed access need care.
-- **Env vars** (no `.env.example` exists despite the README; create `.env.local`):
+- **Env vars** (copy `.env.example` → `.env.local`; root `.env.example` covers scripts, `web/.env.example` covers the web app):
   - web (browser-safe): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
   - scripts (writes): also needs `SUPABASE_SERVICE_ROLE_KEY`; optional `POLYMARKET_API_BASE`. `ingest.ts` loads `../.env.local` then a local `.env.local`.
   - Keep the **service-role key out of the web app** — the read path uses the anon key only.
-- **Two `next.config` files** (`.mjs` and `.ts`) with identical content. Next 14.2 uses `next.config.mjs`; the `.ts` one is inert.
 - Polymarket's API field names are inconsistent, so `polymarket.ts` maps responses defensively via `readString`/`readNumber` with fallback key lists. When the API shape shifts, extend those key arrays rather than assuming one field name.
 - Addresses are normalized to lowercase everywhere (ingestion, API routes, lib). Preserve this when adding lookups.
