@@ -41,7 +41,7 @@ The system is a **batch-compute-then-serve** design. The web app never calls Pol
 
 Ingestion (`scripts/ingest.ts` `main()`):
 1. `discoverTopWallets()` (`polymarket.ts`) seeds wallets from Polymarket's `/v1/leaderboard`, falling back to `/trades` if that fails.
-2. For each wallet (batched, `WALLET_BATCH_SIZE` at a time): fetch `/activity` → `isSuspectedBot()`; fetch `/closed-positions` → `computeMetrics()` for each horizon in `CONFIG.HORIZONS` (30/90/365 days).
+2. For each wallet (batched, `WALLET_BATCH_SIZE` at a time): fetch `/activity` → `isSuspectedBot()`; fetch `/closed-positions` → `computeMetrics()` for each horizon in `CONFIG.HORIZONS` (30/90 days). The max horizon also bounds how far back `getClosedPositions` paginates, so it drives ingest API cost. The web app's `web/lib/types.ts` still lists 365 as a selectable horizon, but ingest no longer computes it — the 365D leaderboard view shows an "under maintenance" banner and serves stale rows.
 3. Upsert into `wallet_stats` and `equity_curve`.
 4. `rebuildLeaderboardCache()` re-derives `leaderboard_cache`: orders by `skill_score`, **excludes bot-suspected wallets**, keeps top `TOP_N`.
 

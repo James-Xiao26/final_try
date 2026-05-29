@@ -1,5 +1,5 @@
 export const CONFIG = {
-  HORIZONS: [30, 90, 365] as const,
+  HORIZONS: [30, 90] as const,
   TOP_N: 100,
   MIN_TRADES: 20,
   MIN_VOLUME_USD: 100,
