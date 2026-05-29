@@ -102,7 +102,10 @@ export function computeMetrics(
 }
 
 /**
- * Skill Score blends return and win rate, subtracts excess drawdown, and applies a sample-size confidence multiplier.
+ * Skill Score blends return, win rate, and sample-size confidence, then subtracts excess drawdown.
+ * A single `confidence` value (a sqrt ramp in trade count, so it tracks how standard error shrinks
+ * with sample size) is used two ways: as an additive depth reward weighted by SKILL_WEIGHTS.sampleSize,
+ * and as a multiplier that discounts — but never guts — thin samples, bounded below by SAMPLE_CONFIDENCE_FLOOR.
  * Ineligible wallets receive null when the sample is too small, volume is too low, or one win dominates PnL.
  */
 export function computeSkillScore(metrics: WalletMetrics, config: typeof CONFIG): number | null {
@@ -118,9 +121,12 @@ export function computeSkillScore(metrics: WalletMetrics, config: typeof CONFIG)
   const drawdownPenalty = metrics.maxDrawdown > config.DRAWDOWN_PENALTY_THRESHOLD
     ? (metrics.maxDrawdown - config.DRAWDOWN_PENALTY_THRESHOLD) / (1 - config.DRAWDOWN_PENALTY_THRESHOLD)
     : 0;
-  const confidenceMultiplier = Math.min(1, metrics.nTrades / (config.MIN_TRADES * 3));
+  const confidence = Math.min(1, Math.sqrt(metrics.nTrades / (config.MIN_TRADES * 3)));
+  const confidenceMultiplier = config.SAMPLE_CONFIDENCE_FLOOR
+    + (1 - config.SAMPLE_CONFIDENCE_FLOOR) * confidence;
   const rawScore = (metrics.pctReturn * weights.pctReturn)
     + (metrics.winRate * weights.winRate)
+    + (confidence * weights.sampleSize)
     - (drawdownPenalty * weights.drawdown);
 
   return round(rawScore * confidenceMultiplier * 1000, 4);

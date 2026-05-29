@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "ingest": "tsx ingest.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"**/*.test.ts\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.46.1",
