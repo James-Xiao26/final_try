@@ -73,7 +73,11 @@ export function computeMetrics(
   positions.forEach((position) => {
     cumulativePnl += position.realizedPnl;
     peakSoFar = Math.max(peakSoFar, cumulativePnl);
-    const drawdown = peakSoFar === 0 ? 0 : (peakSoFar - cumulativePnl) / Math.abs(peakSoFar);
+    // This is a realized-PnL path: it starts at 0 and can go deeply negative. When a small
+    // early peak is followed by a large net loss, (peak - cumulative)/|peak| blows up well past
+    // 1 (we saw 200+), which both overflows max_drawdown's NUMERIC(6,4) column and distorts the
+    // skill-score penalty. Cap at 1.0 (a 100% drawdown) — the conventional max-drawdown ceiling.
+    const drawdown = peakSoFar === 0 ? 0 : Math.min(1, (peakSoFar - cumulativePnl) / Math.abs(peakSoFar));
     maxDrawdown = Math.max(maxDrawdown, drawdown);
   });
 

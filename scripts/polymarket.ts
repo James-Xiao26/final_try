@@ -54,15 +54,30 @@ type JsonRecord = Record<string, unknown>;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Global rate gate: spaces out the start of every request across all wallets so
-// concurrent pagination can't burst past Polymarket's per-IP limit.
-let requestGate: Promise<void> = Promise.resolve();
+type RateLane = keyof typeof CONFIG.REQUEST_INTERVAL_MS;
 
-function throttle(): Promise<void> {
-  const next = requestGate.then(() => sleep(CONFIG.MIN_REQUEST_INTERVAL_MS));
-  requestGate = next;
+// One serial rate gate per rate-limit lane. Polymarket budgets /closed-positions & /positions
+// (150 req/10s) separately from the general endpoints (>=200 req/10s), so spacing each lane on
+// its own gate lets the cheap activity/leaderboard calls run in parallel with the expensive
+// closed-position pagination instead of all sharing a single queue. Within a lane, requests
+// still start at least REQUEST_INTERVAL_MS apart so concurrent wallets can't burst past the cap.
+const requestGates: Record<RateLane, Promise<void>> = {
+  restricted: Promise.resolve(),
+  general: Promise.resolve()
+};
+
+function throttle(lane: RateLane): Promise<void> {
+  const next = requestGates[lane].then(() => sleep(CONFIG.REQUEST_INTERVAL_MS[lane]));
+  requestGates[lane] = next;
   return next;
 }
+
+// Lightweight ingest profiling: lets main() compare actual processing time against the gate's
+// theoretical floor (requests * interval) to tell whether we're rate-gate-bound or starving it.
+export const apiStats = {
+  requests: { restricted: 0, general: 0 } as Record<RateLane, number>,
+  retries: 0
+};
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -121,7 +136,11 @@ function timestampToIso(timestamp: number | string): string {
   return new Date(millis).toISOString();
 }
 
-async function fetchJson(path: string, params: URLSearchParams = new URLSearchParams()): Promise<unknown> {
+async function fetchJson(
+  path: string,
+  params: URLSearchParams = new URLSearchParams(),
+  lane: RateLane = "general"
+): Promise<unknown> {
   const url = new URL(path, CONFIG.POLYMARKET_API_BASE);
   params.forEach((value, key) => url.searchParams.set(key, value));
 
@@ -129,7 +148,8 @@ async function fetchJson(path: string, params: URLSearchParams = new URLSearchPa
   let retryAfterMs = 0;
   for (let attempt = 0; attempt <= CONFIG.API_RETRIES; attempt += 1) {
     try {
-      await throttle();
+      await throttle(lane);
+      apiStats.requests[lane] += 1;
       const response = await fetch(url, {
         headers: {
           accept: "application/json",
@@ -150,6 +170,7 @@ async function fetchJson(path: string, params: URLSearchParams = new URLSearchPa
     }
 
     if (attempt < CONFIG.API_RETRIES) {
+      apiStats.retries += 1;
       await sleep(Math.max(retryAfterMs, CONFIG.RETRY_BASE_DELAY_MS * 2 ** attempt));
     }
   }
@@ -233,7 +254,7 @@ export class PolymarketClient {
         sortBy: "TIMESTAMP",
         sortDirection: "DESC"
       });
-      const page = asArray(await fetchJson("/closed-positions", params)).map(mapClosedPosition);
+      const page = asArray(await fetchJson("/closed-positions", params, "restricted")).map(mapClosedPosition);
       positions.push(...page);
       if (page.length < CONFIG.CLOSED_POSITION_PAGE_SIZE) {
         break;
@@ -249,7 +270,7 @@ export class PolymarketClient {
 
   async getCurrentPositions(address: string): Promise<Position[]> {
     const params = new URLSearchParams({ user: address });
-    return asArray(await fetchJson("/positions", params)).map(mapPosition);
+    return asArray(await fetchJson("/positions", params, "restricted")).map(mapPosition);
   }
 
   async getActivity(address: string, limit = CONFIG.ACTIVITY_LIMIT): Promise<TradeActivity[]> {

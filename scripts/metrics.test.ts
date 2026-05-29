@@ -61,6 +61,17 @@ test("computeMetrics derives return, win rate, and drawdown from the realized pa
   assert.equal(m.nTrades, 3);
 });
 
+test("computeMetrics clamps drawdown to 1 when the PnL path dips far below a small early peak", () => {
+  // Cumulative path +10 -> -990: raw ratio (10 - -990)/10 = 100, must be capped at 1.0 so it
+  // stays within max_drawdown's NUMERIC(6,4) column and doesn't blow up the skill-score penalty.
+  const positions = [
+    position({ realizedPnl: 10, closeTime: recentIso(2) }),
+    position({ realizedPnl: -1000, closeTime: recentIso(1) })
+  ];
+  const m = computeMetrics(positions, 30, CONFIG);
+  assert.equal(m.maxDrawdown, 1);
+});
+
 test("computeMetrics excludes positions older than the horizon", () => {
   const positions = [
     position({ realizedPnl: 10, closeTime: recentIso(5) }),

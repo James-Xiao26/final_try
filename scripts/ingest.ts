@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { isSuspectedBot } from "./botDetection.js";
 import { CONFIG } from "./config.js";
 import { computeMetrics, type WalletMetrics } from "./metrics.js";
-import { discoverTopWallets, PolymarketClient, type DiscoveredWallet } from "./polymarket.js";
+import { apiStats, discoverTopWallets, PolymarketClient, type DiscoveredWallet } from "./polymarket.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -144,7 +144,27 @@ interface ProcessResult {
   insufficient: boolean;
 }
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+// Supabase throws PostgrestError-shaped plain objects ({ message, code, details, hint }), not
+// Error instances, so String(reason) yields a useless "[object Object]". Surface the real fields.
+function describeError(reason: unknown): string {
+  if (reason instanceof Error) {
+    return reason.message;
+  }
+  if (reason && typeof reason === "object") {
+    const e = reason as Record<string, unknown>;
+    if (typeof e.message === "string") {
+      return [e.message, e.code && `code=${String(e.code)}`, e.details && `details=${String(e.details)}`, e.hint && `hint=${String(e.hint)}`]
+        .filter(Boolean)
+        .join(" | ");
+    }
+    try {
+      return JSON.stringify(reason);
+    } catch {
+      return String(reason);
+    }
+  }
+  return String(reason);
+}
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -153,15 +173,6 @@ function requiredEnv(name: string): string {
   }
 
   return value;
-}
-
-function chunks<T>(items: T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    result.push(items.slice(index, index + size));
-  }
-
-  return result;
 }
 
 async function upsertMetrics(
@@ -321,29 +332,54 @@ async function main(): Promise<void> {
 
   console.log(`Discovered ${wallets.length} wallets`);
 
-  for (const batch of chunks(wallets, CONFIG.WALLET_BATCH_SIZE)) {
-    const settled = await Promise.allSettled(
-      batch.map((wallet) => processWallet(supabase, polymarket, wallet))
-    );
-
-    settled.forEach((result, index) => {
-      if (result.status === "fulfilled") {
-        processed += 1;
-        bots += result.value.bot ? 1 : 0;
-        insufficient += result.value.insufficient ? 1 : 0;
-      } else {
-        const wallet = batch[index]?.address ?? "unknown";
-        console.error(`Wallet ${wallet} failed: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`);
+  // Worker pool: each worker pulls the next wallet from a shared cursor and never waits on its
+  // siblings, so fast wallets (bots) don't idle behind slow ones (deep-history whales). This keeps
+  // the per-lane rate gates saturated instead of starving them during per-batch stragglers.
+  const processingStartedAt = Date.now();
+  let cursor = 0;
+  const total = wallets.length;
+  const worker = async (): Promise<void> => {
+    while (cursor < total) {
+      const wallet = wallets[cursor];
+      cursor += 1; // single-threaded JS: read+increment is atomic between awaits, so no double-claim.
+      if (!wallet) {
+        continue;
       }
-    });
-
-    console.log(`Processed ${processed}/${wallets.length} wallets (bots=${bots}, insufficient=${insufficient})`);
-    await sleep(CONFIG.BATCH_DELAY_MS);
-  }
+      try {
+        const result = await processWallet(supabase, polymarket, wallet);
+        bots += result.bot ? 1 : 0;
+        insufficient += result.insufficient ? 1 : 0;
+      } catch (reason) {
+        console.error(`Wallet ${wallet.address} failed: ${describeError(reason)}`);
+      }
+      processed += 1;
+      if (processed % 50 === 0 || processed === total) {
+        console.log(`Processed ${processed}/${total} wallets (bots=${bots}, insufficient=${insufficient})`);
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(CONFIG.WALLET_CONCURRENCY, total) }, () => worker())
+  );
+  const processingSeconds = (Date.now() - processingStartedAt) / CONFIG.MS_PER_SECOND;
 
   await rebuildLeaderboardCache(supabase);
   const elapsedSeconds = (Date.now() - startedAt) / CONFIG.MS_PER_SECOND;
   console.log(`Processed ${processed} wallets; excluded bots=${bots}, insufficient=${insufficient}; elapsed=${elapsedSeconds.toFixed(1)}s`);
+
+  // Diagnostic: the restricted lane (closed-positions) is the dominant cost. Its theoretical floor
+  // is requests * interval; if processing took ~that, we're gate-bound (near the rate-limit ceiling)
+  // and only a smaller interval would help. If processing >> floor, time is leaking elsewhere
+  // (Supabase writes, retry backoff) and concurrency/those paths are the lever.
+  const restrictedFloorSeconds =
+    (apiStats.requests.restricted * CONFIG.REQUEST_INTERVAL_MS.restricted) / CONFIG.MS_PER_SECOND;
+  console.log(
+    `API requests: restricted=${apiStats.requests.restricted} general=${apiStats.requests.general} retries=${apiStats.retries}`
+  );
+  console.log(
+    `Processing=${processingSeconds.toFixed(1)}s vs restricted-gate floor=${restrictedFloorSeconds.toFixed(1)}s ` +
+      `(ratio ${(processingSeconds / Math.max(restrictedFloorSeconds, 1)).toFixed(1)}x)`
+  );
 }
 
 main().catch((error) => {
