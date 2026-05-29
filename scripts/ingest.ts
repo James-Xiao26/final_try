@@ -142,6 +142,7 @@ interface ProcessResult {
   address: string;
   bot: boolean;
   insufficient: boolean;
+  summary: string;
 }
 
 // Supabase throws PostgrestError-shaped plain objects ({ message, code, details, hint }), not
@@ -237,8 +238,7 @@ async function processWallet(
   }
 
   if (bot) {
-    console.log(`  ${normalized}: skipped (bot)`);
-    return { address: normalized, bot: true, insufficient: false };
+    return { address: normalized, bot: true, insufficient: false, summary: "skipped (bot)" };
   }
 
   const closedPositions = await client.getClosedPositions(normalized);
@@ -246,12 +246,11 @@ async function processWallet(
 
   await Promise.all(metrics.map((metric) => upsertMetrics(supabase, normalized, metric)));
 
-  console.log(`  ${normalized}: ${closedPositions.length} closed positions`);
-
   return {
     address: normalized,
     bot,
-    insufficient: metrics.every((metric) => metric.skillScore === null)
+    insufficient: metrics.every((metric) => metric.skillScore === null),
+    summary: `${closedPositions.length} closed positions`
   };
 }
 
@@ -270,11 +269,15 @@ async function rebuildLeaderboardCache(supabase: SupabaseClient): Promise<void> 
 
     const candidateAddresses = (data ?? []).map((row) => row.address);
     const allowedWallets = new Set<string>();
-    if (candidateAddresses.length > 0) {
+    // Filter out bot-suspected wallets in chunks: `.in()` serializes every address into the
+    // request URL, so a single call with thousands of candidates overflows the server's URL-length
+    // limit (this is what silently failed the 10k run). Batches keep each URL small.
+    for (let offset = 0; offset < candidateAddresses.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
+      const slice = candidateAddresses.slice(offset, offset + CONFIG.LEADERBOARD_FILTER_CHUNK);
       const { data: walletRows, error: walletsError } = await supabase
         .from("wallets")
         .select("address")
-        .in("address", candidateAddresses)
+        .in("address", slice)
         .eq("is_bot_suspected", false);
 
       if (walletsError) {
@@ -324,6 +327,15 @@ async function main(): Promise<void> {
     requiredEnv("SUPABASE_SERVICE_ROLE_KEY"),
     { auth: { persistSession: false } }
   );
+
+  // Recovery path: rebuild leaderboard_cache from already-ingested wallet_stats without re-fetching
+  // from Polymarket. Useful when processing succeeded but the cache rebuild failed.
+  if (process.argv.includes("--rebuild-only")) {
+    await rebuildLeaderboardCache(supabase);
+    console.log(`Rebuilt leaderboard cache; elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`);
+    return;
+  }
+
   const polymarket = new PolymarketClient();
   const wallets = await discoverTopWallets();
   let processed = 0;
@@ -345,17 +357,17 @@ async function main(): Promise<void> {
       if (!wallet) {
         continue;
       }
+      let summary: string;
       try {
         const result = await processWallet(supabase, polymarket, wallet);
         bots += result.bot ? 1 : 0;
         insufficient += result.insufficient ? 1 : 0;
+        summary = result.summary;
       } catch (reason) {
-        console.error(`Wallet ${wallet.address} failed: ${describeError(reason)}`);
+        summary = `FAILED: ${describeError(reason)}`;
       }
       processed += 1;
-      if (processed % 50 === 0 || processed === total) {
-        console.log(`Processed ${processed}/${total} wallets (bots=${bots}, insufficient=${insufficient})`);
-      }
+      console.log(`[${processed}/${total}] ${wallet.address.toLowerCase()}: ${summary} (bots=${bots}, insufficient=${insufficient})`);
     }
   };
   await Promise.all(
@@ -383,6 +395,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
+  console.error(describeError(error));
   process.exitCode = 1;
 });

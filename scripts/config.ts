@@ -18,7 +18,7 @@ export const CONFIG = {
     MIN_AVG_TRADE_SIZE_USD: 1
   },
   POLYMARKET_API_BASE: process.env.POLYMARKET_API_BASE ?? "https://data-api.polymarket.com",
-  SEED_WALLET_COUNT: 1000,
+  SEED_WALLET_COUNT: 10000,
   API_RETRIES: 5,
   RETRY_BASE_DELAY_MS: 1000,
   // Number of wallets processed concurrently by the worker pool. The per-lane request gates
@@ -40,6 +40,9 @@ export const CONFIG = {
   CLOSED_POSITION_PAGE_SIZE: 50,
   MAX_CLOSED_POSITION_PAGES: 40,
   LEADERBOARD_PAGE_SIZE: 50,
+  // Max addresses per `.in(...)` filter when rebuilding the leaderboard cache. Each address adds
+  // ~45 chars to the request URL, so this bounds URL length below the server's limit at any scale.
+  LEADERBOARD_FILTER_CHUNK: 200,
   TRADES_DISCOVERY_LIMIT: 10000,
   SECONDS_PER_DAY: 86400,
   MS_PER_SECOND: 1000
