@@ -87,7 +87,10 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
       return rows;
     }
 
-    return rows.filter((row) => row.address.toLowerCase().startsWith(normalized));
+    return rows.filter((row) =>
+      row.address.toLowerCase().startsWith(normalized) ||
+      (row.handle?.toLowerCase().includes(normalized) ?? false)
+    );
   }, [query, rows]);
 
   return (

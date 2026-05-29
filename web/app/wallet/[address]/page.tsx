@@ -57,7 +57,7 @@ export default async function WalletPage({ params }: WalletPageProps) {
       <header className="topbar" style={{ marginTop: 24 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <h1 className="brand mono">{profile.isClaimed && profile.handle ? `@${profile.handle}` : shortenAddress(profile.address)}</h1>
+            <h1 className="brand mono">{profile.handle ? `@${profile.handle}` : shortenAddress(profile.address)}</h1>
             <button
               type="button"
               aria-label="Copy wallet address"

@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { isSuspectedBot } from "./botDetection.js";
 import { CONFIG } from "./config.js";
 import { computeMetrics, type WalletMetrics } from "./metrics.js";
-import { discoverTopWallets, PolymarketClient } from "./polymarket.js";
+import { discoverTopWallets, PolymarketClient, type DiscoveredWallet } from "./polymarket.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -206,25 +206,36 @@ async function upsertMetrics(
 async function processWallet(
   supabase: SupabaseClient,
   client: PolymarketClient,
-  address: string
+  wallet: DiscoveredWallet
 ): Promise<ProcessResult> {
-  const normalized = address.toLowerCase();
+  const normalized = wallet.address.toLowerCase();
   const activity = await client.getActivity(normalized);
   const bot = isSuspectedBot(activity, CONFIG.HORIZONS[1], CONFIG);
 
-  const { error: walletError } = await supabase.from("wallets").upsert({
+  const handle = wallet.userName?.trim() || null;
+  const walletRow: Database["public"]["Tables"]["wallets"]["Insert"] = {
     address: normalized,
-    is_bot_suspected: bot
-  }, { onConflict: "address" });
+    is_bot_suspected: bot,
+    // Only set handle when we have one, so re-runs without a name don't wipe a stored handle.
+    ...(handle ? { handle } : {})
+  };
+  const { error: walletError } = await supabase.from("wallets").upsert(walletRow, { onConflict: "address" });
 
   if (walletError) {
     throw walletError;
+  }
+
+  if (bot) {
+    console.log(`  ${normalized}: skipped (bot)`);
+    return { address: normalized, bot: true, insufficient: false };
   }
 
   const closedPositions = await client.getClosedPositions(normalized);
   const metrics = CONFIG.HORIZONS.map((horizon) => computeMetrics(closedPositions, horizon, CONFIG));
 
   await Promise.all(metrics.map((metric) => upsertMetrics(supabase, normalized, metric)));
+
+  console.log(`  ${normalized}: ${closedPositions.length} closed positions`);
 
   return {
     address: normalized,
@@ -321,11 +332,12 @@ async function main(): Promise<void> {
         bots += result.value.bot ? 1 : 0;
         insufficient += result.value.insufficient ? 1 : 0;
       } else {
-        const wallet = batch[index] ?? "unknown";
+        const wallet = batch[index]?.address ?? "unknown";
         console.error(`Wallet ${wallet} failed: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`);
       }
     });
 
+    console.log(`Processed ${processed}/${wallets.length} wallets (bots=${bots}, insufficient=${insufficient})`);
     await sleep(CONFIG.BATCH_DELAY_MS);
   }
 

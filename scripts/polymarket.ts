@@ -54,6 +54,16 @@ type JsonRecord = Record<string, unknown>;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Global rate gate: spaces out the start of every request across all wallets so
+// concurrent pagination can't burst past Polymarket's per-IP limit.
+let requestGate: Promise<void> = Promise.resolve();
+
+function throttle(): Promise<void> {
+  const next = requestGate.then(() => sleep(CONFIG.MIN_REQUEST_INTERVAL_MS));
+  requestGate = next;
+  return next;
+}
+
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -116,8 +126,10 @@ async function fetchJson(path: string, params: URLSearchParams = new URLSearchPa
   params.forEach((value, key) => url.searchParams.set(key, value));
 
   let lastError: Error | null = null;
+  let retryAfterMs = 0;
   for (let attempt = 0; attempt <= CONFIG.API_RETRIES; attempt += 1) {
     try {
+      await throttle();
       const response = await fetch(url, {
         headers: {
           accept: "application/json",
@@ -130,12 +142,15 @@ async function fetchJson(path: string, params: URLSearchParams = new URLSearchPa
       }
 
       lastError = new Error(`Polymarket ${response.status} ${response.statusText} for ${url.toString()}`);
+      const retryAfter = Number(response.headers.get("retry-after"));
+      retryAfterMs = Number.isFinite(retryAfter) ? retryAfter * CONFIG.MS_PER_SECOND : 0;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+      retryAfterMs = 0;
     }
 
     if (attempt < CONFIG.API_RETRIES) {
-      await sleep(CONFIG.RETRY_BASE_DELAY_MS * 2 ** attempt);
+      await sleep(Math.max(retryAfterMs, CONFIG.RETRY_BASE_DELAY_MS * 2 ** attempt));
     }
   }
 
@@ -205,18 +220,26 @@ function mapLeaderboard(record: JsonRecord): LeaderboardEntry {
 
 export class PolymarketClient {
   async getClosedPositions(address: string): Promise<ClosedPosition[]> {
+    // Positions older than the largest scoring horizon are discarded downstream, so stop
+    // paginating once we cross that boundary (the API returns newest-first).
+    const maxHorizonDays = Math.max(...CONFIG.HORIZONS);
+    const cutoffMs = Date.now() - maxHorizonDays * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
     const positions: ClosedPosition[] = [];
-    for (let offset = 0; ; offset += CONFIG.CLOSED_POSITION_PAGE_SIZE) {
+    for (let pageIndex = 0; pageIndex < CONFIG.MAX_CLOSED_POSITION_PAGES; pageIndex += 1) {
       const params = new URLSearchParams({
         user: address,
         limit: String(CONFIG.CLOSED_POSITION_PAGE_SIZE),
-        offset: String(offset),
+        offset: String(pageIndex * CONFIG.CLOSED_POSITION_PAGE_SIZE),
         sortBy: "TIMESTAMP",
         sortDirection: "DESC"
       });
       const page = asArray(await fetchJson("/closed-positions", params)).map(mapClosedPosition);
       positions.push(...page);
       if (page.length < CONFIG.CLOSED_POSITION_PAGE_SIZE) {
+        break;
+      }
+      const oldest = page[page.length - 1];
+      if (oldest && Date.parse(oldest.closeTime) < cutoffMs) {
         break;
       }
     }
@@ -247,8 +270,21 @@ export class PolymarketClient {
   }
 }
 
-export async function discoverTopWallets(): Promise<string[]> {
-  const wallets = new Set<string>();
+export interface DiscoveredWallet {
+  address: string;
+  userName: string | null;
+}
+
+export async function discoverTopWallets(): Promise<DiscoveredWallet[]> {
+  const wallets = new Map<string, string | null>();
+  const remember = (address: string, userName: string | null): void => {
+    if (!address.startsWith("0x")) {
+      return;
+    }
+    const existing = wallets.get(address);
+    // Keep the first non-null name we see; never downgrade a known name to null.
+    wallets.set(address, existing ?? userName);
+  };
 
   try {
     for (let offset = 0; wallets.size < CONFIG.SEED_WALLET_COUNT; offset += CONFIG.LEADERBOARD_PAGE_SIZE) {
@@ -260,11 +296,7 @@ export async function discoverTopWallets(): Promise<string[]> {
         offset: String(offset)
       });
       const page = asArray(await fetchJson("/v1/leaderboard", params)).map(mapLeaderboard);
-      page.forEach((entry) => {
-        if (entry.proxyWallet.startsWith("0x")) {
-          wallets.add(entry.proxyWallet);
-        }
-      });
+      page.forEach((entry) => remember(entry.proxyWallet, entry.userName));
 
       if (page.length < CONFIG.LEADERBOARD_PAGE_SIZE) {
         break;
@@ -287,14 +319,11 @@ export async function discoverTopWallets(): Promise<string[]> {
         readString(trade, ["taker", "takerAddress"]),
         readString(trade, ["proxyWallet", "user", "wallet"])
       ];
-      candidates.forEach((candidate) => {
-        const normalized = candidate.toLowerCase();
-        if (normalized.startsWith("0x")) {
-          wallets.add(normalized);
-        }
-      });
+      candidates.forEach((candidate) => remember(candidate.toLowerCase(), null));
     });
   }
 
-  return [...wallets].slice(0, CONFIG.SEED_WALLET_COUNT);
+  return [...wallets.entries()]
+    .slice(0, CONFIG.SEED_WALLET_COUNT)
+    .map(([address, userName]) => ({ address, userName }));
 }

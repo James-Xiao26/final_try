@@ -14,7 +14,7 @@ export default function WalletSearch({ value, onChange }: WalletSearchProps) {
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="Filter address prefix"
+        placeholder="Filter by name or address"
         className="mono"
         style={{
           width: "100%",
