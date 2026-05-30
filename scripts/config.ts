@@ -1,6 +1,6 @@
 export const CONFIG = {
   HORIZONS: [30, 90] as const,
-  TOP_N: 500,
+  TOP_N: 100,
   MIN_TRADES: 20,
   MIN_VOLUME_USD: 100,
   // Min volume-weighted average entry price (USD/share). Longshot traders who only buy sub-cent
@@ -23,7 +23,7 @@ export const CONFIG = {
     MIN_AVG_TRADE_SIZE_USD: 1
   },
   POLYMARKET_API_BASE: process.env.POLYMARKET_API_BASE ?? "https://data-api.polymarket.com",
-  SEED_WALLET_COUNT: 10000,
+  SEED_WALLET_COUNT: 1000,
   API_RETRIES: 5,
   RETRY_BASE_DELAY_MS: 1000,
   // Number of wallets processed concurrently by the worker pool. The per-lane request gates

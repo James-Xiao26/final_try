@@ -328,6 +328,26 @@ async function rebuildLeaderboardCache(supabase: SupabaseClient): Promise<void> 
   }
 }
 
+// Clear the computed tables so a re-ingest starts fresh. Stale rows from a prior, larger run would
+// otherwise linger in wallet_stats and contaminate the rebuilt leaderboard (rebuildLeaderboardCache
+// ranks across ALL wallet_stats rows). The wallets table is left intact — ingest re-upserts it.
+// Each delete needs a filter because supabase-js refuses unconditional deletes; `horizon_days >= 0`
+// matches every row.
+async function resetComputedTables(supabase: SupabaseClient): Promise<void> {
+  const { error: lbError } = await supabase.from("leaderboard_cache").delete().gte("horizon_days", 0);
+  if (lbError) {
+    throw lbError;
+  }
+  const { error: curveError } = await supabase.from("equity_curve").delete().gte("horizon_days", 0);
+  if (curveError) {
+    throw curveError;
+  }
+  const { error: statsError } = await supabase.from("wallet_stats").delete().gte("horizon_days", 0);
+  if (statsError) {
+    throw statsError;
+  }
+}
+
 async function main(): Promise<void> {
   const startedAt = Date.now();
   const supabase = createClient<Database>(
@@ -342,6 +362,13 @@ async function main(): Promise<void> {
     await rebuildLeaderboardCache(supabase);
     console.log(`Rebuilt leaderboard cache; elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`);
     return;
+  }
+
+  // Opt-in fresh start: wipe computed tables before ingesting so stale rows from a prior run don't
+  // linger. Placed after --rebuild-only so the two flags never combine to wipe-then-rebuild-empty.
+  if (process.argv.includes("--reset")) {
+    await resetComputedTables(supabase);
+    console.log("Reset: cleared wallet_stats, equity_curve, and leaderboard_cache");
   }
 
   const polymarket = new PolymarketClient();
