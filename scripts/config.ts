@@ -1,6 +1,6 @@
 export const CONFIG = {
   HORIZONS: [30, 90] as const,
-  TOP_N: 100,
+  TOP_N: 500,
   MIN_TRADES: 20,
   MIN_VOLUME_USD: 100,
   // Min volume-weighted average entry price (USD/share). Longshot traders who only buy sub-cent
@@ -44,6 +44,10 @@ export const CONFIG = {
   ACTIVITY_LIMIT: 500,
   CLOSED_POSITION_PAGE_SIZE: 50,
   MAX_CLOSED_POSITION_PAGES: 40,
+  // /positions pagination: resolved-but-unredeemed positions (abandoned losers, unredeemed winners)
+  // are folded into the metric set so the score reflects real edge, not just redeemed winners.
+  POSITION_PAGE_SIZE: 500,
+  MAX_POSITION_PAGES: 40,
   LEADERBOARD_PAGE_SIZE: 50,
   // Max addresses per `.in(...)` filter when rebuilding the leaderboard cache. Each address adds
   // ~45 chars to the request URL, so this bounds URL length below the server's limit at any scale.

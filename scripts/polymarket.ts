@@ -26,6 +26,9 @@ export interface Position {
   realizedPnl: number;
   curPrice: number;
   endDate: string | null;
+  // True once the market has resolved (the position is settleable). Distinguishes resolved-but-
+  // unredeemed positions (which carry a realized win/loss) from genuinely-open ones.
+  redeemable: boolean;
 }
 
 export interface TradeActivity {
@@ -207,8 +210,38 @@ function mapPosition(record: JsonRecord): Position {
     cashPnl: readNumber(record, ["cashPnl"]),
     realizedPnl: readNumber(record, ["realizedPnl", "realizedPnL"]),
     curPrice: readNumber(record, ["curPrice", "price"]),
-    endDate: readString(record, ["endDate"]) || null
+    endDate: readString(record, ["endDate"]) || null,
+    redeemable: record.redeemable === true
   };
+}
+
+// endDate on a position is a calendar date string ("2026-05-10"), not a numeric timestamp, so it
+// needs Date.parse (timestampToIso would Number() it to NaN and fall back to the epoch).
+function isoFromEndDate(endDate: string | null): string {
+  const ms = endDate ? Date.parse(endDate) : NaN;
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : new Date(0).toISOString();
+}
+
+// Convert resolved-but-unredeemed positions into ClosedPosition records so they can be scored
+// alongside actually-closed positions. `/closed-positions` only contains positions the trader sold
+// or redeemed — i.e. winners — so without this the metric set is winner-biased (abandoned losers
+// that resolved to $0 never appear). cashPnl already equals currentValue - initialValue, giving the
+// realized win/loss; endDate is the resolution time. Genuinely-open (redeemable=false) positions are
+// dropped: they have no realized outcome yet.
+export function resolvedToClosed(positions: Position[]): ClosedPosition[] {
+  return positions
+    .filter((position) => position.redeemable)
+    .map((position) => ({
+      proxyWallet: position.proxyWallet,
+      asset: position.asset,
+      conditionId: position.conditionId,
+      market: position.market,
+      outcomeIndex: position.outcomeIndex,
+      size: position.size,
+      avgPrice: position.avgPrice,
+      realizedPnl: position.cashPnl,
+      closeTime: isoFromEndDate(position.endDate)
+    }));
 }
 
 function mapActivity(record: JsonRecord): TradeActivity {
@@ -269,8 +302,27 @@ export class PolymarketClient {
   }
 
   async getCurrentPositions(address: string): Promise<Position[]> {
-    const params = new URLSearchParams({ user: address });
-    return asArray(await fetchJson("/positions", params, "restricted")).map(mapPosition);
+    // /positions defaults to 100 rows; paginate so heavy accounts' full holdings are captured.
+    const positions: Position[] = [];
+    for (let pageIndex = 0; pageIndex < CONFIG.MAX_POSITION_PAGES; pageIndex += 1) {
+      const params = new URLSearchParams({
+        user: address,
+        limit: String(CONFIG.POSITION_PAGE_SIZE),
+        offset: String(pageIndex * CONFIG.POSITION_PAGE_SIZE)
+      });
+      const page = asArray(await fetchJson("/positions", params, "restricted")).map(mapPosition);
+      positions.push(...page);
+      if (page.length < CONFIG.POSITION_PAGE_SIZE) {
+        break;
+      }
+    }
+
+    return positions;
+  }
+
+  // Resolved-but-unredeemed positions, shaped as ClosedPosition so they merge with getClosedPositions.
+  async getResolvedPositions(address: string): Promise<ClosedPosition[]> {
+    return resolvedToClosed(await this.getCurrentPositions(address));
   }
 
   async getActivity(address: string, limit = CONFIG.ACTIVITY_LIMIT): Promise<TradeActivity[]> {

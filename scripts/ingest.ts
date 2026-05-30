@@ -241,8 +241,16 @@ async function processWallet(
     return { address: normalized, bot: true, insufficient: false, summary: "skipped (bot)" };
   }
 
-  const closedPositions = await client.getClosedPositions(normalized);
-  const metrics = CONFIG.HORIZONS.map((horizon) => computeMetrics(closedPositions, horizon, CONFIG));
+  // Merge actually-closed positions with resolved-but-unredeemed ones. /closed-positions holds only
+  // positions the trader sold/redeemed (winner-biased, since $0 losers get abandoned, not redeemed);
+  // the resolved-unredeemed set restores those losses so the score reflects real edge. The two
+  // endpoints are disjoint (sold/redeemed vs current holding), so they concatenate without dedup.
+  const [closedPositions, resolvedPositions] = await Promise.all([
+    client.getClosedPositions(normalized),
+    client.getResolvedPositions(normalized)
+  ]);
+  const positions = [...closedPositions, ...resolvedPositions];
+  const metrics = CONFIG.HORIZONS.map((horizon) => computeMetrics(positions, horizon, CONFIG));
 
   await Promise.all(metrics.map((metric) => upsertMetrics(supabase, normalized, metric)));
 
@@ -250,7 +258,7 @@ async function processWallet(
     address: normalized,
     bot,
     insufficient: metrics.every((metric) => metric.skillScore === null),
-    summary: `${closedPositions.length} closed positions`
+    summary: `${closedPositions.length} closed + ${resolvedPositions.length} resolved positions`
   };
 }
 

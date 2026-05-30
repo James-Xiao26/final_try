@@ -84,6 +84,28 @@ test("computeMetrics computes a volume-weighted average entry price", () => {
   assert.equal(m.avgEntryPrice, 0.4);
 });
 
+test("computeMetrics folds resolved losses in, lowering win rate and return", () => {
+  // Three winners alone => 100% win rate, positive return (the old winner-biased view).
+  const winnersOnly = [
+    position({ realizedPnl: 100, size: 100, avgPrice: 0.5, closeTime: recentIso(3) }),
+    position({ realizedPnl: 80, size: 100, avgPrice: 0.5, closeTime: recentIso(2) }),
+    position({ realizedPnl: 120, size: 100, avgPrice: 0.5, closeTime: recentIso(1) })
+  ];
+  const biased = computeMetrics(winnersOnly, 30, CONFIG);
+  assert.equal(biased.winRate, 1);
+
+  // Add two resolved losers (as resolvedToClosed would produce: realizedPnl < 0). Win rate and
+  // return must drop once the abandoned losses are counted.
+  const withLosses = [
+    ...winnersOnly,
+    position({ realizedPnl: -200, size: 400, avgPrice: 0.5, closeTime: recentIso(2) }),
+    position({ realizedPnl: -150, size: 300, avgPrice: 0.5, closeTime: recentIso(1) })
+  ];
+  const corrected = computeMetrics(withLosses, 30, CONFIG);
+  assert.equal(corrected.winRate, 0.6); // 3 wins of 5
+  assert.ok(corrected.pctReturn < biased.pctReturn);
+});
+
 test("computeMetrics excludes positions older than the horizon", () => {
   const positions = [
     position({ realizedPnl: 10, closeTime: recentIso(5) }),
