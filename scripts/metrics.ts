@@ -14,6 +14,7 @@ export interface WalletMetrics {
   maxDrawdown: number;
   totalPnlUsd: number;
   totalVolumeUsd: number;
+  avgEntryPrice: number;
   nTrades: number;
   outlierFlag: boolean;
   equityCurve: EquityPoint[];
@@ -62,6 +63,10 @@ export function computeMetrics(
 
   const totalPnlUsd = positions.reduce((sum, position) => sum + position.realizedPnl, 0);
   const totalVolumeUsd = positions.reduce((sum, position) => sum + position.size * position.avgPrice, 0);
+  const totalShares = positions.reduce((sum, position) => sum + position.size, 0);
+  // Volume-weighted average entry price = total cost / total shares. Catches longshot wallets
+  // whose capital sits in cheap shares (see MIN_AVG_ENTRY_PRICE gate in computeSkillScore).
+  const avgEntryPrice = totalShares > 0 ? totalVolumeUsd / totalShares : 0;
   const pctReturn = totalVolumeUsd > 0 ? totalPnlUsd / totalVolumeUsd : 0;
   const wins = positions.filter((position) => position.realizedPnl > 0).length;
   const winRate = positions.length > 0 ? wins / positions.length : 0;
@@ -94,6 +99,7 @@ export function computeMetrics(
     maxDrawdown: round(maxDrawdown, 4),
     totalPnlUsd: round(totalPnlUsd, 2),
     totalVolumeUsd: round(totalVolumeUsd, 2),
+    avgEntryPrice: round(avgEntryPrice, 4),
     nTrades: positions.length,
     outlierFlag,
     equityCurve: buildDailyCurve(positions)
@@ -110,12 +116,14 @@ export function computeMetrics(
  * A single `confidence` value (a sqrt ramp in trade count, so it tracks how standard error shrinks
  * with sample size) is used two ways: as an additive depth reward weighted by SKILL_WEIGHTS.sampleSize,
  * and as a multiplier that discounts — but never guts — thin samples, bounded below by SAMPLE_CONFIDENCE_FLOOR.
- * Ineligible wallets receive null when the sample is too small, volume is too low, or one win dominates PnL.
+ * Ineligible wallets receive null when the sample is too small, volume is too low, one win dominates
+ * PnL, or the wallet is a sub-cent longshot trader (low volume-weighted average entry price).
  */
 export function computeSkillScore(metrics: WalletMetrics, config: typeof CONFIG): number | null {
   if (
     metrics.nTrades < config.MIN_TRADES ||
     metrics.totalVolumeUsd < config.MIN_VOLUME_USD ||
+    metrics.avgEntryPrice < config.MIN_AVG_ENTRY_PRICE ||
     metrics.outlierFlag
   ) {
     return null;

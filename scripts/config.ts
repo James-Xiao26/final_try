@@ -3,7 +3,12 @@ export const CONFIG = {
   TOP_N: 100,
   MIN_TRADES: 20,
   MIN_VOLUME_USD: 100,
-  OUTLIER_TRADE_FRACTION: 0.7,
+  // Min volume-weighted average entry price (USD/share). Longshot traders who only buy sub-cent
+  // shares have a tiny capital-proxy denominator, which inflates pctReturn and distorts the score;
+  // this gate excludes them. Volume-weighted (not median) so a few small dust bets among normal
+  // positions don't trip it — only wallets whose *capital* sits in cheap shares are caught.
+  MIN_AVG_ENTRY_PRICE: 0.02,
+  OUTLIER_TRADE_FRACTION: 0.6,
   SKILL_WEIGHTS: {
     pctReturn: 0.5,
     winRate: 0.25,

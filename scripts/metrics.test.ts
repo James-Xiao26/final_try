@@ -31,6 +31,7 @@ function metrics(overrides: Partial<WalletMetrics> = {}): WalletMetrics {
     maxDrawdown: 0.1,
     totalPnlUsd: 1000,
     totalVolumeUsd: 5000,
+    avgEntryPrice: 0.5,
     nTrades: CONFIG.MIN_TRADES,
     outlierFlag: false,
     equityCurve: [],
@@ -72,6 +73,17 @@ test("computeMetrics clamps drawdown to 1 when the PnL path dips far below a sma
   assert.equal(m.maxDrawdown, 1);
 });
 
+test("computeMetrics computes a volume-weighted average entry price", () => {
+  // 100 shares @ $0.10 + 300 shares @ $0.50: cost 10 + 150 = 160 over 400 shares => $0.40.
+  // A simple mean of the two prices would be $0.30, so this confirms share-weighting.
+  const positions = [
+    position({ size: 100, avgPrice: 0.1, closeTime: recentIso(2) }),
+    position({ size: 300, avgPrice: 0.5, closeTime: recentIso(1) })
+  ];
+  const m = computeMetrics(positions, 30, CONFIG);
+  assert.equal(m.avgEntryPrice, 0.4);
+});
+
 test("computeMetrics excludes positions older than the horizon", () => {
   const positions = [
     position({ realizedPnl: 10, closeTime: recentIso(5) }),
@@ -100,6 +112,12 @@ test("computeSkillScore is null below the trade minimum", () => {
 
 test("computeSkillScore is null below the volume minimum", () => {
   assert.equal(computeSkillScore(metrics({ totalVolumeUsd: CONFIG.MIN_VOLUME_USD - 1 }), CONFIG), null);
+});
+
+test("computeSkillScore is null for sub-cent longshot traders (low avg entry price)", () => {
+  assert.equal(computeSkillScore(metrics({ avgEntryPrice: 0.005 }), CONFIG), null);
+  // At/above the floor, the wallet stays eligible (gate is strict less-than).
+  assert.ok(computeSkillScore(metrics({ avgEntryPrice: CONFIG.MIN_AVG_ENTRY_PRICE }), CONFIG) !== null);
 });
 
 test("computeSkillScore is null when a single win dominates PnL", () => {
