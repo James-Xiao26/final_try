@@ -18,9 +18,22 @@ export const CONFIG = {
   DRAWDOWN_PENALTY_THRESHOLD: 0.2,
   SAMPLE_CONFIDENCE_FLOOR: 0.6,
   BOT: {
-    MAX_TRADES_PER_DAY: 50,
+    // Calibrated against a working trades/day denominator (see MIN_RATE_WINDOW_DAYS). The old 50
+    // was a dead constant: activity is capped at ACTIVITY_LIMIT and the rate used to be divided by
+    // a fixed horizon, so the check could never exceed ~5.6/day and never fired. With the observed
+    // span as denominator, 50/day swept up ~63% of leaderboard-seeded (i.e. very active) traders.
+    // 250 flags only the sustained high-frequency tail — the 500-trade sample caps measurable rate
+    // near 500/day, so real market-making bots cluster high while discretionary traders sit well
+    // below even on event days. Retune from the trades/day distribution if exclusions look off.
+    MAX_TRADES_PER_DAY: 250,
     MAX_SIMULTANEOUS_MARKETS: 30,
-    MIN_AVG_TRADE_SIZE_USD: 1
+    MIN_AVG_TRADE_SIZE_USD: 1,
+    // Floor (days) for the trades/day denominator. /activity returns the most recent
+    // ACTIVITY_LIMIT trades with no date filter, so trades/day is computed over the span the
+    // returned trades actually occupy (max - min timestamp), not a fixed horizon. This floor
+    // stops a handful of quick trades in a single session from dividing by a near-zero window
+    // and looking automated, while a genuine burst (>MAX_TRADES_PER_DAY within a day) still trips.
+    MIN_RATE_WINDOW_DAYS: 1
   },
   POLYMARKET_API_BASE: process.env.POLYMARKET_API_BASE ?? "https://data-api.polymarket.com",
   SEED_WALLET_COUNT: 1000,

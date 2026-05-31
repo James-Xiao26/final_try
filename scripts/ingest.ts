@@ -1,6 +1,6 @@
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
-import { isSuspectedBot } from "./botDetection.js";
+import { botSignal, type BotSignal } from "./botDetection.js";
 import { CONFIG } from "./config.js";
 import { computeMetrics, type WalletMetrics } from "./metrics.js";
 import { apiStats, discoverTopWallets, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet } from "./polymarket.js";
@@ -144,6 +144,7 @@ type SupabaseClient = ReturnType<typeof createClient<Database>>;
 interface ProcessResult {
   address: string;
   bot: boolean;
+  botReason: BotSignal | null;
   insufficient: boolean;
   summary: string;
 }
@@ -226,7 +227,8 @@ async function processWallet(
 ): Promise<ProcessResult> {
   const normalized = wallet.address.toLowerCase();
   const activity = await client.getActivity(normalized);
-  const bot = isSuspectedBot(activity, CONFIG.HORIZONS[1], CONFIG);
+  const botReason = botSignal(activity, CONFIG);
+  const bot = botReason !== null;
 
   const handle = wallet.userName?.trim() || null;
   const walletRow: Database["public"]["Tables"]["wallets"]["Insert"] = {
@@ -242,7 +244,7 @@ async function processWallet(
   }
 
   if (bot) {
-    return { address: normalized, bot: true, insufficient: false, summary: "skipped (bot)" };
+    return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})` };
   }
 
   // Merge actually-closed positions with resolved-but-unredeemed ones. /closed-positions holds only
@@ -265,6 +267,7 @@ async function processWallet(
   return {
     address: normalized,
     bot,
+    botReason,
     insufficient: metrics.every((metric) => metric.skillScore === null),
     summary: `${closedPositions.length} closed + ${resolvedPositions.length} resolved positions`
   };
@@ -384,6 +387,7 @@ async function main(): Promise<void> {
   let processed = 0;
   let bots = 0;
   let insufficient = 0;
+  const botBreakdown: Record<BotSignal, number> = { trade_rate: 0, dust_trades: 0, simultaneous_markets: 0 };
 
   console.log(`Discovered ${wallets.length} wallets`);
 
@@ -404,6 +408,9 @@ async function main(): Promise<void> {
       try {
         const result = await processWallet(supabase, polymarket, wallet);
         bots += result.bot ? 1 : 0;
+        if (result.botReason) {
+          botBreakdown[result.botReason] += 1;
+        }
         insufficient += result.insufficient ? 1 : 0;
         summary = result.summary;
       } catch (reason) {
@@ -421,6 +428,7 @@ async function main(): Promise<void> {
   await rebuildLeaderboardCache(supabase);
   const elapsedSeconds = (Date.now() - startedAt) / CONFIG.MS_PER_SECOND;
   console.log(`Processed ${processed} wallets; excluded bots=${bots}, insufficient=${insufficient}; elapsed=${elapsedSeconds.toFixed(1)}s`);
+  console.log(`Bot breakdown: trade_rate=${botBreakdown.trade_rate}, dust_trades=${botBreakdown.dust_trades}, simultaneous_markets=${botBreakdown.simultaneous_markets}`);
 
   // Diagnostic: the restricted lane (closed-positions) is the dominant cost. Its theoretical floor
   // is requests * interval; if processing took ~that, we're gate-bound (near the rate-limit ceiling)
