@@ -9,20 +9,17 @@ export const CONFIG = {
   // positions don't trip it — only wallets whose *capital* sits in cheap shares are caught.
   MIN_AVG_ENTRY_PRICE: 0.02,
   OUTLIER_TRADE_FRACTION: 0.6,
-  // Additive reward weights (drawdown is subtracted as a penalty). The positive weights
-  // (pctReturn + edge + winRate + sampleSize) sum to 0.85, matching the pre-edge total so the
-  // score stays on the same ~0-850 scale. `edge` is forecasting edge: entry price vs. the market's
-  // eventual resolution (see computeMetrics), weighted by its own nResolved confidence ramp so a
-  // few lucky resolved bets don't move it. It overlaps pctReturn by design — both reward being
-  // right — but edge isolates prediction from exit/trading skill.
+  // Additive reward weights, summing to 0.85 (the score stays on the same ~0-850 scale as before).
+  // `edge` is forecasting edge: entry price vs. the market's eventual resolution (see
+  // computeMetrics), weighted by its own nResolved confidence ramp so a few lucky resolved bets
+  // don't move it. It overlaps pctReturn by design — both reward being right — but edge isolates
+  // prediction from exit/trading skill.
   SKILL_WEIGHTS: {
     pctReturn: 0.4,
     edge: 0.2,
     winRate: 0.2,
-    drawdown: 0.15,
     sampleSize: 0.05
   },
-  DRAWDOWN_PENALTY_THRESHOLD: 0.2,
   SAMPLE_CONFIDENCE_FLOOR: 0.6,
   // Resolved-position count at which the edge term reaches full weight (saturates at 3x, like the
   // trade-count ramp). Below it, edge is discounted toward 0 — a 5pp edge over a handful of

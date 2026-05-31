@@ -12,7 +12,7 @@ export default async function HomePage() {
         <div>
           <h1 className="brand">WhaleWatcher</h1>
           <p className="subtitle">
-            Polymarket traders ranked by risk-adjusted realized skill: return, win rate, drawdown, sample size, and outlier discipline.
+            Polymarket traders ranked by risk-adjusted realized skill: return, forecasting edge, win rate, sample size, and outlier discipline.
           </p>
         </div>
         <div className="mono muted">PUBLIC LEADERBOARD / 90D</div>

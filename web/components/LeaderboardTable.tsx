@@ -126,7 +126,6 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
               <th style={{ padding: "12px" }}>SKILL</th>
               <th style={{ padding: "12px" }}>RETURN</th>
               <th style={{ padding: "12px" }}>WIN RATE</th>
-              <th style={{ padding: "12px" }}>MDD</th>
               <th style={{ padding: "12px" }}>N</th>
             </tr>
           </thead>
@@ -176,7 +175,6 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
                   {formatPercent(row.pctReturn, true)}
                 </td>
                 <td className="mono" style={{ padding: "12px" }}>{formatPercent(row.winRate)}</td>
-                <td className="mono negative" style={{ padding: "12px" }}>{formatPercent(row.maxDrawdown)}</td>
                 <td className="mono" style={{ padding: "12px" }}>{formatNumber(row.nTrades)}</td>
               </tr>
             ))}

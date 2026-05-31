@@ -32,8 +32,6 @@ export default function MetricsCard({ horizonDays, metrics }: MetricsCardProps) 
         </dd>
         <dt className="muted">Win Rate</dt>
         <dd className="mono" style={{ margin: 0 }}>{formatPercent(metrics.winRate)}</dd>
-        <dt className="muted">MDD</dt>
-        <dd className="mono negative" style={{ margin: 0 }}>{formatPercent(metrics.maxDrawdown)}</dd>
         <dt className="muted">Total P/L / Vol</dt>
         <dd className="mono" style={{ margin: 0 }} title="Total P/L includes current unrealized PnL on open positions">{formatUsd(metrics.totalPnlUsd)} / {formatUsd(metrics.totalVolumeUsd)}</dd>
         <dt className="muted">N</dt>

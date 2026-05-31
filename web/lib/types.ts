@@ -6,9 +6,7 @@ export interface LeaderboardRow {
   address: string;
   skillScore: number;
   pctReturn: number;
-  winRate: number;
-  maxDrawdown: number;
-  nTrades: number;
+  winRate: number;  nTrades: number;
   handle: string | null;
 }
 
@@ -16,9 +14,7 @@ export interface WalletMetrics {
   horizonDays: number;
   skillScore: number | null;
   pctReturn: number;
-  winRate: number;
-  maxDrawdown: number;
-  totalPnlUsd: number;
+  winRate: number;  totalPnlUsd: number;
   unrealizedPnlUsd: number;
   totalVolumeUsd: number;
   nTrades: number;
@@ -78,9 +74,7 @@ export interface Database {
           horizon_days: number;
           skill_score: number | null;
           pct_return: number | null;
-          win_rate: number | null;
-          max_drawdown: number | null;
-          total_pnl_usd: number | null;
+          win_rate: number | null;          total_pnl_usd: number | null;
           unrealized_pnl_usd: number | null;
           total_volume_usd: number | null;
           n_trades: number | null;
@@ -94,9 +88,7 @@ export interface Database {
           horizon_days: number;
           skill_score?: number | null;
           pct_return?: number | null;
-          win_rate?: number | null;
-          max_drawdown?: number | null;
-          total_pnl_usd?: number | null;
+          win_rate?: number | null;          total_pnl_usd?: number | null;
           unrealized_pnl_usd?: number | null;
           total_volume_usd?: number | null;
           n_trades?: number | null;
@@ -108,9 +100,7 @@ export interface Database {
         Update: {
           skill_score?: number | null;
           pct_return?: number | null;
-          win_rate?: number | null;
-          max_drawdown?: number | null;
-          total_pnl_usd?: number | null;
+          win_rate?: number | null;          total_pnl_usd?: number | null;
           unrealized_pnl_usd?: number | null;
           total_volume_usd?: number | null;
           n_trades?: number | null;
@@ -147,9 +137,7 @@ export interface Database {
           address: string;
           skill_score: number | null;
           pct_return: number | null;
-          win_rate: number | null;
-          max_drawdown: number | null;
-          n_trades: number | null;
+          win_rate: number | null;          n_trades: number | null;
           cached_at: string;
         };
         Insert: {
@@ -158,17 +146,13 @@ export interface Database {
           address: string;
           skill_score?: number | null;
           pct_return?: number | null;
-          win_rate?: number | null;
-          max_drawdown?: number | null;
-          n_trades?: number | null;
+          win_rate?: number | null;          n_trades?: number | null;
           cached_at?: string;
         };
         Update: {
           skill_score?: number | null;
           pct_return?: number | null;
-          win_rate?: number | null;
-          max_drawdown?: number | null;
-          n_trades?: number | null;
+          win_rate?: number | null;          n_trades?: number | null;
           cached_at?: string;
         };
         Relationships: [];

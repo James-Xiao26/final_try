@@ -45,9 +45,7 @@ interface Database {
           horizon_days: number;
           skill_score: number | null;
           pct_return: number;
-          win_rate: number;
-          max_drawdown: number;
-          total_pnl_usd: number;
+          win_rate: number;          total_pnl_usd: number;
           unrealized_pnl_usd: number | null;
           total_volume_usd: number;
           n_trades: number;
@@ -61,9 +59,7 @@ interface Database {
           horizon_days: number;
           skill_score: number | null;
           pct_return: number;
-          win_rate: number;
-          max_drawdown: number;
-          total_pnl_usd: number;
+          win_rate: number;          total_pnl_usd: number;
           unrealized_pnl_usd?: number | null;
           total_volume_usd: number;
           n_trades: number;
@@ -75,9 +71,7 @@ interface Database {
         Update: {
           skill_score?: number | null;
           pct_return?: number;
-          win_rate?: number;
-          max_drawdown?: number;
-          total_pnl_usd?: number;
+          win_rate?: number;          total_pnl_usd?: number;
           unrealized_pnl_usd?: number | null;
           total_volume_usd?: number;
           n_trades?: number;
@@ -114,9 +108,7 @@ interface Database {
           address: string;
           skill_score: number | null;
           pct_return: number;
-          win_rate: number;
-          max_drawdown: number;
-          n_trades: number;
+          win_rate: number;          n_trades: number;
           cached_at: string;
         };
         Insert: {
@@ -125,17 +117,13 @@ interface Database {
           address: string;
           skill_score: number | null;
           pct_return: number;
-          win_rate: number;
-          max_drawdown: number;
-          n_trades: number;
+          win_rate: number;          n_trades: number;
           cached_at?: string;
         };
         Update: {
           skill_score?: number | null;
           pct_return?: number;
-          win_rate?: number;
-          max_drawdown?: number;
-          n_trades?: number;
+          win_rate?: number;          n_trades?: number;
           cached_at?: string;
         };
         Relationships: [];
@@ -200,7 +188,6 @@ async function upsertMetrics(
     skill_score: metrics.skillScore,
     pct_return: metrics.pctReturn,
     win_rate: metrics.winRate,
-    max_drawdown: metrics.maxDrawdown,
     total_pnl_usd: metrics.totalPnlUsd,
     unrealized_pnl_usd: metrics.unrealizedPnlUsd,
     total_volume_usd: metrics.totalVolumeUsd,
@@ -289,7 +276,7 @@ async function rebuildLeaderboardCache(supabase: SupabaseClient): Promise<void> 
   for (const horizon of CONFIG.HORIZONS) {
     const { data, error } = await supabase
       .from("wallet_stats")
-      .select("address, skill_score, pct_return, win_rate, max_drawdown, n_trades")
+      .select("address, skill_score, pct_return, win_rate, n_trades")
       .eq("horizon_days", horizon)
       .not("skill_score", "is", null)
       .order("skill_score", { ascending: false });
@@ -337,7 +324,6 @@ async function rebuildLeaderboardCache(supabase: SupabaseClient): Promise<void> 
         skill_score: row.skill_score,
         pct_return: row.pct_return,
         win_rate: row.win_rate,
-        max_drawdown: row.max_drawdown,
         n_trades: row.n_trades,
         cached_at: new Date().toISOString()
       }));
