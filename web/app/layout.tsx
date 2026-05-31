@@ -10,7 +10,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EdgeBoard",
+  title: "WhaleWatcher",
   description: "Risk-adjusted Polymarket trader leaderboard."
 };
 

@@ -30,6 +30,7 @@ function metrics(overrides: Partial<WalletMetrics> = {}): WalletMetrics {
     winRate: 0.65,
     maxDrawdown: 0.1,
     totalPnlUsd: 1000,
+    unrealizedPnlUsd: 0,
     totalVolumeUsd: 5000,
     avgEntryPrice: 0.5,
     nTrades: CONFIG.MIN_TRADES,
@@ -124,6 +125,52 @@ test("computeMetrics handles an empty position set without dividing by zero", ()
   assert.equal(m.winRate, 0);
   assert.equal(m.totalVolumeUsd, 0);
   assert.equal(m.skillScore, null);
+  assert.equal(m.equityCurve.length, 0); // no closed positions and no open exposure => empty curve
+});
+
+// --- computeMetrics: Total P/L (realized + current unrealized) --------------
+
+test("computeMetrics folds current unrealized PnL into totalPnlUsd and the curve endpoint", () => {
+  const positions = [
+    position({ realizedPnl: 100, closeTime: recentIso(3) }),
+    position({ realizedPnl: 50, closeTime: recentIso(1) })
+  ];
+  const m = computeMetrics(positions, 30, CONFIG, 75);
+  assert.equal(m.unrealizedPnlUsd, 75);
+  assert.equal(m.totalPnlUsd, 225); // realized 150 + unrealized 75
+  // Final curve point is marked to market: realized cumulative 150 + unrealized 75.
+  assert.equal(m.equityCurve[m.equityCurve.length - 1]?.cumulativePnl, 225);
+});
+
+test("computeMetrics lets a negative unrealized (open loser) drag the total below realized", () => {
+  const positions = [position({ realizedPnl: 100, closeTime: recentIso(1) })];
+  const m = computeMetrics(positions, 30, CONFIG, -160);
+  assert.equal(m.unrealizedPnlUsd, -160);
+  assert.equal(m.totalPnlUsd, -60); // realized 100 + unrealized -160
+  assert.equal(m.equityCurve[m.equityCurve.length - 1]?.cumulativePnl, -60);
+});
+
+test("computeMetrics with only open exposure emits a single today point", () => {
+  const m = computeMetrics([], 30, CONFIG, 40);
+  assert.equal(m.nTrades, 0);
+  assert.equal(m.totalPnlUsd, 40);
+  assert.equal(m.equityCurve.length, 1);
+  assert.equal(m.equityCurve[0]?.cumulativePnl, 40);
+});
+
+test("unrealized PnL does not affect realized scoring inputs or the skill score", () => {
+  const positions = [
+    position({ realizedPnl: 100, size: 100, avgPrice: 0.5, closeTime: recentIso(3) }),
+    position({ realizedPnl: -40, size: 100, avgPrice: 0.5, closeTime: recentIso(2) }),
+    position({ realizedPnl: 60, size: 100, avgPrice: 0.5, closeTime: recentIso(1) })
+  ];
+  const realizedOnly = computeMetrics(positions, 30, CONFIG, 0);
+  const withUnrealized = computeMetrics(positions, 30, CONFIG, 500);
+  // Scoring stays strictly realized: only totalPnlUsd / unrealizedPnlUsd / the curve endpoint move.
+  assert.equal(withUnrealized.pctReturn, realizedOnly.pctReturn);
+  assert.equal(withUnrealized.winRate, realizedOnly.winRate);
+  assert.equal(withUnrealized.maxDrawdown, realizedOnly.maxDrawdown);
+  assert.equal(withUnrealized.skillScore, realizedOnly.skillScore);
 });
 
 // --- computeSkillScore: eligibility gate ------------------------------------

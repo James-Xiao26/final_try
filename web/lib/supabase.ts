@@ -116,6 +116,7 @@ function mapMetric(row: Database["public"]["Tables"]["wallet_stats"]["Row"]): Wa
     winRate: toNumber(row.win_rate),
     maxDrawdown: toNumber(row.max_drawdown),
     totalPnlUsd: toNumber(row.total_pnl_usd),
+    unrealizedPnlUsd: toNumber(row.unrealized_pnl_usd),
     totalVolumeUsd: toNumber(row.total_volume_usd),
     nTrades: row.n_trades ?? 0
   };

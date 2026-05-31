@@ -10,7 +10,7 @@ export default async function HomePage() {
     <main className="page">
       <header className="topbar">
         <div>
-          <h1 className="brand">EdgeBoard</h1>
+          <h1 className="brand">WhaleWatcher</h1>
           <p className="subtitle">
             Polymarket traders ranked by risk-adjusted realized skill: return, win rate, drawdown, sample size, and outlier discipline.
           </p>

@@ -244,6 +244,17 @@ export function resolvedToClosed(positions: Position[]): ClosedPosition[] {
     }));
 }
 
+// Current unrealized PnL across genuinely-open positions (redeemable === false). Resolved-but-
+// unredeemed positions are excluded here — their realized win/loss already enters the metric set via
+// resolvedToClosed. currentValue - initialValue is unrealized-only: it marks the *remaining* held
+// shares to market against their cost basis, and any partially-sold portion already appears in
+// /closed-positions, so this never double-counts realized PnL.
+export function openUnrealizedPnl(positions: Position[]): number {
+  return positions
+    .filter((position) => !position.redeemable)
+    .reduce((sum, position) => sum + (position.currentValue - position.initialValue), 0);
+}
+
 function mapActivity(record: JsonRecord): TradeActivity {
   const size = readNumber(record, ["size", "tokens"]);
   const price = readNumber(record, ["price", "avgPrice"]);

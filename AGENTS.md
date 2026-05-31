@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## What this is
 
@@ -64,9 +64,3 @@ Bot detection (`scripts/botDetection.ts`): flags wallets exceeding trades/day, s
   - Keep the **service-role key out of the web app** — the read path uses the anon key only.
 - Polymarket's API field names are inconsistent, so `polymarket.ts` maps responses defensively via `readString`/`readNumber` with fallback key lists. When the API shape shifts, extend those key arrays rather than assuming one field name.
 - Addresses are normalized to lowercase everywhere (ingestion, API routes, lib). Preserve this when adding lookups.
-- **Polymarket rate limits** ([docs](https://docs.polymarket.com/api-reference/rate-limits)). We only hit the Data API (`data-api.polymarket.com`), enforced by Cloudflare over sliding 10s windows (requests are queued, not hard-rejected). Per-endpoint limits for the endpoints we call:
-  - `/closed-positions`, `/positions` — **150 req / 10s** (the binding constraint)
-  - `/trades` — **200 req / 10s**
-  - `/activity`, `/value`, `/v1/leaderboard` — fall under the general Data API limit of **1,000 req / 10s**
-
-  `polymarket.ts` runs **one serial rate gate per lane** (`throttle(lane)`), keyed by `CONFIG.REQUEST_INTERVAL_MS`: the `restricted` lane (`/closed-positions`, `/positions`) and the `general` lane (everything else). Spacing them separately lets cheap general calls run in parallel with the expensive closed-position pagination. Intervals target ~75% of each cap: restricted 90ms (~111 req/10s, under 150), general 30ms (~333 req/10s, under the ≥200 budget). When tuning an interval down, keep that lane under its cap — `restricted` must stay ≥67ms (150/10s) and `general` ≥50ms (200/10s for `/trades`). `fetchJson` also honors the `Retry-After` header on a throttled response before exponential backoff.

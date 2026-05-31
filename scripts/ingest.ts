@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { isSuspectedBot } from "./botDetection.js";
 import { CONFIG } from "./config.js";
 import { computeMetrics, type WalletMetrics } from "./metrics.js";
-import { apiStats, discoverTopWallets, PolymarketClient, type DiscoveredWallet } from "./polymarket.js";
+import { apiStats, discoverTopWallets, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet } from "./polymarket.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -48,6 +48,7 @@ interface Database {
           win_rate: number;
           max_drawdown: number;
           total_pnl_usd: number;
+          unrealized_pnl_usd: number | null;
           total_volume_usd: number;
           n_trades: number;
           computed_at: string;
@@ -60,6 +61,7 @@ interface Database {
           win_rate: number;
           max_drawdown: number;
           total_pnl_usd: number;
+          unrealized_pnl_usd?: number | null;
           total_volume_usd: number;
           n_trades: number;
           computed_at?: string;
@@ -70,6 +72,7 @@ interface Database {
           win_rate?: number;
           max_drawdown?: number;
           total_pnl_usd?: number;
+          unrealized_pnl_usd?: number | null;
           total_volume_usd?: number;
           n_trades?: number;
           computed_at?: string;
@@ -189,6 +192,7 @@ async function upsertMetrics(
     win_rate: metrics.winRate,
     max_drawdown: metrics.maxDrawdown,
     total_pnl_usd: metrics.totalPnlUsd,
+    unrealized_pnl_usd: metrics.unrealizedPnlUsd,
     total_volume_usd: metrics.totalVolumeUsd,
     n_trades: metrics.nTrades,
     computed_at: new Date().toISOString()
@@ -245,12 +249,16 @@ async function processWallet(
   // positions the trader sold/redeemed (winner-biased, since $0 losers get abandoned, not redeemed);
   // the resolved-unredeemed set restores those losses so the score reflects real edge. The two
   // endpoints are disjoint (sold/redeemed vs current holding), so they concatenate without dedup.
-  const [closedPositions, resolvedPositions] = await Promise.all([
+  // Fetch open positions once and derive both the resolved-but-unredeemed set (folded into the
+  // realized metric set) and the current unrealized PnL (folded into the Total P/L curve endpoint).
+  const [closedPositions, currentPositions] = await Promise.all([
     client.getClosedPositions(normalized),
-    client.getResolvedPositions(normalized)
+    client.getCurrentPositions(normalized)
   ]);
+  const resolvedPositions = resolvedToClosed(currentPositions);
+  const unrealizedPnlUsd = openUnrealizedPnl(currentPositions);
   const positions = [...closedPositions, ...resolvedPositions];
-  const metrics = CONFIG.HORIZONS.map((horizon) => computeMetrics(positions, horizon, CONFIG));
+  const metrics = CONFIG.HORIZONS.map((horizon) => computeMetrics(positions, horizon, CONFIG, unrealizedPnlUsd));
 
   await Promise.all(metrics.map((metric) => upsertMetrics(supabase, normalized, metric)));
 

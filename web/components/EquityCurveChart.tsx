@@ -29,7 +29,7 @@ export default function EquityCurveChart({ equityCurves }: EquityCurveChartProps
     <section className="panel" style={{ padding: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
         <div>
-          <div className="mono muted">REALIZED EQUITY CURVE</div>
+          <div className="mono muted">TOTAL P/L</div>
           <div className={endingPnl >= 0 ? "mono positive" : "mono negative"} style={{ fontSize: 24, marginTop: 4 }}>
             {formatUsd(endingPnl)}
           </div>
@@ -54,7 +54,7 @@ export default function EquityCurveChart({ equityCurves }: EquityCurveChartProps
               <YAxis tick={{ fill: "#8D95A3", fontSize: 12 }} stroke="#262A33" tickFormatter={formatUsd} width={78} />
               <Tooltip
                 contentStyle={{ background: "#101217", border: "1px solid #262A33", color: "#F2F5F7" }}
-                formatter={(value) => [formatUsd(Number(value)), "Cumulative PnL"]}
+                formatter={(value) => [formatUsd(Number(value)), "Total P/L"]}
                 labelStyle={{ color: "#8D95A3" }}
               />
               <Area

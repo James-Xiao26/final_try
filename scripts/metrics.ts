@@ -13,6 +13,7 @@ export interface WalletMetrics {
   winRate: number;
   maxDrawdown: number;
   totalPnlUsd: number;
+  unrealizedPnlUsd: number;
   totalVolumeUsd: number;
   avgEntryPrice: number;
   nTrades: number;
@@ -30,7 +31,12 @@ function toMillis(closeTime: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function buildDailyCurve(sortedPositions: ClosedPosition[]): EquityPoint[] {
+// Builds the daily cumulative-PnL curve. The interior is the realized path (steps on close dates);
+// a final "today" point folds in current unrealized PnL on open positions so the curve ends at the
+// marked-to-market total, matching the displayed Total P/L. When unrealized is 0 the today-point
+// simply extends the line flat to now; when there are no closed positions but unrealized != 0 the
+// curve is that single today-point.
+function buildDailyCurve(sortedPositions: ClosedPosition[], unrealizedPnlUsd: number): EquityPoint[] {
   const byDate = new Map<string, number>();
   let cumulative = 0;
 
@@ -39,6 +45,15 @@ function buildDailyCurve(sortedPositions: ClosedPosition[]): EquityPoint[] {
     const date = new Date(toMillis(position.closeTime)).toISOString().slice(0, "YYYY-MM-DD".length);
     byDate.set(date, cumulative);
   });
+
+  // Final marked-to-market point. Keyed by today's date, so a position that closed today is
+  // overwritten with the day's total (realized + unrealized) rather than duplicated. Skip it only
+  // when there's nothing to plot (no closed positions and no open exposure), to preserve the empty
+  // curve for inactive wallets.
+  if (sortedPositions.length > 0 || unrealizedPnlUsd !== 0) {
+    const today = new Date().toISOString().slice(0, "YYYY-MM-DD".length);
+    byDate.set(today, cumulative + unrealizedPnlUsd);
+  }
 
   return [...byDate.entries()].map(([ts, cumulativePnl]) => ({
     ts,
@@ -54,20 +69,23 @@ function buildDailyCurve(sortedPositions: ClosedPosition[]): EquityPoint[] {
 export function computeMetrics(
   closedPositions: ClosedPosition[],
   horizonDays: number,
-  config: typeof CONFIG
+  config: typeof CONFIG,
+  unrealizedPnlUsd = 0
 ): WalletMetrics {
   const cutoffMs = Date.now() - horizonDays * config.SECONDS_PER_DAY * config.MS_PER_SECOND;
   const positions = closedPositions
     .filter((position) => toMillis(position.closeTime) >= cutoffMs)
     .sort((left, right) => toMillis(left.closeTime) - toMillis(right.closeTime));
 
-  const totalPnlUsd = positions.reduce((sum, position) => sum + position.realizedPnl, 0);
+  const realizedPnlUsd = positions.reduce((sum, position) => sum + position.realizedPnl, 0);
   const totalVolumeUsd = positions.reduce((sum, position) => sum + position.size * position.avgPrice, 0);
   const totalShares = positions.reduce((sum, position) => sum + position.size, 0);
   // Volume-weighted average entry price = total cost / total shares. Catches longshot wallets
   // whose capital sits in cheap shares (see MIN_AVG_ENTRY_PRICE gate in computeSkillScore).
   const avgEntryPrice = totalShares > 0 ? totalVolumeUsd / totalShares : 0;
-  const pctReturn = totalVolumeUsd > 0 ? totalPnlUsd / totalVolumeUsd : 0;
+  // Return, win rate, drawdown, outlier flag, and the Skill Score stay strictly realized — they
+  // measure realized discipline. Only totalPnlUsd and the curve's final point fold in unrealized.
+  const pctReturn = totalVolumeUsd > 0 ? realizedPnlUsd / totalVolumeUsd : 0;
   const wins = positions.filter((position) => position.realizedPnl > 0).length;
   const winRate = positions.length > 0 ? wins / positions.length : 0;
 
@@ -90,19 +108,20 @@ export function computeMetrics(
     (largest, position) => Math.max(largest, position.realizedPnl),
     0
   );
-  const outlierFlag = totalPnlUsd > 0 && largestWin / totalPnlUsd > config.OUTLIER_TRADE_FRACTION;
+  const outlierFlag = realizedPnlUsd > 0 && largestWin / realizedPnlUsd > config.OUTLIER_TRADE_FRACTION;
   const metricsWithoutScore: WalletMetrics = {
     horizonDays,
     skillScore: null,
     pctReturn: round(pctReturn, 4),
     winRate: round(winRate, 4),
     maxDrawdown: round(maxDrawdown, 4),
-    totalPnlUsd: round(totalPnlUsd, 2),
+    totalPnlUsd: round(realizedPnlUsd + unrealizedPnlUsd, 2),
+    unrealizedPnlUsd: round(unrealizedPnlUsd, 2),
     totalVolumeUsd: round(totalVolumeUsd, 2),
     avgEntryPrice: round(avgEntryPrice, 4),
     nTrades: positions.length,
     outlierFlag,
-    equityCurve: buildDailyCurve(positions)
+    equityCurve: buildDailyCurve(positions, unrealizedPnlUsd)
   };
 
   return {

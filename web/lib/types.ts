@@ -19,6 +19,7 @@ export interface WalletMetrics {
   winRate: number;
   maxDrawdown: number;
   totalPnlUsd: number;
+  unrealizedPnlUsd: number;
   totalVolumeUsd: number;
   nTrades: number;
 }
@@ -80,6 +81,7 @@ export interface Database {
           win_rate: number | null;
           max_drawdown: number | null;
           total_pnl_usd: number | null;
+          unrealized_pnl_usd: number | null;
           total_volume_usd: number | null;
           n_trades: number | null;
           computed_at: string;
@@ -92,6 +94,7 @@ export interface Database {
           win_rate?: number | null;
           max_drawdown?: number | null;
           total_pnl_usd?: number | null;
+          unrealized_pnl_usd?: number | null;
           total_volume_usd?: number | null;
           n_trades?: number | null;
           computed_at?: string;
@@ -102,6 +105,7 @@ export interface Database {
           win_rate?: number | null;
           max_drawdown?: number | null;
           total_pnl_usd?: number | null;
+          unrealized_pnl_usd?: number | null;
           total_volume_usd?: number | null;
           n_trades?: number | null;
           computed_at?: string;
