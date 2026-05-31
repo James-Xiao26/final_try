@@ -290,7 +290,11 @@ async function rebuildLeaderboardCache(supabase: SupabaseClient): Promise<void> 
       .select("address, skill_score, pct_return, win_rate, n_trades, avg_edge_per_share")
       .eq("horizon_days", horizon)
       .not("skill_score", "is", null)
-      .order("skill_score", { ascending: false });
+      // Rank by score, then break ties (notably the cluster clamped at SCORE_MAX) by raw edge so
+      // the strongest forecasters surface within a tied score. nullsFirst:false keeps any
+      // unknown-edge rows from jumping the tiebreak.
+      .order("skill_score", { ascending: false })
+      .order("avg_edge_per_share", { ascending: false, nullsFirst: false });
 
     if (error) {
       throw error;

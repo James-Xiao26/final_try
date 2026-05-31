@@ -25,7 +25,7 @@ export default function SkillScoreBadge({ score }: SkillScoreBadgeProps) {
         fontWeight: 700
       }}
     >
-      {score === null ? "N/A" : score.toFixed(1)}
+      {score === null ? "N/A" : score.toFixed(2)}
     </span>
   );
 }
