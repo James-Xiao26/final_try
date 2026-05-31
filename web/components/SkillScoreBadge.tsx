@@ -3,11 +3,12 @@ interface SkillScoreBadgeProps {
 }
 
 export default function SkillScoreBadge({ score }: SkillScoreBadgeProps) {
+  // Score is the 0–10 statistical-edge score (see scripts/metrics.ts computeSkillScore).
   const color = score === null
     ? "var(--muted)"
-    : score > 500
+    : score >= 7
       ? "var(--green)"
-      : score >= 200
+      : score >= 4
         ? "var(--yellow)"
         : "var(--red)";
 

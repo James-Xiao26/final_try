@@ -19,6 +19,7 @@ interface Database {
           handle: string | null;
           bio: string | null;
           links: Record<string, unknown> | null;
+          lifetime_pnl: number | null;
           first_seen_at: string;
           updated_at: string;
         };
@@ -29,6 +30,7 @@ interface Database {
           handle?: string | null;
           bio?: string | null;
           links?: Record<string, unknown> | null;
+          lifetime_pnl?: number | null;
         };
         Update: {
           is_bot_suspected?: boolean;
@@ -36,6 +38,7 @@ interface Database {
           handle?: string | null;
           bio?: string | null;
           links?: Record<string, unknown> | null;
+          lifetime_pnl?: number | null;
         };
         Relationships: [];
       };
@@ -108,7 +111,9 @@ interface Database {
           address: string;
           skill_score: number | null;
           pct_return: number;
-          win_rate: number;          n_trades: number;
+          win_rate: number;
+          n_trades: number;
+          avg_edge_per_share: number | null;
           cached_at: string;
         };
         Insert: {
@@ -117,13 +122,17 @@ interface Database {
           address: string;
           skill_score: number | null;
           pct_return: number;
-          win_rate: number;          n_trades: number;
+          win_rate: number;
+          n_trades: number;
+          avg_edge_per_share?: number | null;
           cached_at?: string;
         };
         Update: {
           skill_score?: number | null;
           pct_return?: number;
-          win_rate?: number;          n_trades?: number;
+          win_rate?: number;
+          n_trades?: number;
+          avg_edge_per_share?: number | null;
           cached_at?: string;
         };
         Relationships: [];
@@ -233,8 +242,10 @@ async function processWallet(
   const walletRow: Database["public"]["Tables"]["wallets"]["Insert"] = {
     address: normalized,
     is_bot_suspected: bot,
-    // Only set handle when we have one, so re-runs without a name don't wipe a stored handle.
-    ...(handle ? { handle } : {})
+    // Only set handle/lifetime_pnl when we have them, so re-runs without a value (e.g. /trades
+    // fallback discovery) don't wipe a previously stored one.
+    ...(handle ? { handle } : {}),
+    ...(wallet.lifetimePnl !== null ? { lifetime_pnl: wallet.lifetimePnl } : {})
   };
   const { error: walletError } = await supabase.from("wallets").upsert(walletRow, { onConflict: "address" });
 
@@ -276,7 +287,7 @@ async function rebuildLeaderboardCache(supabase: SupabaseClient): Promise<void> 
   for (const horizon of CONFIG.HORIZONS) {
     const { data, error } = await supabase
       .from("wallet_stats")
-      .select("address, skill_score, pct_return, win_rate, n_trades")
+      .select("address, skill_score, pct_return, win_rate, n_trades, avg_edge_per_share")
       .eq("horizon_days", horizon)
       .not("skill_score", "is", null)
       .order("skill_score", { ascending: false });
@@ -287,16 +298,19 @@ async function rebuildLeaderboardCache(supabase: SupabaseClient): Promise<void> 
 
     const candidateAddresses = (data ?? []).map((row) => row.address);
     const allowedWallets = new Set<string>();
-    // Filter out bot-suspected wallets in chunks: `.in()` serializes every address into the
-    // request URL, so a single call with thousands of candidates overflows the server's URL-length
-    // limit (this is what silently failed the 10k run). Batches keep each URL small.
+    // Filter out bot-suspected wallets and proven lifetime losers in chunks: `.in()` serializes
+    // every address into the request URL, so a single call with thousands of candidates overflows
+    // the server's URL-length limit (this is what silently failed the 10k run). Batches keep each
+    // URL small.
     for (let offset = 0; offset < candidateAddresses.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
       const slice = candidateAddresses.slice(offset, offset + CONFIG.LEADERBOARD_FILTER_CHUNK);
       const { data: walletRows, error: walletsError } = await supabase
         .from("wallets")
         .select("address")
         .in("address", slice)
-        .eq("is_bot_suspected", false);
+        .eq("is_bot_suspected", false)
+        // Drop proven lifetime losers; keep wallets whose all-time P/L is non-negative or unknown.
+        .or(`lifetime_pnl.gte.${CONFIG.MIN_LIFETIME_PNL},lifetime_pnl.is.null`);
 
       if (walletsError) {
         throw walletsError;
@@ -325,6 +339,7 @@ async function rebuildLeaderboardCache(supabase: SupabaseClient): Promise<void> 
         pct_return: row.pct_return,
         win_rate: row.win_rate,
         n_trades: row.n_trades,
+        avg_edge_per_share: row.avg_edge_per_share,
         cached_at: new Date().toISOString()
       }));
 

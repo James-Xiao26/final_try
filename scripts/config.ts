@@ -3,29 +3,30 @@ export const CONFIG = {
   TOP_N: 100,
   MIN_TRADES: 20,
   MIN_VOLUME_USD: 100,
+  // Wallets with a known all-time P/L below this are excluded from the leaderboard (captured from
+  // /v1/leaderboard `pnl`, timePeriod=ALL). Unknown (null) P/L is NOT excluded — only proven losers.
+  MIN_LIFETIME_PNL: 0,
   // Min volume-weighted average entry price (USD/share). Longshot traders who only buy sub-cent
   // shares have a tiny capital-proxy denominator, which inflates pctReturn and distorts the score;
   // this gate excludes them. Volume-weighted (not median) so a few small dust bets among normal
   // positions don't trip it — only wallets whose *capital* sits in cheap shares are caught.
   MIN_AVG_ENTRY_PRICE: 0.02,
   OUTLIER_TRADE_FRACTION: 0.6,
-  // Additive reward weights, summing to 0.85 (the score stays on the same ~0-850 scale as before).
-  // `edge` is forecasting edge: entry price vs. the market's eventual resolution (see
-  // computeMetrics), weighted by its own nResolved confidence ramp so a few lucky resolved bets
-  // don't move it. It overlaps pctReturn by design — both reward being right — but edge isolates
-  // prediction from exit/trading skill.
-  SKILL_WEIGHTS: {
-    pctReturn: 0.4,
-    edge: 0.2,
-    winRate: 0.2,
-    sampleSize: 0.05
-  },
-  SAMPLE_CONFIDENCE_FLOOR: 0.6,
-  // Resolved-position count at which the edge term reaches full weight (saturates at 3x, like the
-  // trade-count ramp). Below it, edge is discounted toward 0 — a 5pp edge over a handful of
-  // resolved bets is noise, and it also damps the term while sold-position outcome coverage is
-  // still partial (only held-to-resolution positions carry a guaranteed outcome today).
-  MIN_RESOLVED: 10,
+  // Skill Score = pure statistical forecasting edge, on a 0-SCORE_MAX scale. Each resolved
+  // position is a Bernoulli trial whose entry price is the market's implied probability; per-share
+  // edge is (outcome - price). The score is the Bayesian-shrunk mean edge:
+  //   shrunkEdge = sum(outcome - price) / (nResolved + EDGE_SHRINKAGE_K)
+  //   score      = clamp(0, SCORE_MAX, SCORE_MAX * shrunkEdge / EDGE_FOR_TEN)
+  // Shrinkage toward 0 means small/lucky samples can't earn a high score; negative edge floors to 0.
+  SCORE_MAX: 10,
+  // Prior strength: everyone starts as if they had this many zero-edge resolved bets. Higher = more
+  // skeptical (slower to reward a short hot streak).
+  EDGE_SHRINKAGE_K: 20,
+  // The proven (shrunk) per-share edge that earns a perfect SCORE_MAX. 0.05 = a 5-cents-per-share
+  // edge over the market's implied price. Placeholder — calibrate from the shrunk-edge distribution
+  // after the first real ingest so SCORE_MAX is reserved for the genuine top. Changing this (or
+  // EDGE_SHRINKAGE_K) requires updating the exact score constants in metrics.test.ts.
+  EDGE_FOR_TEN: 0.05,
   BOT: {
     // Calibrated against a working trades/day denominator (see MIN_RATE_WINDOW_DAYS). The old 50
     // was a dead constant: activity is capped at ACTIVITY_LIMIT and the rate used to be divided by

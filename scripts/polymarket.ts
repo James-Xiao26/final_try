@@ -404,17 +404,23 @@ export class PolymarketClient {
 export interface DiscoveredWallet {
   address: string;
   userName: string | null;
+  // All-time P/L from the leaderboard (timePeriod=ALL). null when discovered via the /trades
+  // fallback, which carries no pnl.
+  lifetimePnl: number | null;
 }
 
 export async function discoverTopWallets(): Promise<DiscoveredWallet[]> {
-  const wallets = new Map<string, string | null>();
-  const remember = (address: string, userName: string | null): void => {
+  const wallets = new Map<string, { userName: string | null; lifetimePnl: number | null }>();
+  const remember = (address: string, userName: string | null, lifetimePnl: number | null): void => {
     if (!address.startsWith("0x")) {
       return;
     }
     const existing = wallets.get(address);
-    // Keep the first non-null name we see; never downgrade a known name to null.
-    wallets.set(address, existing ?? userName);
+    // Keep the first non-null name/pnl we see; never downgrade a known value to null.
+    wallets.set(address, {
+      userName: existing?.userName ?? userName,
+      lifetimePnl: existing?.lifetimePnl ?? lifetimePnl
+    });
   };
 
   try {
@@ -427,7 +433,7 @@ export async function discoverTopWallets(): Promise<DiscoveredWallet[]> {
         offset: String(offset)
       });
       const page = asArray(await fetchJson("/v1/leaderboard", params)).map(mapLeaderboard);
-      page.forEach((entry) => remember(entry.proxyWallet, entry.userName));
+      page.forEach((entry) => remember(entry.proxyWallet, entry.userName, entry.pnl));
 
       if (page.length < CONFIG.LEADERBOARD_PAGE_SIZE) {
         break;
@@ -450,11 +456,11 @@ export async function discoverTopWallets(): Promise<DiscoveredWallet[]> {
         readString(trade, ["taker", "takerAddress"]),
         readString(trade, ["proxyWallet", "user", "wallet"])
       ];
-      candidates.forEach((candidate) => remember(candidate.toLowerCase(), null));
+      candidates.forEach((candidate) => remember(candidate.toLowerCase(), null, null));
     });
   }
 
   return [...wallets.entries()]
     .slice(0, CONFIG.SEED_WALLET_COUNT)
-    .map(([address, userName]) => ({ address, userName }));
+    .map(([address, info]) => ({ address, userName: info.userName, lifetimePnl: info.lifetimePnl }));
 }

@@ -8,6 +8,14 @@ export function formatPercent(value: number, signed = false): string {
   return `${prefix}${percent.toFixed(1)}%`;
 }
 
+// Per-position mean forecasting edge, shown in cents per share (e.g. "+4.2¢"). The value is in
+// dollars/share, so ×100 gives cents.
+export function formatEdge(value: number): string {
+  const cents = value * 100;
+  const prefix = cents > 0 ? "+" : "";
+  return `${prefix}${cents.toFixed(1)}¢`;
+}
+
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 2

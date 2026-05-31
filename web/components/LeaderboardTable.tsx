@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import HorizonToggle from "@/components/HorizonToggle";
 import SkillScoreBadge from "@/components/SkillScoreBadge";
 import WalletSearch from "@/components/WalletSearch";
-import { formatNumber, formatPercent, shortenAddress } from "@/lib/format";
+import { formatEdge, formatNumber, formatPercent, shortenAddress } from "@/lib/format";
 import type { HorizonDays, LeaderboardRow } from "@/lib/types";
 
 interface LeaderboardTableProps {
@@ -124,7 +124,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
               <th style={{ padding: "12px" }}>RANK</th>
               <th style={{ padding: "12px" }}>WALLET</th>
               <th style={{ padding: "12px" }}>SKILL</th>
-              <th style={{ padding: "12px" }}>RETURN</th>
+              <th style={{ padding: "12px" }}>EDGE</th>
               <th style={{ padding: "12px" }}>WIN RATE</th>
               <th style={{ padding: "12px" }}>N</th>
             </tr>
@@ -171,8 +171,12 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
                 <td style={{ padding: "12px" }}>
                   <SkillScoreBadge score={row.skillScore} />
                 </td>
-                <td className={row.pctReturn >= 0 ? "mono positive" : "mono negative"} style={{ padding: "12px" }}>
-                  {formatPercent(row.pctReturn, true)}
+                <td
+                  className={row.avgEdgePerShare >= 0 ? "mono positive" : "mono negative"}
+                  style={{ padding: "12px" }}
+                  title="Per-position mean edge: avg (resolution outcome − entry price) over resolved markets"
+                >
+                  {formatEdge(row.avgEdgePerShare)}
                 </td>
                 <td className="mono" style={{ padding: "12px" }}>{formatPercent(row.winRate)}</td>
                 <td className="mono" style={{ padding: "12px" }}>{formatNumber(row.nTrades)}</td>

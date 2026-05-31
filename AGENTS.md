@@ -4,7 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## What this is
 
-EdgeBoard ranks Polymarket traders by a risk-adjusted "Skill Score" (return, forecasting edge, win rate, sample size, outlier discipline) rather than raw PnL. A pnpm monorepo with two workspaces:
+EdgeBoard ranks Polymarket traders by a 0–10 "Skill Score" that is purely statistical forecasting edge — how reliably a trader's entry prices beat the market's eventual resolution, Bayesian-shrunk for sample size — rather than raw PnL. A pnpm monorepo with two workspaces:
 
 - `scripts/` (`edgeboard-scripts`) — TypeScript ingestion pipeline run via `tsx`. Pulls Polymarket's public Data API, computes metrics, writes to Supabase.
 - `web/` (`edgeboard-web`) — Next.js 14 App Router frontend that reads computed data from Supabase.
@@ -27,8 +27,8 @@ pnpm --filter edgeboard-scripts test   # run the unit tests (from repo root)
 **Unit tests** live in the `scripts/` workspace and run on Node's built-in test runner via tsx (`node --import tsx --test "**/*.test.ts"`, wired up as the `test` script in `scripts/package.json` — there is no root-level `test` script, so run it with `pnpm --filter edgeboard-scripts test` or `pnpm test` from inside `scripts/`). No jest/vitest. Current coverage:
 
 - `scripts/metrics.test.ts` — pure-function tests for scoring:
-  - `computeMetrics` derives `pctReturn`, `winRate`, `pctEdge`, `nTrades`, and volume from the realized PnL path; excludes positions older than the horizon; and handles an empty position set without dividing by zero.
-  - `computeSkillScore` returns `null` for ineligible wallets (below `MIN_TRADES`, below `MIN_VOLUME_USD`, or `outlierFlag` set), applies the sqrt sample-size confidence ramp with a 0.6 floor at `MIN_TRADES`, saturates confidence at `MIN_TRADES * 3`, and adds a forecasting-edge term gated by its own `nResolved` confidence ramp. Expected scores are asserted as exact constants/approximations, so changing any weight or the ramp in `config.ts`/`metrics.ts` will require updating these.
+  - `computeMetrics` derives `pctReturn`, `winRate`, `avgEdgePerShare` (per-position mean forecasting edge), `pctEdge`, `nResolved`, `nTrades`, and volume; excludes positions older than the horizon; and handles an empty position set without dividing by zero.
+  - `computeSkillScore` returns `null` for ineligible wallets (below `MIN_TRADES`, below `MIN_VOLUME_USD`, sub-cent longshot trader, or `outlierFlag` set), then scores the Bayesian-shrunk per-share edge on a 0–`SCORE_MAX` scale: `shrunk = avgEdgePerShare·nResolved/(nResolved+EDGE_SHRINKAGE_K)`, `score = clamp(0, SCORE_MAX, SCORE_MAX·shrunk/EDGE_FOR_TEN)` (negative edge floors to 0). Expected scores are asserted as exact constants, so changing `EDGE_SHRINKAGE_K`/`EDGE_FOR_TEN` in `config.ts` requires updating these.
 - `scripts/botDetection.test.ts` — tests for the bot heuristics.
 
 "Verifying a change" now means `pnpm typecheck`, `pnpm build`, and the unit tests all pass — and for the full pipeline, running `pnpm ingest` against a real Supabase + the live Polymarket API.
@@ -48,8 +48,8 @@ Ingestion (`scripts/ingest.ts` `main()`):
 Web read path: `web/lib/supabase.ts` (`getLeaderboard`, `getWalletProfile`) is the only DB access layer. Pages (`web/app/page.tsx`, `web/app/wallet/[address]/page.tsx`) and API routes (`web/app/api/**`) call it. Leaderboard reads come straight from `leaderboard_cache`; wallet profiles join `wallet_stats` + `equity_curve` + `leaderboard_cache` (for rank badges).
 
 ### Scoring lives in two files
-- `scripts/config.ts` — the **single source of truth** for every tunable threshold (horizons, min trades/volume, skill weights, forecasting-edge confidence, bot heuristics, API pagination/retry). Change tuning here, not inline.
-- `scripts/metrics.ts` — `computeMetrics` (per-horizon realized PnL, % return, win rate, forecasting edge, daily equity curve) and `computeSkillScore` (returns `null` for ineligible wallets: too few trades, too little volume, or one win dominating PnL).
+- `scripts/config.ts` — the **single source of truth** for every tunable threshold (horizons, min trades/volume, skill-score knobs `EDGE_SHRINKAGE_K`/`EDGE_FOR_TEN`/`SCORE_MAX`, eligibility gates, bot heuristics, API pagination/retry). Change tuning here, not inline.
+- `scripts/metrics.ts` — `computeMetrics` (per-horizon realized PnL, % return, win rate, forecasting edge, daily equity curve) and `computeSkillScore` (the 0–10 Bayesian-shrunk edge score; `null` for ineligible wallets: too few trades, too little volume, sub-cent longshot, or one win dominating PnL).
 
 Bot detection (`scripts/botDetection.ts`): flags wallets exceeding trades/day, simultaneous-market, or min-avg-trade-size limits.
 

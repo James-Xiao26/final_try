@@ -17,8 +17,9 @@ export interface WalletMetrics {
   avgEntryPrice: number;
   nTrades: number;
   // Forecasting edge over positions whose market has resolved: how far the entry price beat (or
-  // missed) the eventual 0/1 outcome. pctEdge is edge as a return on the capital in those positions;
-  // avgEdgePerShare is the share-weighted (outcome - entryPrice), i.e. cents of edge per share.
+  // missed) the eventual 0/1 outcome. avgEdgePerShare is the PER-POSITION mean of (outcome - price)
+  // — the point estimate the Skill Score shrinks. pctEdge is the share-weighted edge as a return on
+  // the capital in those positions (display stat). nResolved is the resolved-position sample size.
   pctEdge: number;
   avgEdgePerShare: number;
   nResolved: number;
@@ -94,24 +95,28 @@ export function computeMetrics(
   const winRate = positions.length > 0 ? wins / positions.length : 0;
 
   // Forecasting edge: over positions whose market has resolved (outcome known to be 0 or 1), how
-  // far the entry price beat the eventual outcome, share-weighted. Exit timing is irrelevant —
-  // this measures prediction, not trading. Positions with no known outcome (still trading, or sold
-  // without a settled price in the payload) are skipped, not counted as misses.
+  // far the entry price beat the eventual outcome. Exit timing is irrelevant — this measures
+  // prediction, not trading. Positions with no known outcome (still trading, or sold without a
+  // settled price in the payload) are skipped, not counted as misses.
+  //   avgEdgePerShare — PER-POSITION mean of (outcome - price); each resolved position is one
+  //     equal-weight prediction. This is the point estimate the Skill Score shrinks (see
+  //     computeSkillScore).
+  //   pctEdge — share-weighted edge as a return on the capital in those positions (display stat).
+  let perShareEdgeSum = 0;
   let edgeDollars = 0;
   let edgeCapital = 0;
-  let edgeShares = 0;
   let nResolved = 0;
   for (const position of positions) {
     if (position.outcome === null) {
       continue;
     }
+    perShareEdgeSum += position.outcome - position.avgPrice;
     edgeDollars += position.size * (position.outcome - position.avgPrice);
     edgeCapital += position.size * position.avgPrice;
-    edgeShares += position.size;
     nResolved += 1;
   }
   const pctEdge = edgeCapital > 0 ? edgeDollars / edgeCapital : 0;
-  const avgEdgePerShare = edgeShares > 0 ? edgeDollars / edgeShares : 0;
+  const avgEdgePerShare = nResolved > 0 ? perShareEdgeSum / nResolved : 0;
 
   const largestWin = positions.reduce(
     (largest, position) => Math.max(largest, position.realizedPnl),
@@ -142,12 +147,13 @@ export function computeMetrics(
 }
 
 /**
- * Skill Score blends return, forecasting edge, win rate, and sample-size confidence.
- * A single `confidence` value (a sqrt ramp in trade count, so it tracks how standard error shrinks
- * with sample size) is used two ways: as an additive depth reward weighted by SKILL_WEIGHTS.sampleSize,
- * and as a multiplier that discounts — but never guts — thin samples, bounded below by SAMPLE_CONFIDENCE_FLOOR.
- * Ineligible wallets receive null when the sample is too small, volume is too low, one win dominates
- * PnL, or the wallet is a sub-cent longshot trader (low volume-weighted average entry price).
+ * Skill Score = pure statistical forecasting edge on a 0–SCORE_MAX scale.
+ * Each resolved position is a Bernoulli trial whose entry price is the market's implied
+ * probability; per-share edge is (outcome − price). We shrink the per-position mean edge toward 0
+ * by EDGE_SHRINKAGE_K pseudo-bets, so small/lucky samples can't earn a high score, then map the
+ * shrunk edge linearly to the score (EDGE_FOR_TEN per-share edge == SCORE_MAX) and clamp.
+ * Negative edge floors to 0. Ineligible wallets receive null (too few trades, too little volume,
+ * sub-cent longshot trader, or one win dominating realized PnL).
  */
 export function computeSkillScore(metrics: WalletMetrics, config: typeof CONFIG): number | null {
   if (
@@ -159,18 +165,10 @@ export function computeSkillScore(metrics: WalletMetrics, config: typeof CONFIG)
     return null;
   }
 
-  const weights = config.SKILL_WEIGHTS;
-  const confidence = Math.min(1, Math.sqrt(metrics.nTrades / (config.MIN_TRADES * 3)));
-  const confidenceMultiplier = config.SAMPLE_CONFIDENCE_FLOOR
-    + (1 - config.SAMPLE_CONFIDENCE_FLOOR) * confidence;
-  // The edge term carries its own sqrt confidence ramp on the resolved-position count, so a thin
-  // resolved sample (statistically noisy edge, or incomplete sold-position outcome coverage)
-  // contributes little. With nResolved == 0 the term is exactly 0.
-  const edgeConfidence = Math.min(1, Math.sqrt(metrics.nResolved / (config.MIN_RESOLVED * 3)));
-  const rawScore = (metrics.pctReturn * weights.pctReturn)
-    + (metrics.pctEdge * edgeConfidence * weights.edge)
-    + (metrics.winRate * weights.winRate)
-    + (confidence * weights.sampleSize);
-
-  return round(rawScore * confidenceMultiplier * 1000, 4);
+  // Bayesian shrinkage: sum of per-share edges divided by (nResolved + K). The numerator is
+  // avgEdgePerShare * nResolved (avgEdgePerShare is the per-position mean), so dividing by
+  // nResolved + K pulls the estimate toward 0 — hard for small samples, negligibly for large ones.
+  const shrunkEdge = (metrics.avgEdgePerShare * metrics.nResolved) / (metrics.nResolved + config.EDGE_SHRINKAGE_K);
+  const score = config.SCORE_MAX * shrunkEdge / config.EDGE_FOR_TEN;
+  return round(Math.min(config.SCORE_MAX, Math.max(0, score)), 2);
 }

@@ -1,5 +1,5 @@
 import SkillScoreBadge from "@/components/SkillScoreBadge";
-import { formatNumber, formatPercent, formatUsd } from "@/lib/format";
+import { formatEdge, formatNumber, formatPercent, formatUsd } from "@/lib/format";
 import type { WalletMetrics } from "@/lib/types";
 
 interface MetricsCardProps {
@@ -26,9 +26,13 @@ export default function MetricsCard({ horizonDays, metrics }: MetricsCardProps) 
         <SkillScoreBadge score={metrics.skillScore} />
       </div>
       <dl style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "10px 12px", margin: "18px 0 0" }}>
-        <dt className="muted">Return</dt>
-        <dd className={metrics.pctReturn >= 0 ? "mono positive" : "mono negative"} style={{ margin: 0 }}>
-          {formatPercent(metrics.pctReturn, true)}
+        <dt className="muted">Edge</dt>
+        <dd
+          className={metrics.avgEdgePerShare >= 0 ? "mono positive" : "mono negative"}
+          style={{ margin: 0 }}
+          title="Per-position mean edge: avg (resolution outcome − entry price) over resolved markets. Drives the Skill Score."
+        >
+          {`${formatEdge(metrics.avgEdgePerShare)} · ${formatNumber(metrics.nResolved)} resolved`}
         </dd>
         <dt className="muted">Win Rate</dt>
         <dd className="mono" style={{ margin: 0 }}>{formatPercent(metrics.winRate)}</dd>

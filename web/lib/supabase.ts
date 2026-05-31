@@ -7,7 +7,7 @@ type WalletRow = Database["public"]["Tables"]["wallets"]["Row"];
 type WalletStatsRow = Database["public"]["Tables"]["wallet_stats"]["Row"];
 type EquityCurveRow = Database["public"]["Tables"]["equity_curve"]["Row"];
 type LeaderboardCacheRow = Database["public"]["Tables"]["leaderboard_cache"]["Row"];
-type LeaderboardSelectRow = Pick<LeaderboardCacheRow, "rank" | "address" | "skill_score" | "pct_return" | "win_rate" | "n_trades">;
+type LeaderboardSelectRow = Pick<LeaderboardCacheRow, "rank" | "address" | "skill_score" | "avg_edge_per_share" | "win_rate" | "n_trades">;
 type WalletHandleRow = Pick<WalletRow, "address" | "handle">;
 type WalletProfileRow = Pick<WalletRow, "address" | "handle" | "bio" | "is_claimed" | "is_bot_suspected">;
 type CurveSelectRow = Pick<EquityCurveRow, "horizon_days" | "ts" | "cumulative_pnl">;
@@ -63,7 +63,7 @@ export async function getLeaderboard(horizonDays: number): Promise<LeaderboardRo
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("leaderboard_cache")
-    .select("rank, address, skill_score, pct_return, win_rate, n_trades")
+    .select("rank, address, skill_score, avg_edge_per_share, win_rate, n_trades")
     .eq("horizon_days", horizonDays)
     .order("rank", { ascending: true });
 
@@ -100,7 +100,7 @@ export async function getLeaderboard(horizonDays: number): Promise<LeaderboardRo
     rank: row.rank,
     address: row.address,
     skillScore: toNumber(row.skill_score),
-    pctReturn: toNumber(row.pct_return),
+    avgEdgePerShare: toNumber(row.avg_edge_per_share),
     winRate: toNumber(row.win_rate),
     nTrades: row.n_trades ?? 0,
     handle: handles.get(row.address) ?? null
@@ -116,7 +116,9 @@ function mapMetric(row: Database["public"]["Tables"]["wallet_stats"]["Row"]): Wa
     totalPnlUsd: toNumber(row.total_pnl_usd),
     unrealizedPnlUsd: toNumber(row.unrealized_pnl_usd),
     totalVolumeUsd: toNumber(row.total_volume_usd),
-    nTrades: row.n_trades ?? 0
+    nTrades: row.n_trades ?? 0,
+    avgEdgePerShare: toNumber(row.avg_edge_per_share),
+    nResolved: row.n_resolved ?? 0
   };
 }
 

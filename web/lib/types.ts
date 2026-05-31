@@ -5,8 +5,9 @@ export interface LeaderboardRow {
   rank: number;
   address: string;
   skillScore: number;
-  pctReturn: number;
-  winRate: number;  nTrades: number;
+  avgEdgePerShare: number;
+  winRate: number;
+  nTrades: number;
   handle: string | null;
 }
 
@@ -14,10 +15,13 @@ export interface WalletMetrics {
   horizonDays: number;
   skillScore: number | null;
   pctReturn: number;
-  winRate: number;  totalPnlUsd: number;
+  winRate: number;
+  totalPnlUsd: number;
   unrealizedPnlUsd: number;
   totalVolumeUsd: number;
   nTrades: number;
+  avgEdgePerShare: number;
+  nResolved: number;
 }
 
 export interface EquityPoint {
@@ -48,6 +52,7 @@ export interface Database {
           handle: string | null;
           bio: string | null;
           links: Record<string, unknown> | null;
+          lifetime_pnl: number | null;
           first_seen_at: string;
           updated_at: string;
         };
@@ -58,6 +63,7 @@ export interface Database {
           handle?: string | null;
           bio?: string | null;
           links?: Record<string, unknown> | null;
+          lifetime_pnl?: number | null;
         };
         Update: {
           is_bot_suspected?: boolean;
@@ -65,6 +71,7 @@ export interface Database {
           handle?: string | null;
           bio?: string | null;
           links?: Record<string, unknown> | null;
+          lifetime_pnl?: number | null;
         };
         Relationships: [];
       };
@@ -137,7 +144,9 @@ export interface Database {
           address: string;
           skill_score: number | null;
           pct_return: number | null;
-          win_rate: number | null;          n_trades: number | null;
+          win_rate: number | null;
+          n_trades: number | null;
+          avg_edge_per_share: number | null;
           cached_at: string;
         };
         Insert: {
@@ -146,13 +155,17 @@ export interface Database {
           address: string;
           skill_score?: number | null;
           pct_return?: number | null;
-          win_rate?: number | null;          n_trades?: number | null;
+          win_rate?: number | null;
+          n_trades?: number | null;
+          avg_edge_per_share?: number | null;
           cached_at?: string;
         };
         Update: {
           skill_score?: number | null;
           pct_return?: number | null;
-          win_rate?: number | null;          n_trades?: number | null;
+          win_rate?: number | null;
+          n_trades?: number | null;
+          avg_edge_per_share?: number | null;
           cached_at?: string;
         };
         Relationships: [];
