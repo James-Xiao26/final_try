@@ -84,6 +84,9 @@ export interface Database {
           unrealized_pnl_usd: number | null;
           total_volume_usd: number | null;
           n_trades: number | null;
+          pct_edge: number | null;
+          avg_edge_per_share: number | null;
+          n_resolved: number | null;
           computed_at: string;
         };
         Insert: {
@@ -97,6 +100,9 @@ export interface Database {
           unrealized_pnl_usd?: number | null;
           total_volume_usd?: number | null;
           n_trades?: number | null;
+          pct_edge?: number | null;
+          avg_edge_per_share?: number | null;
+          n_resolved?: number | null;
           computed_at?: string;
         };
         Update: {
@@ -108,6 +114,9 @@ export interface Database {
           unrealized_pnl_usd?: number | null;
           total_volume_usd?: number | null;
           n_trades?: number | null;
+          pct_edge?: number | null;
+          avg_edge_per_share?: number | null;
+          n_resolved?: number | null;
           computed_at?: string;
         };
         Relationships: [];

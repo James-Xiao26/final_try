@@ -17,6 +17,12 @@ export interface WalletMetrics {
   totalVolumeUsd: number;
   avgEntryPrice: number;
   nTrades: number;
+  // Forecasting edge over positions whose market has resolved: how far the entry price beat (or
+  // missed) the eventual 0/1 outcome. pctEdge is edge as a return on the capital in those positions;
+  // avgEdgePerShare is the share-weighted (outcome - entryPrice), i.e. cents of edge per share.
+  pctEdge: number;
+  avgEdgePerShare: number;
+  nResolved: number;
   outlierFlag: boolean;
   equityCurve: EquityPoint[];
 }
@@ -89,6 +95,26 @@ export function computeMetrics(
   const wins = positions.filter((position) => position.realizedPnl > 0).length;
   const winRate = positions.length > 0 ? wins / positions.length : 0;
 
+  // Forecasting edge: over positions whose market has resolved (outcome known to be 0 or 1), how
+  // far the entry price beat the eventual outcome, share-weighted. Exit timing is irrelevant —
+  // this measures prediction, not trading. Positions with no known outcome (still trading, or sold
+  // without a settled price in the payload) are skipped, not counted as misses.
+  let edgeDollars = 0;
+  let edgeCapital = 0;
+  let edgeShares = 0;
+  let nResolved = 0;
+  for (const position of positions) {
+    if (position.outcome === null) {
+      continue;
+    }
+    edgeDollars += position.size * (position.outcome - position.avgPrice);
+    edgeCapital += position.size * position.avgPrice;
+    edgeShares += position.size;
+    nResolved += 1;
+  }
+  const pctEdge = edgeCapital > 0 ? edgeDollars / edgeCapital : 0;
+  const avgEdgePerShare = edgeShares > 0 ? edgeDollars / edgeShares : 0;
+
   let cumulativePnl = 0;
   let peakSoFar = 0;
   let maxDrawdown = 0;
@@ -120,6 +146,9 @@ export function computeMetrics(
     totalVolumeUsd: round(totalVolumeUsd, 2),
     avgEntryPrice: round(avgEntryPrice, 4),
     nTrades: positions.length,
+    pctEdge: round(pctEdge, 4),
+    avgEdgePerShare: round(avgEdgePerShare, 4),
+    nResolved,
     outlierFlag,
     equityCurve: buildDailyCurve(positions, unrealizedPnlUsd)
   };
@@ -155,7 +184,12 @@ export function computeSkillScore(metrics: WalletMetrics, config: typeof CONFIG)
   const confidence = Math.min(1, Math.sqrt(metrics.nTrades / (config.MIN_TRADES * 3)));
   const confidenceMultiplier = config.SAMPLE_CONFIDENCE_FLOOR
     + (1 - config.SAMPLE_CONFIDENCE_FLOOR) * confidence;
+  // The edge term carries its own sqrt confidence ramp on the resolved-position count, so a thin
+  // resolved sample (statistically noisy edge, or incomplete sold-position outcome coverage)
+  // contributes little. With nResolved == 0 the term is exactly 0.
+  const edgeConfidence = Math.min(1, Math.sqrt(metrics.nResolved / (config.MIN_RESOLVED * 3)));
   const rawScore = (metrics.pctReturn * weights.pctReturn)
+    + (metrics.pctEdge * edgeConfidence * weights.edge)
     + (metrics.winRate * weights.winRate)
     + (confidence * weights.sampleSize)
     - (drawdownPenalty * weights.drawdown);

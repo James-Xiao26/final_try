@@ -10,6 +10,11 @@ export interface ClosedPosition {
   avgPrice: number;
   realizedPnl: number;
   closeTime: string;
+  // Resolved outcome of THIS position's token: 1 if it settled to $1, 0 if to $0, null if the
+  // market hasn't resolved (or we can't tell). Drives the forecasting-edge metric (entry price vs.
+  // eventual outcome). Positions held to resolution always have it (curPrice is 0/1); positions
+  // sold before resolution only have it if the API payload carries a settled price.
+  outcome: number | null;
 }
 
 export interface Position {
@@ -121,6 +126,43 @@ function readNumber(record: JsonRecord, keys: readonly string[], fallback = 0): 
   return fallback;
 }
 
+// Like readNumber but returns null (not a fallback) when no key is present, so callers can tell
+// "field absent" from "field is 0" — needed for resolution prices, where 0 is a real outcome.
+function readOptionalNumber(record: JsonRecord, keys: readonly string[]): number | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  return null;
+}
+
+// Resolved markets settle at exactly $1 or $0. Snap a (near-)settled price to a 0/1 outcome; return
+// null for anything in between, which means the market is still trading and has no outcome yet. The
+// epsilon is deliberately tiny so a near-certain-but-unresolved price (e.g. 0.99) is NOT mistaken
+// for a resolution.
+const RESOLUTION_EPSILON = 0.001;
+function outcomeFromResolvedPrice(price: number | null): number | null {
+  if (price === null) {
+    return null;
+  }
+  if (price >= 1 - RESOLUTION_EPSILON) {
+    return 1;
+  }
+  if (price <= RESOLUTION_EPSILON) {
+    return 0;
+  }
+  return null;
+}
+
 function readSide(record: JsonRecord): "BUY" | "SELL" | "UNKNOWN" {
   const side = readString(record, ["side", "action", "type"]).toUpperCase();
   return side === "BUY" || side === "SELL" ? side : "UNKNOWN";
@@ -192,7 +234,10 @@ function mapClosedPosition(record: JsonRecord): ClosedPosition {
     size: readNumber(record, ["size", "totalBought", "tokens"]),
     avgPrice: readNumber(record, ["avgPrice", "averagePrice", "price"]),
     realizedPnl: readNumber(record, ["realizedPnl", "realizedPnL", "pnl", "cashPnl"]),
-    closeTime: timestampToIso(typeof timestamp === "string" || typeof timestamp === "number" ? timestamp : 0)
+    closeTime: timestampToIso(typeof timestamp === "string" || typeof timestamp === "number" ? timestamp : 0),
+    // Sold positions only expose an outcome if the payload carries a settled price; absent that
+    // (or if the market is still trading), this is null and the position is excluded from edge.
+    outcome: outcomeFromResolvedPrice(readOptionalNumber(record, ["curPrice", "outcome", "payout", "resolvedPrice"]))
   };
 }
 
@@ -240,7 +285,9 @@ export function resolvedToClosed(positions: Position[]): ClosedPosition[] {
       size: position.size,
       avgPrice: position.avgPrice,
       realizedPnl: position.cashPnl,
-      closeTime: isoFromEndDate(position.endDate)
+      closeTime: isoFromEndDate(position.endDate),
+      // Held to resolution and redeemable, so curPrice is the settled price (0 or 1) = the outcome.
+      outcome: outcomeFromResolvedPrice(position.curPrice)
     }));
 }
 

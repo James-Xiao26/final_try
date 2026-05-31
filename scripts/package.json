@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "ingest": "tsx ingest.ts",
+    "probe": "tsx probeClosedPositions.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test \"**/*.test.ts\""
   },

@@ -51,6 +51,9 @@ interface Database {
           unrealized_pnl_usd: number | null;
           total_volume_usd: number;
           n_trades: number;
+          pct_edge: number | null;
+          avg_edge_per_share: number | null;
+          n_resolved: number | null;
           computed_at: string;
         };
         Insert: {
@@ -64,6 +67,9 @@ interface Database {
           unrealized_pnl_usd?: number | null;
           total_volume_usd: number;
           n_trades: number;
+          pct_edge?: number | null;
+          avg_edge_per_share?: number | null;
+          n_resolved?: number | null;
           computed_at?: string;
         };
         Update: {
@@ -75,6 +81,9 @@ interface Database {
           unrealized_pnl_usd?: number | null;
           total_volume_usd?: number;
           n_trades?: number;
+          pct_edge?: number | null;
+          avg_edge_per_share?: number | null;
+          n_resolved?: number | null;
           computed_at?: string;
         };
         Relationships: [];
@@ -196,6 +205,9 @@ async function upsertMetrics(
     unrealized_pnl_usd: metrics.unrealizedPnlUsd,
     total_volume_usd: metrics.totalVolumeUsd,
     n_trades: metrics.nTrades,
+    pct_edge: metrics.pctEdge,
+    avg_edge_per_share: metrics.avgEdgePerShare,
+    n_resolved: metrics.nResolved,
     computed_at: new Date().toISOString()
   }, { onConflict: "address,horizon_days" });
 

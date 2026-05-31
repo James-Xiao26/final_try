@@ -18,6 +18,7 @@ function position(overrides: Partial<ClosedPosition> = {}): ClosedPosition {
     avgPrice: 1,
     realizedPnl: 0,
     closeTime: recentIso(1),
+    outcome: null,
     ...overrides
   };
 }
@@ -34,6 +35,9 @@ function metrics(overrides: Partial<WalletMetrics> = {}): WalletMetrics {
     totalVolumeUsd: 5000,
     avgEntryPrice: 0.5,
     nTrades: CONFIG.MIN_TRADES,
+    pctEdge: 0,
+    avgEdgePerShare: 0,
+    nResolved: 0,
     outlierFlag: false,
     equityCurve: [],
     ...overrides
@@ -198,19 +202,20 @@ test("computeSkillScore is null when a single win dominates PnL", () => {
 test("computeSkillScore applies the sqrt confidence ramp and floor at the trade minimum", () => {
   // nTrades == MIN_TRADES: confidence = sqrt(1/3) ~= 0.5774.
   // multiplier = 0.6 + 0.4 * 0.5774 ~= 0.8309.
-  // rawScore = 0.4*0.5 + 0.65*0.25 + 0.5774*0.1 ~= 0.42024 -> *0.8309*1000 ~= 349.19.
+  // edge term is 0 here (nResolved 0). rawScore = 0.4*0.4 + 0.65*0.2 + 0.5774*0.05 ~= 0.31887
+  //   -> *0.8309*1000 ~= 264.96.
   const score = computeSkillScore(
     metrics({ nTrades: CONFIG.MIN_TRADES, pctReturn: 0.4, winRate: 0.65, maxDrawdown: 0.1 }),
     CONFIG
   );
-  approx(score, 349.19);
+  approx(score, 264.96);
 });
 
 test("computeSkillScore saturates confidence at MIN_TRADES * 3", () => {
   const at60 = computeSkillScore(metrics({ nTrades: CONFIG.MIN_TRADES * 3, maxDrawdown: 0.1 }), CONFIG);
   const at200 = computeSkillScore(metrics({ nTrades: 200, maxDrawdown: 0.1 }), CONFIG);
-  // confidence == 1, multiplier == 1: rawScore = 0.4*0.5 + 0.65*0.25 + 1*0.1 = 0.4625.
-  approx(at60, 462.5);
+  // confidence == 1, multiplier == 1, edge term 0: rawScore = 0.4*0.4 + 0.65*0.2 + 1*0.05 = 0.34.
+  approx(at60, 340);
   assert.equal(at60, at200);
 });
 
@@ -223,8 +228,58 @@ test("computeSkillScore no longer guts a thin-but-eligible sample (floor holds)"
 });
 
 test("computeSkillScore penalizes drawdown beyond the threshold", () => {
-  // maxDrawdown 0.6 -> penalty (0.6 - 0.2)/0.8 = 0.5; nTrades 60 -> multiplier 1.
-  // rawScore = 0.2 + 0.1625 + 0.1 - 0.5*0.15 = 0.3875 -> 387.5.
+  // maxDrawdown 0.6 -> penalty (0.6 - 0.2)/0.8 = 0.5; nTrades 60 -> multiplier 1; edge term 0.
+  // rawScore = 0.4*0.4 + 0.65*0.2 + 1*0.05 - 0.5*0.15 = 0.34 - 0.075 = 0.265 -> 265.
   const score = computeSkillScore(metrics({ nTrades: CONFIG.MIN_TRADES * 3, maxDrawdown: 0.6 }), CONFIG);
-  approx(score, 387.5);
+  approx(score, 265);
+});
+
+// --- forecasting edge -------------------------------------------------------
+
+test("computeMetrics derives forecasting edge from resolved-position outcomes", () => {
+  // Edge $ = size * (outcome - entryPrice), summed over resolved positions:
+  //   100@0.5 win  -> +50,  100@0.4 win -> +60,  100@0.6 loss -> -60  => +50 over $150 capital.
+  // The still-trading position (outcome null) is excluded, not counted as a miss.
+  const positions = [
+    position({ size: 100, avgPrice: 0.5, outcome: 1 }),
+    position({ size: 100, avgPrice: 0.4, outcome: 1 }),
+    position({ size: 100, avgPrice: 0.6, outcome: 0 }),
+    position({ size: 1000, avgPrice: 0.9, outcome: null })
+  ];
+  const m = computeMetrics(positions, 30, CONFIG);
+  assert.equal(m.nResolved, 3);
+  assert.equal(m.pctEdge, 0.3333); // 50 / 150
+  assert.equal(m.avgEdgePerShare, 0.1667); // 50 / 300 shares
+});
+
+test("computeMetrics reports zero edge when no position has resolved", () => {
+  const m = computeMetrics([position({ outcome: null }), position({ outcome: null })], 30, CONFIG);
+  assert.equal(m.nResolved, 0);
+  assert.equal(m.pctEdge, 0);
+  assert.equal(m.avgEdgePerShare, 0);
+});
+
+test("computeSkillScore rewards forecasting edge once the resolved sample is large enough", () => {
+  // nResolved 0 -> edge term is exactly 0 (baseline 340). At MIN_RESOLVED*3 the edge confidence
+  // saturates to 1, adding pctEdge 0.5 * 1 * weight 0.2 * 1000 = +100.
+  const base = computeSkillScore(
+    metrics({ nTrades: CONFIG.MIN_TRADES * 3, maxDrawdown: 0.1, pctEdge: 0.5, nResolved: 0 }),
+    CONFIG
+  );
+  const withEdge = computeSkillScore(
+    metrics({ nTrades: CONFIG.MIN_TRADES * 3, maxDrawdown: 0.1, pctEdge: 0.5, nResolved: CONFIG.MIN_RESOLVED * 3 }),
+    CONFIG
+  );
+  approx(base, 340);
+  approx(withEdge, 440);
+});
+
+test("computeSkillScore discounts edge for a thin resolved sample", () => {
+  // nResolved == MIN_RESOLVED: edgeConfidence = sqrt(1/3) ~= 0.5774.
+  // edge contribution = 0.5 * 0.5774 * 0.2 ~= 0.05774; rawScore = 0.34 + 0.05774 -> ~397.74.
+  const thin = computeSkillScore(
+    metrics({ nTrades: CONFIG.MIN_TRADES * 3, maxDrawdown: 0.1, pctEdge: 0.5, nResolved: CONFIG.MIN_RESOLVED }),
+    CONFIG
+  );
+  approx(thin, 397.74);
 });

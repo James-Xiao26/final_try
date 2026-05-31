@@ -32,6 +32,7 @@ test("resolvedToClosed maps a resolved loser to a negative-PnL closed position",
   const [out] = resolvedToClosed([position({ curPrice: 0, cashPnl: -400 })]);
   assert.ok(out);
   assert.equal(out.realizedPnl, -400);
+  assert.equal(out.outcome, 0); // settled at $0 -> outcome 0
   // closeTime comes from endDate (a calendar date), not the epoch fallback.
   assert.equal(out.closeTime, new Date("2026-05-10").toISOString());
 });
@@ -41,4 +42,5 @@ test("resolvedToClosed maps a resolved winner (unredeemed) to a positive-PnL clo
   const [out] = resolvedToClosed([position({ curPrice: 1, currentValue: 1000, cashPnl: 600 })]);
   assert.ok(out);
   assert.equal(out.realizedPnl, 600);
+  assert.equal(out.outcome, 1); // settled at $1 -> outcome 1
 });
