@@ -23,7 +23,8 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22+ has a native global WebSocket; @supabase/supabase-js throws without one on Node 20.
+          node-version: 22
           cache: pnpm
       # Only the scripts workspace runs here — skip installing the heavy web (next/react) deps.
       - run: pnpm install --frozen-lockfile --filter edgeboard-scripts
