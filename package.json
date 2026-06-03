@@ -7,7 +7,8 @@
     "dev": "pnpm --filter edgeboard-web dev",
     "build": "pnpm --filter edgeboard-web build",
     "typecheck": "pnpm --recursive run typecheck",
-    "ingest": "pnpm --filter edgeboard-scripts ingest"
+    "ingest": "pnpm --filter edgeboard-scripts ingest",
+    "ingest:feed": "pnpm --filter edgeboard-scripts ingest:feed"
   },
   "workspaces": [
     "scripts",

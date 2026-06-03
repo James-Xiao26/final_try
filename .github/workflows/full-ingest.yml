@@ -1,0 +1,33 @@
+name: Full ingest
+
+# Full pipeline: discovers wallets, computes metrics/skill scores, rebuilds the leaderboard cache, and
+# refreshes markets + the activity feed. This is what populates leaderboard_cache that the cheaper
+# refresh-feed workflow depends on. Runs on a slow cadence; the feed cron keeps trades fresh between.
+on:
+  schedule:
+    # Daily at 06:00 UTC.
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: full-ingest
+  cancel-in-progress: false
+
+jobs:
+  full-ingest:
+    runs-on: ubuntu-latest
+    # Full ingest paginates closed-positions for thousands of wallets under a rate gate; give it room.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      # Only the scripts workspace runs here — skip installing the heavy web (next/react) deps.
+      - run: pnpm install --frozen-lockfile --filter edgeboard-scripts
+      - run: pnpm ingest
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

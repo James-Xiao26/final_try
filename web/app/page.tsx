@@ -12,14 +12,12 @@ export default async function HomePage() {
         <div>
           <h1 className="brand">Live Activity</h1>
           <p className="subtitle">
-            Trades placed in the last 24 hours by wallets currently on the leaderboard — who traded, at what price, how much, and when. Refreshed each ingest.
+            Trades placed in the last 24 hours by wallets currently on the leaderboard — who traded, at what price, how much, and when. Auto-refreshes every minute.
           </p>
         </div>
-        <div className="mono muted">
-          LAST 24H / {traderCount} {traderCount === 1 ? "TRADER" : "TRADERS"}
-        </div>
+        <div className="mono muted">LIVE / LAST 24H</div>
       </header>
-      <RecentTradesFeed trades={trades} />
+      <RecentTradesFeed initialTrades={trades} initialTraderCount={traderCount} />
     </main>
   );
 }

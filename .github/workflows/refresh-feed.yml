@@ -1,0 +1,33 @@
+name: Refresh activity feed
+
+# Keeps the home-page "last 24h" feed fresh between full ingests. Cheap: re-pulls /activity (general
+# rate lane) for only the wallets currently on the leaderboard and rewrites their recent_trades rows.
+# Requires a prior full ingest to have populated leaderboard_cache.
+on:
+  schedule:
+    # Every 10 minutes. GitHub's scheduler can drift several minutes under load — fine for a 24h feed.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+# A slow run must not stack on the next tick.
+concurrency:
+  group: refresh-feed
+  cancel-in-progress: false
+
+jobs:
+  refresh-feed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      # Only the scripts workspace runs here — skip installing the heavy web (next/react) deps.
+      - run: pnpm install --frozen-lockfile --filter edgeboard-scripts
+      - run: pnpm ingest:feed
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

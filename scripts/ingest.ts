@@ -542,6 +542,30 @@ async function ingestMarkets(supabase: SupabaseClient, client: PolymarketClient)
   return events.length;
 }
 
+function toRecentTradeRow(trade: RecentTrade): Database["public"]["Tables"]["recent_trades"]["Insert"] {
+  return {
+    address: trade.address,
+    condition_id: trade.conditionId,
+    market: trade.market,
+    outcome_index: trade.outcomeIndex,
+    side: trade.side,
+    price: trade.price,
+    size: trade.size,
+    usdc_size: trade.usdcSize,
+    traded_at: trade.tradedAt
+  };
+}
+
+async function insertRecentTrades(supabase: SupabaseClient, trades: RecentTrade[]): Promise<void> {
+  for (let offset = 0; offset < trades.length; offset += CONFIG.RECENT_TRADES_INSERT_CHUNK) {
+    const rows = trades.slice(offset, offset + CONFIG.RECENT_TRADES_INSERT_CHUNK).map(toRecentTradeRow);
+    const { error } = await supabase.from("recent_trades").insert(rows);
+    if (error) {
+      throw error;
+    }
+  }
+}
+
 // Wipe-and-replace the recent_trades feed from the fills collected during wallet processing (no extra
 // API calls — they ride on the /activity payload bot detection already pulled). Mirrors ingestMarkets:
 // a single delete-then-insert at the end of the run keeps writes off the rate-gated per-wallet path
@@ -553,25 +577,67 @@ async function replaceRecentTrades(supabase: SupabaseClient, trades: RecentTrade
     throw deleteError;
   }
 
-  for (let offset = 0; offset < trades.length; offset += CONFIG.RECENT_TRADES_INSERT_CHUNK) {
-    const slice = trades.slice(offset, offset + CONFIG.RECENT_TRADES_INSERT_CHUNK).map((trade) => ({
-      address: trade.address,
-      condition_id: trade.conditionId,
-      market: trade.market,
-      outcome_index: trade.outcomeIndex,
-      side: trade.side,
-      price: trade.price,
-      size: trade.size,
-      usdc_size: trade.usdcSize,
-      traded_at: trade.tradedAt
-    }));
-    const { error } = await supabase.from("recent_trades").insert(slice);
-    if (error) {
-      throw error;
+  await insertRecentTrades(supabase, trades);
+  return trades.length;
+}
+
+// Lightweight, decoupled refresh of the activity feed for wallets currently on the leaderboard.
+// Unlike a full ingest it touches neither closed-positions nor scoring: it reads the leaderboard
+// address set from leaderboard_cache, re-pulls /activity (general rate lane) for just those wallets,
+// and rewrites their recent_trades rows. Cheap enough to run every few minutes between full ingests.
+// Requires a prior full ingest to have populated leaderboard_cache (scores come from there).
+async function refreshLeaderboardFeed(
+  supabase: SupabaseClient,
+  client: PolymarketClient
+): Promise<{ wallets: number; trades: number }> {
+  const cutoffMs = Date.now() - CONFIG.RECENT_TRADE_WINDOW_HOURS * 60 * 60 * CONFIG.MS_PER_SECOND;
+
+  const { data, error } = await supabase.from("leaderboard_cache").select("address");
+  if (error) {
+    throw error;
+  }
+  const addresses = [...new Set((data ?? []).map((row) => row.address))];
+  if (addresses.length === 0) {
+    return { wallets: 0, trades: 0 };
+  }
+
+  // Worker pool over the (small) leaderboard set; /activity rides the general lane, so this is a few
+  // seconds of gating even for the full set.
+  const collected: RecentTrade[] = [];
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    while (cursor < addresses.length) {
+      const address = addresses[cursor];
+      cursor += 1; // single-threaded JS: read+increment is atomic between awaits, so no double-claim.
+      if (!address) {
+        continue;
+      }
+      try {
+        const activity = await client.getActivity(address);
+        // pushing between awaits can't interleave mid-operation, so concurrent workers are safe here.
+        collected.push(...recentTradesFromActivity(activity, address, cutoffMs));
+      } catch (reason) {
+        console.warn(`Feed refresh failed for ${address}: ${describeError(reason)}`);
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(CONFIG.WALLET_CONCURRENCY, addresses.length) }, () => worker())
+  );
+
+  // Scoped replace: delete only these addresses' rows, then insert the fresh fills. Unlike the global
+  // wipe, a concurrent read never sees the whole feed momentarily empty. Chunk the delete filter so
+  // the `.in(...)` address list can't overflow the request URL at scale.
+  for (let offset = 0; offset < addresses.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
+    const slice = addresses.slice(offset, offset + CONFIG.LEADERBOARD_FILTER_CHUNK);
+    const { error: deleteError } = await supabase.from("recent_trades").delete().in("address", slice);
+    if (deleteError) {
+      throw deleteError;
     }
   }
 
-  return trades.length;
+  await insertRecentTrades(supabase, collected);
+  return { wallets: addresses.length, trades: collected.length };
 }
 
 async function main(): Promise<void> {
@@ -595,6 +661,18 @@ async function main(): Promise<void> {
   if (process.argv.includes("--markets-only")) {
     const marketCount = await ingestMarkets(supabase, new PolymarketClient());
     console.log(`Ingested ${marketCount} markets; elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`);
+    return;
+  }
+
+  // Live-feed refresh: re-pull /activity for just the wallets currently on the leaderboard and
+  // rewrite their recent_trades rows. Cheap (general lane only) and decoupled from scoring, so it can
+  // run every few minutes between full ingests. Requires leaderboard_cache from a prior full ingest.
+  if (process.argv.includes("--feed-only")) {
+    const { wallets, trades } = await refreshLeaderboardFeed(supabase, new PolymarketClient());
+    console.log(
+      `Refreshed feed: ${trades} recent trades across ${wallets} leaderboard wallets; ` +
+        `elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`
+    );
     return;
   }
 

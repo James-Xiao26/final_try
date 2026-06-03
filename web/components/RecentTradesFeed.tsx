@@ -1,11 +1,19 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import SkillScoreBadge from "@/components/SkillScoreBadge";
 import { formatPrice, formatTimeAgo, formatUsd, shortenAddress } from "@/lib/format";
-import type { RecentTrade } from "@/lib/types";
+import type { RecentTrade, RecentTradesFeed as RecentTradesFeedData } from "@/lib/types";
 
 interface RecentTradesFeedProps {
-  trades: RecentTrade[];
+  initialTrades: RecentTrade[];
+  initialTraderCount: number;
 }
+
+// Poll a little more often than the server-side feed refreshes (every ~10 min), so the UI catches a
+// new batch within a minute of it landing without hammering the API route.
+const POLL_INTERVAL_MS = 60_000;
 
 function sideColor(side: string | null): string {
   if (side === "BUY") {
@@ -17,9 +25,58 @@ function sideColor(side: string | null): string {
   return "var(--muted)";
 }
 
-export default function RecentTradesFeed({ trades }: RecentTradesFeedProps) {
+export default function RecentTradesFeed({ initialTrades, initialTraderCount }: RecentTradesFeedProps) {
+  const [trades, setTrades] = useState(initialTrades);
+  const [traderCount, setTraderCount] = useState(initialTraderCount);
+
+  useEffect(() => {
+    let active = true;
+
+    const poll = (): void => {
+      // Don't poll a backgrounded tab; it refreshes on visibility change instead.
+      if (document.hidden) {
+        return;
+      }
+      fetch("/api/recent-trades")
+        .then((response) =>
+          response.ok
+            ? (response.json() as Promise<RecentTradesFeedData>)
+            : Promise.reject(new Error("Recent trades request failed"))
+        )
+        .then((feed) => {
+          if (active) {
+            setTrades(feed.trades);
+            setTraderCount(feed.traderCount);
+          }
+        })
+        .catch(() => {
+          // Keep showing the last good data on a transient failure.
+        });
+    };
+
+    const intervalId = setInterval(poll, POLL_INTERVAL_MS);
+    const onVisibility = (): void => {
+      if (!document.hidden) {
+        poll();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   return (
     <section className="panel">
+      <div className="toolbar">
+        <span className="mono muted">
+          LAST 24H · {traderCount} {traderCount === 1 ? "TRADER" : "TRADERS"} · {trades.length}{" "}
+          {trades.length === 1 ? "FILL" : "FILLS"}
+        </span>
+      </div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 860 }}>
           <thead>
