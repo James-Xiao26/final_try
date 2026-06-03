@@ -1,23 +1,25 @@
-import LeaderboardTable from "@/components/LeaderboardTable";
-import { getLeaderboard } from "@/lib/supabase";
+import RecentTradesFeed from "@/components/RecentTradesFeed";
+import { getRecentLeaderboardTrades } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const initialRows = await getLeaderboard(90);
+  const { trades, traderCount } = await getRecentLeaderboardTrades();
 
   return (
     <main className="page">
       <header className="topbar">
         <div>
-          <h1 className="brand">WhaleWatcher</h1>
+          <h1 className="brand">Live Activity</h1>
           <p className="subtitle">
-            Polymarket traders ranked by statistical forecasting edge — how reliably their entry prices beat the market's eventual resolution, scored 0–10 with confidence for sample size.
+            Trades placed in the last 24 hours by wallets currently on the leaderboard — who traded, at what price, how much, and when. Refreshed each ingest.
           </p>
         </div>
-        <div className="mono muted">PUBLIC LEADERBOARD / 90D</div>
+        <div className="mono muted">
+          LAST 24H / {traderCount} {traderCount === 1 ? "TRADER" : "TRADERS"}
+        </div>
       </header>
-      <LeaderboardTable initialRows={initialRows} initialHorizon={90} />
+      <RecentTradesFeed trades={trades} />
     </main>
   );
 }

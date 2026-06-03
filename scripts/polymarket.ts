@@ -58,6 +58,30 @@ interface LeaderboardEntry {
   pnl: number;
 }
 
+// A Polymarket *event* — the grouping shown as one row on the Markets page. Sourced from the Gamma
+// API's /events endpoint (gamma-api.polymarket.com), which rolls up the individual outcome markets
+// (e.g. one per team in "World Cup Winner") into a single event with aggregate liquidity/volume.
+// `id` is the Gamma event id. Multi-outcome events have no single price, so `currentPrice`/
+// `topOutcome` describe the leading (most-likely) outcome among the event's markets; `spread` is
+// that leading market's bid/ask spread (the volatility proxy). null = not derivable.
+export interface EventSummary {
+  id: string;
+  question: string;
+  slug: string;
+  category: string | null;
+  liquidityUsd: number;
+  volumeUsd: number;
+  volume24hrUsd: number;
+  volume1wkUsd: number;
+  currentPrice: number | null;
+  topOutcome: string | null;
+  spread: number | null;
+  endDate: string | null;
+  image: string | null;
+  active: boolean;
+  closed: boolean;
+}
+
 type JsonRecord = Record<string, unknown>;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -184,9 +208,12 @@ function timestampToIso(timestamp: number | string): string {
 async function fetchJson(
   path: string,
   params: URLSearchParams = new URLSearchParams(),
-  lane: RateLane = "general"
+  lane: RateLane = "general",
+  // Defaults to the Data API host; the Gamma markets calls pass CONFIG.GAMMA_API_BASE so they can
+  // reuse this same throttle/retry/stats path against a different host.
+  base: string = CONFIG.POLYMARKET_API_BASE
 ): Promise<unknown> {
-  const url = new URL(path, CONFIG.POLYMARKET_API_BASE);
+  const url = new URL(path, base);
   params.forEach((value, key) => url.searchParams.set(key, value));
 
   let lastError: Error | null = null;
@@ -330,6 +357,88 @@ function mapLeaderboard(record: JsonRecord): LeaderboardEntry {
   };
 }
 
+// Gamma returns `outcomes`/`outcomePrices` either as a real JSON array or — more commonly — as a
+// JSON-encoded string (e.g. "[\"Yes\",\"No\"]"). Parse both shapes into a plain array; anything
+// missing or malformed yields []. Mapping the string case wrong would leave every market with empty
+// outcomes, so this is covered by markets.test.ts.
+function parseJsonArray(value: unknown): unknown[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+interface LeadingOutcome {
+  price: number | null;
+  label: string | null;
+  spread: number | null;
+}
+
+// An event has many outcome markets (e.g. one per team). There's no single event price, so we
+// surface the *favorite*: the market with the highest implied "Yes" probability. Its label is the
+// market's groupItemTitle ("Spain"), or the first outcome name for a plain binary market ("Yes").
+function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
+  let leading: LeadingOutcome = { price: null, label: null, spread: null };
+  let bestPrice = -Infinity;
+
+  for (const market of markets) {
+    const prices = parseJsonArray(market.outcomePrices)
+      .map((entry) => Number(entry))
+      .filter((value) => Number.isFinite(value));
+    // Implied Yes probability from outcomePrices[0]; fall back to the last trade price.
+    const yesPrice = prices.length > 0 ? prices[0] ?? null : readOptionalNumber(market, ["lastTradePrice"]);
+    if (yesPrice === null || yesPrice <= bestPrice) {
+      continue;
+    }
+
+    bestPrice = yesPrice;
+    const outcomes = parseJsonArray(market.outcomes).map((entry) => String(entry));
+    const groupTitle = readString(market, ["groupItemTitle"]);
+    leading = {
+      price: yesPrice,
+      label: groupTitle || outcomes[0] || "Yes",
+      spread: readOptionalNumber(market, ["spread"])
+    };
+  }
+
+  return leading;
+}
+
+export function mapEvent(record: JsonRecord): EventSummary {
+  const markets = parseJsonArray(record.markets).filter(isRecord);
+  const leading = pickLeadingOutcome(markets);
+  // No explicit category on events — fall back to the first tag's label/slug.
+  const firstTag = parseJsonArray(record.tags)[0];
+  const tagLabel = isRecord(firstTag) ? readString(firstTag, ["label", "slug", "name"]) || null : null;
+  const category = readString(record, ["category"]) || tagLabel;
+
+  return {
+    id: readString(record, ["id", "eventId"]),
+    question: readString(record, ["title", "question"]),
+    slug: readString(record, ["slug"]),
+    category,
+    liquidityUsd: readNumber(record, ["liquidity", "liquidityNum"]),
+    volumeUsd: readNumber(record, ["volume", "volumeNum"]),
+    volume24hrUsd: readNumber(record, ["volume24hr"]),
+    volume1wkUsd: readNumber(record, ["volume1wk"]),
+    currentPrice: leading.price,
+    topOutcome: leading.label,
+    spread: leading.spread,
+    endDate: readString(record, ["endDate", "endDateIso"]) || null,
+    image: readString(record, ["image", "icon"]) || null,
+    active: record.active === true,
+    closed: record.closed === true
+  };
+}
+
 export class PolymarketClient {
   async getClosedPositions(address: string): Promise<ClosedPosition[]> {
     // Positions older than the largest scoring horizon are discarded downstream, so stop
@@ -398,6 +507,38 @@ export class PolymarketClient {
     const response = await fetchJson("/value", params);
     const first = asArray(response)[0];
     return first ? readNumber(first, ["value"]) : 0;
+  }
+
+  // Top active events by liquidity, from the Gamma API. A single global pass (not per-wallet):
+  // we persist one liquidity-sorted superset and re-order it by volume/24h/volatility at read time,
+  // so no per-sort fetch is needed. /events groups the per-outcome markets into one row each. Gamma
+  // returns a bare array, so asArray handles it.
+  async getTopEvents(): Promise<EventSummary[]> {
+    const events: EventSummary[] = [];
+    for (
+      let offset = 0;
+      events.length < CONFIG.MARKETS_TOP_N;
+      offset += CONFIG.MARKETS_PAGE_SIZE
+    ) {
+      const params = new URLSearchParams({
+        limit: String(CONFIG.MARKETS_PAGE_SIZE),
+        offset: String(offset),
+        order: "liquidity",
+        ascending: "false",
+        active: "true",
+        closed: "false",
+        archived: "false",
+        liquidity_min: String(CONFIG.MARKETS_MIN_LIQUIDITY),
+        volume_min: String(CONFIG.MARKETS_MIN_VOLUME)
+      });
+      const page = asArray(await fetchJson("/events", params, "general", CONFIG.GAMMA_API_BASE)).map(mapEvent);
+      events.push(...page);
+      if (page.length < CONFIG.MARKETS_PAGE_SIZE) {
+        break;
+      }
+    }
+
+    return events.slice(0, CONFIG.MARKETS_TOP_N);
   }
 }
 

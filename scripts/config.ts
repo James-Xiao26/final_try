@@ -46,7 +46,24 @@ export const CONFIG = {
     MIN_RATE_WINDOW_DAYS: 1
   },
   POLYMARKET_API_BASE: process.env.POLYMARKET_API_BASE ?? "https://data-api.polymarket.com",
-  SEED_WALLET_COUNT: 1000,
+  // The Gamma API (a different host than the Data API above) is the only Polymarket source that
+  // lists markets with liquidity/volume/price fields. It powers the Markets page. The markets pass
+  // is a single cheap global fetch (not per-wallet), so it reuses the "general" rate lane.
+  GAMMA_API_BASE: process.env.GAMMA_API_BASE ?? "https://gamma-api.polymarket.com",
+  // How many top markets to persist for the Markets page. One liquidity-sorted superset is stored;
+  // the read layer re-orders it by volume/24h/volatility, so no per-sort fetch is needed.
+  MARKETS_TOP_N: 300,
+  MARKETS_PAGE_SIZE: 100,
+  // Floors applied to the Gamma query so dust markets never enter the set.
+  MARKETS_MIN_LIQUIDITY: 1000,
+  MARKETS_MIN_VOLUME: 1000,
+  // Landing-page activity feed: only fills within this window are persisted to recent_trades and
+  // shown on the home page. Reuses the /activity payload already fetched for bot detection, so it
+  // adds no Polymarket API calls. Read-side freshness is bounded by ingest cadence.
+  RECENT_TRADE_WINDOW_HOURS: 24,
+  // Chunk size for the recent_trades bulk insert (keeps each insert payload modest).
+  RECENT_TRADES_INSERT_CHUNK: 500,
+  SEED_WALLET_COUNT: 5000,
   API_RETRIES: 5,
   RETRY_BASE_DELAY_MS: 1000,
   // Number of wallets processed concurrently by the worker pool. The per-lane request gates

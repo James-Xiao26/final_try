@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { IBM_Plex_Mono } from "next/font/google";
 import type { ReactNode } from "react";
+import SidebarNav from "@/components/SidebarNav";
 
 const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
@@ -47,6 +48,37 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           button, input { font: inherit; }
           button { cursor: pointer; }
           .mono { font-family: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace; }
+          .shell { display: flex; min-height: 100vh; }
+          .sidebar {
+            width: 220px;
+            flex-shrink: 0;
+            border-right: 1px solid var(--line);
+            background: rgba(16, 18, 23, 0.9);
+            padding: 24px 14px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+          }
+          .brand-mark { font-size: 15px; font-weight: 700; letter-spacing: 1px; color: var(--text); }
+          .nav-links { display: flex; flex-direction: column; gap: 4px; }
+          .nav-link {
+            display: block;
+            padding: 10px 12px;
+            color: var(--muted);
+            border: 1px solid transparent;
+            font-size: 13px;
+          }
+          .nav-link:hover { color: var(--text); }
+          .nav-link[aria-current=page] {
+            color: var(--text);
+            border-color: var(--line);
+            background: rgba(0, 255, 136, 0.06);
+          }
+          /* min-width:0 lets wide tables inside scroll instead of stretching the flex layout. */
+          .content { flex: 1; min-width: 0; }
           .page {
             width: min(1180px, calc(100vw - 32px));
             margin: 0 auto;
@@ -84,12 +116,32 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             animation: pulse 1.2s ease-in-out infinite;
           }
           @media (max-width: 760px) {
+            .shell { flex-direction: column; }
+            .sidebar {
+              width: auto;
+              height: auto;
+              position: static;
+              flex-direction: row;
+              align-items: center;
+              gap: 14px;
+              border-right: 0;
+              border-bottom: 1px solid var(--line);
+              padding: 14px 16px;
+              overflow-x: auto;
+            }
+            .nav-links { flex-direction: row; }
             .page { width: min(100vw - 20px, 1180px); padding-top: 18px; }
             .topbar, .toolbar { align-items: stretch; flex-direction: column; }
             .brand { font-size: 24px; }
           }
         `}</style>
-        {children}
+        <div className="shell">
+          <nav className="sidebar" aria-label="Primary">
+            <div className="brand-mark mono">EDGEBOARD</div>
+            <SidebarNav />
+          </nav>
+          <div className="content">{children}</div>
+        </div>
       </body>
     </html>
   );

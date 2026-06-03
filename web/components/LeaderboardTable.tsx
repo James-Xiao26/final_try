@@ -9,6 +9,10 @@ import WalletSearch from "@/components/WalletSearch";
 import { formatEdge, formatNumber, formatPercent, shortenAddress } from "@/lib/format";
 import type { HorizonDays, LeaderboardRow } from "@/lib/types";
 
+// 365D is intentionally omitted from the leaderboard view (its data is stale /
+// under maintenance and is no longer refreshed by ingest).
+const LEADERBOARD_HORIZONS: readonly HorizonDays[] = [30, 90];
+
 interface LeaderboardTableProps {
   initialRows: LeaderboardRow[];
   initialHorizon: HorizonDays;
@@ -96,27 +100,9 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
   return (
     <section className="panel">
       <div className="toolbar">
-        <HorizonToggle value={horizon} onChange={setHorizon} />
+        <HorizonToggle value={horizon} onChange={setHorizon} horizons={LEADERBOARD_HORIZONS} />
         <WalletSearch value={query} onChange={setQuery} />
       </div>
-      {horizon === 365 ? (
-        <div
-          role="status"
-          className="mono"
-          style={{
-            margin: "0 12px 12px",
-            padding: "10px 12px",
-            borderLeft: "3px solid #FFD166",
-            border: "1px solid var(--line)",
-            color: "var(--muted)",
-            fontSize: 12,
-            lineHeight: 1.5
-          }}
-        >
-          The 365-day leaderboard is outdated and under maintenance. These numbers are no longer being
-          refreshed — use the 30D or 90D views for current rankings.
-        </div>
-      ) : null}
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 860 }}>
           <thead>

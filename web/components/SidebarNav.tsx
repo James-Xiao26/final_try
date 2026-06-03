@@ -1,0 +1,39 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const LINKS = [
+  { href: "/", label: "Activity" },
+  { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/markets", label: "Markets" }
+] as const;
+
+export default function SidebarNav() {
+  const pathname = usePathname();
+
+  return (
+    <div className="nav-links">
+      {LINKS.map((link) => {
+        // Activity ("/") is active only on the exact path. Leaderboard owns wallet profiles (linked
+        // from both views); other links match their own subtree.
+        const isActive =
+          link.href === "/"
+            ? pathname === "/"
+            : link.href === "/leaderboard"
+              ? pathname.startsWith("/leaderboard") || pathname.startsWith("/wallet")
+              : pathname.startsWith(link.href);
+        return (
+          <Link
+            key={link.href}
+            href={link.href}
+            className="nav-link mono"
+            aria-current={isActive ? "page" : undefined}
+          >
+            {link.label}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}

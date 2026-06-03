@@ -41,6 +41,51 @@ export interface WalletProfile {
   badges: { label: string; horizonDays: number }[];
 }
 
+// Sortable columns on the Markets page. "volatility" maps to the bid/ask spread (the orderable
+// proxy stored on each market). Kept as a const array so the API route can validate against it.
+export const MARKET_SORTS = ["liquidity", "volume", "volume_24hr", "volatility"] as const;
+export type MarketSort = (typeof MARKET_SORTS)[number];
+
+// One grouped Polymarket event, as shown on the Markets page. currentPrice/topOutcome describe the
+// leading (favorite) outcome; spread is its bid/ask spread (volatility proxy).
+export interface MarketRow {
+  id: string;
+  question: string;
+  slug: string;
+  category: string | null;
+  liquidityUsd: number;
+  volumeUsd: number;
+  volume24hrUsd: number;
+  volume1wkUsd: number;
+  currentPrice: number | null;
+  topOutcome: string | null;
+  spread: number | null;
+  endDate: string | null;
+  image: string | null;
+}
+
+// One fill in the landing-page activity feed: a recent trade by a wallet currently on the
+// leaderboard. skillScore/handle are joined in from leaderboard_cache/wallets at read time.
+export interface RecentTrade {
+  address: string;
+  handle: string | null;
+  skillScore: number | null;
+  conditionId: string | null;
+  market: string | null;
+  outcomeIndex: number | null;
+  side: string | null;
+  price: number | null;
+  size: number | null;
+  usdcSize: number | null;
+  tradedAt: string;
+}
+
+export interface RecentTradesFeed {
+  trades: RecentTrade[];
+  // Distinct leaderboard wallets that traded within the window.
+  traderCount: number;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -167,6 +212,113 @@ export interface Database {
           n_trades?: number | null;
           avg_edge_per_share?: number | null;
           cached_at?: string;
+        };
+        Relationships: [];
+      };
+      markets: {
+        Row: {
+          id: string;
+          condition_id: string | null;
+          question: string;
+          slug: string | null;
+          category: string | null;
+          liquidity_usd: number | null;
+          volume_usd: number | null;
+          volume_24hr_usd: number | null;
+          volume_1wk_usd: number | null;
+          one_day_price_change: number | null;
+          spread: number | null;
+          last_trade_price: number | null;
+          top_outcome: string | null;
+          outcomes: string[] | null;
+          outcome_prices: number[] | null;
+          end_date: string | null;
+          image: string | null;
+          active: boolean;
+          closed: boolean;
+          cached_at: string;
+        };
+        Insert: {
+          id: string;
+          condition_id?: string | null;
+          question: string;
+          slug?: string | null;
+          category?: string | null;
+          liquidity_usd?: number | null;
+          volume_usd?: number | null;
+          volume_24hr_usd?: number | null;
+          volume_1wk_usd?: number | null;
+          one_day_price_change?: number | null;
+          spread?: number | null;
+          last_trade_price?: number | null;
+          top_outcome?: string | null;
+          outcomes?: string[] | null;
+          outcome_prices?: number[] | null;
+          end_date?: string | null;
+          image?: string | null;
+          active?: boolean;
+          closed?: boolean;
+          cached_at?: string;
+        };
+        Update: {
+          condition_id?: string | null;
+          question?: string;
+          slug?: string | null;
+          category?: string | null;
+          liquidity_usd?: number | null;
+          volume_usd?: number | null;
+          volume_24hr_usd?: number | null;
+          volume_1wk_usd?: number | null;
+          one_day_price_change?: number | null;
+          spread?: number | null;
+          last_trade_price?: number | null;
+          top_outcome?: string | null;
+          outcomes?: string[] | null;
+          outcome_prices?: number[] | null;
+          end_date?: string | null;
+          image?: string | null;
+          active?: boolean;
+          closed?: boolean;
+          cached_at?: string;
+        };
+        Relationships: [];
+      };
+      recent_trades: {
+        Row: {
+          id: number;
+          address: string;
+          condition_id: string | null;
+          market: string | null;
+          outcome_index: number | null;
+          side: string | null;
+          price: number | null;
+          size: number | null;
+          usdc_size: number | null;
+          traded_at: string;
+          ingested_at: string;
+        };
+        Insert: {
+          address: string;
+          condition_id?: string | null;
+          market?: string | null;
+          outcome_index?: number | null;
+          side?: string | null;
+          price?: number | null;
+          size?: number | null;
+          usdc_size?: number | null;
+          traded_at: string;
+          ingested_at?: string;
+        };
+        Update: {
+          condition_id?: string | null;
+          market?: string | null;
+          outcome_index?: number | null;
+          side?: string | null;
+          price?: number | null;
+          size?: number | null;
+          usdc_size?: number | null;
+          traded_at?: string;
+          ingested_at?: string;
         };
         Relationships: [];
       };

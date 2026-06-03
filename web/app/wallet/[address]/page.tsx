@@ -37,7 +37,7 @@ export default async function WalletPage({ params, searchParams }: WalletPagePro
   if (!profile) {
     return (
       <main className="page">
-        <Link href="/" className="mono muted">BACK TO LEADERBOARD</Link>
+        <Link href="/leaderboard" className="mono muted">BACK TO LEADERBOARD</Link>
         <section className="panel" style={{ marginTop: 24, padding: 28 }}>
           <h1 className="brand">Wallet not indexed</h1>
           <p className="subtitle">This wallet hasn&apos;t been indexed yet.</p>
@@ -63,7 +63,7 @@ export default async function WalletPage({ params, searchParams }: WalletPagePro
 
   return (
     <main className="page">
-      <Link href="/" className="mono muted">BACK TO LEADERBOARD</Link>
+      <Link href="/leaderboard" className="mono muted">BACK TO LEADERBOARD</Link>
       <header className="topbar" style={{ marginTop: 24 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
