@@ -16,10 +16,11 @@ import type { EquityPoint, HorizonDays } from "@/lib/types";
 
 interface EquityCurveChartProps {
   equityCurves: Record<HorizonDays, EquityPoint[]>;
+  initialHorizon?: HorizonDays;
 }
 
-export default function EquityCurveChart({ equityCurves }: EquityCurveChartProps) {
-  const [horizon, setHorizon] = useState<HorizonDays>(90);
+export default function EquityCurveChart({ equityCurves, initialHorizon = 90 }: EquityCurveChartProps) {
+  const [horizon, setHorizon] = useState<HorizonDays>(initialHorizon);
   const data = equityCurves[horizon];
   const endingPnl = data[data.length - 1]?.cumulativePnl ?? 0;
   const stroke = endingPnl >= 0 ? "var(--green)" : "var(--red)";

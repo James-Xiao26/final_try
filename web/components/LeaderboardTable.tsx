@@ -145,7 +145,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
                 </td>
                 <td style={{ padding: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Link href={`/wallet/${row.address}`} className="mono" style={{ color: "var(--text)" }}>
+                    <Link href={`/wallet/${row.address}?horizon=${horizon}`} className="mono" style={{ color: "var(--text)" }}>
                       {row.handle ? `@${row.handle}` : shortenAddress(row.address)}
                     </Link>
                     <button

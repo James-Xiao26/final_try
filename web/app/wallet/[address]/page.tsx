@@ -6,6 +6,7 @@ import MetricsCard from "@/components/MetricsCard";
 import { formatPercent, shortenAddress } from "@/lib/format";
 import { getWalletProfile } from "@/lib/supabase";
 import { HORIZONS } from "@/lib/types";
+import type { HorizonDays } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +14,19 @@ interface WalletPageProps {
   params: {
     address: string;
   };
+  searchParams: {
+    horizon?: string;
+  };
 }
 
-export default async function WalletPage({ params }: WalletPageProps) {
+function parseHorizon(value: string | undefined): HorizonDays {
+  const parsed = Number(value);
+  return HORIZONS.includes(parsed as HorizonDays) ? (parsed as HorizonDays) : 90;
+}
+
+export default async function WalletPage({ params, searchParams }: WalletPageProps) {
   const address = params.address.toLowerCase();
+  const initialHorizon = parseHorizon(searchParams.horizon);
 
   if (!address.startsWith("0x") || address.length !== 42) {
     notFound();
@@ -109,7 +119,7 @@ export default async function WalletPage({ params }: WalletPageProps) {
         ))}
       </section>
 
-      <EquityCurveChart equityCurves={profile.equityCurves} />
+      <EquityCurveChart equityCurves={profile.equityCurves} initialHorizon={initialHorizon} />
     </main>
   );
 }
