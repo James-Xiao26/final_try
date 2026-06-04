@@ -48,25 +48,32 @@ test("mapEvent rolls up event-level aggregate fields", () => {
   assert.equal(event.volume1wkUsd, 120_000_000);
 });
 
-test("mapEvent surfaces the leading (highest-probability) outcome and its spread", () => {
-  const event = mapEvent(eventRecord());
-  // France (0.22) beats Spain (0.17), so it leads.
-  assert.equal(event.topOutcome, "France");
-  assert.equal(event.currentPrice, 0.22);
-  assert.equal(event.spread, 0.003);
-});
-
-test("mapEvent surfaces the leading outcome's 24h price change", () => {
+test("mapEvent surfaces the highest-volume outcome (not the highest price)", () => {
   const event = mapEvent(
     eventRecord({
       markets: [
-        nestedMarket({ groupItemTitle: "France", outcomePrices: "[\"0.22\", \"0.78\"]", oneDayPriceChange: 0.05 }),
-        nestedMarket({ groupItemTitle: "Spain", outcomePrices: "[\"0.17\", \"0.83\"]", oneDayPriceChange: -0.01 })
+        nestedMarket({ groupItemTitle: "France", outcomePrices: "[\"0.22\", \"0.78\"]", spread: 0.003, volume: 1_000 }),
+        nestedMarket({ groupItemTitle: "Spain", outcomePrices: "[\"0.17\", \"0.83\"]", spread: 0.004, volume: 5_000 })
       ]
     })
   );
-  // From the leading outcome (France, 0.22), not Spain.
-  assert.equal(event.oneDayPriceChange, 0.05);
+  // Spain has the lower price but the most volume, so it leads.
+  assert.equal(event.topOutcome, "Spain");
+  assert.equal(event.currentPrice, 0.17);
+  assert.equal(event.spread, 0.004);
+});
+
+test("mapEvent surfaces the leading (highest-volume) outcome's 24h price change", () => {
+  const event = mapEvent(
+    eventRecord({
+      markets: [
+        nestedMarket({ groupItemTitle: "France", outcomePrices: "[\"0.22\", \"0.78\"]", oneDayPriceChange: 0.05, volume: 1_000 }),
+        nestedMarket({ groupItemTitle: "Spain", outcomePrices: "[\"0.17\", \"0.83\"]", oneDayPriceChange: -0.01, volume: 5_000 })
+      ]
+    })
+  );
+  // Spain leads by volume, so its change is surfaced (not France's).
+  assert.equal(event.oneDayPriceChange, -0.01);
 });
 
 test("mapEvent yields null 24h change when the field is absent", () => {

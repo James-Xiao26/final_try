@@ -386,23 +386,25 @@ interface LeadingOutcome {
 }
 
 // An event has many outcome markets (e.g. one per team). There's no single event price, so we
-// surface the *favorite*: the market with the highest implied "Yes" probability. Its label is the
-// market's groupItemTitle ("Spain"), or the first outcome name for a plain binary market ("Yes").
+// surface the *most-traded* outcome: the market with the highest volume within the event, and show
+// that market's price. Its label is the market's groupItemTitle ("Spain"), or the first outcome name
+// for a plain binary market ("Yes").
 function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
   let leading: LeadingOutcome = { price: null, label: null, spread: null, oneDayPriceChange: null };
-  let bestPrice = -Infinity;
+  let bestVolume = -Infinity;
 
   for (const market of markets) {
+    const volume = readNumber(market, ["volume", "volumeNum"]);
+    if (volume <= bestVolume) {
+      continue;
+    }
+    bestVolume = volume;
+
     const prices = parseJsonArray(market.outcomePrices)
       .map((entry) => Number(entry))
       .filter((value) => Number.isFinite(value));
     // Implied Yes probability from outcomePrices[0]; fall back to the last trade price.
     const yesPrice = prices.length > 0 ? prices[0] ?? null : readOptionalNumber(market, ["lastTradePrice"]);
-    if (yesPrice === null || yesPrice <= bestPrice) {
-      continue;
-    }
-
-    bestPrice = yesPrice;
     const outcomes = parseJsonArray(market.outcomes).map((entry) => String(entry));
     const groupTitle = readString(market, ["groupItemTitle"]);
     leading = {
