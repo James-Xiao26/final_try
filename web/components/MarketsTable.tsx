@@ -84,6 +84,10 @@ function formatCurrentPrice(price: number | null, outcome: string | null): strin
   return outcome ? `${outcome} ${pct}` : pct;
 }
 
+// Poll a little more often than the markets ingest refreshes (~20 min) so the tab catches a new
+// batch within a minute without hammering the API route.
+const POLL_INTERVAL_MS = 60_000;
+
 export default function MarketsTable({ initialRows, initialSort }: MarketsTableProps) {
   const [sort, setSort] = useState<MarketSort>(initialSort);
   const [rows, setRows] = useState(initialRows);
@@ -120,6 +124,41 @@ export default function MarketsTable({ initialRows, initialSort }: MarketsTableP
       active = false;
     };
   }, [sort, initialSort, initialRows]);
+
+  // Background poll of the current sort so the tab stays fresh without a reload. Silent (no loading
+  // skeleton), and paused on a hidden tab — refreshes on re-focus.
+  useEffect(() => {
+    let active = true;
+    const poll = (): void => {
+      if (document.hidden) {
+        return;
+      }
+      fetch(`/api/markets?sort=${sort}`)
+        .then((response) => (response.ok ? (response.json() as Promise<MarketRow[]>) : Promise.reject(new Error("Markets request failed"))))
+        .then((nextRows) => {
+          if (active) {
+            setRows(nextRows);
+          }
+        })
+        .catch(() => {
+          // Keep showing the last good data on a transient failure.
+        });
+    };
+
+    const intervalId = setInterval(poll, POLL_INTERVAL_MS);
+    const onVisibility = (): void => {
+      if (!document.hidden) {
+        poll();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [sort]);
 
   return (
     <section className="panel">

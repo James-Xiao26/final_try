@@ -15,7 +15,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json(rows, {
       headers: {
-        "Cache-Control": "s-maxage=3600, stale-while-revalidate=300"
+        // Short edge cache so the client poll surfaces a fresh markets ingest within ~a minute,
+        // while still collapsing concurrent requests to one origin hit per window.
+        "Cache-Control": "s-maxage=60, stale-while-revalidate=120"
       }
     });
   } catch (error) {

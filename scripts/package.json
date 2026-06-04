@@ -6,6 +6,7 @@
   "scripts": {
     "ingest": "tsx ingest.ts",
     "ingest:feed": "tsx ingest.ts --feed-only",
+    "ingest:markets": "tsx ingest.ts --markets-only",
     "probe": "tsx probeClosedPositions.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test \"**/*.test.ts\""
