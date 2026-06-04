@@ -25,6 +25,17 @@ function sideColor(side: string | null): string {
   return "var(--muted)";
 }
 
+// Long handles blow out the TRADER column and push every column after it to the right; cap the
+// displayed length (the cell also hard-clips with an ellipsis, and the full value is on hover).
+const MAX_HANDLE_LENGTH = 16;
+function traderLabel(handle: string | null, address: string): string {
+  if (!handle) {
+    return shortenAddress(address);
+  }
+  const label = `@${handle}`;
+  return label.length > MAX_HANDLE_LENGTH ? `${label.slice(0, MAX_HANDLE_LENGTH - 1)}…` : label;
+}
+
 export default function RecentTradesFeed({ initialTrades, initialTraderCount }: RecentTradesFeedProps) {
   const [trades, setTrades] = useState(initialTrades);
   const [traderCount, setTraderCount] = useState(initialTraderCount);
@@ -100,9 +111,14 @@ export default function RecentTradesFeed({ initialTrades, initialTraderCount }: 
             ) : null}
             {trades.map((trade, index) => (
               <tr key={`${trade.address}-${trade.tradedAt}-${index}`} style={{ borderTop: "1px solid var(--line)" }}>
-                <td style={{ padding: "12px" }}>
-                  <Link href={`/wallet/${trade.address}`} className="mono" style={{ color: "var(--text)" }}>
-                    {trade.handle ? `@${trade.handle}` : shortenAddress(trade.address)}
+                <td style={{ padding: "12px", maxWidth: 170 }}>
+                  <Link
+                    href={`/wallet/${trade.address}`}
+                    className="mono"
+                    title={trade.handle ? `@${trade.handle}` : trade.address}
+                    style={{ color: "var(--text)", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                  >
+                    {traderLabel(trade.handle, trade.address)}
                   </Link>
                 </td>
                 <td style={{ padding: "12px" }}>
