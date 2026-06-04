@@ -22,11 +22,11 @@ export const CONFIG = {
   // Prior strength: everyone starts as if they had this many zero-edge resolved bets. Higher = more
   // skeptical (slower to reward a short hot streak).
   EDGE_SHRINKAGE_K: 20,
-  // The proven (shrunk) per-share edge that earns a perfect SCORE_MAX. 0.05 = a 5-cents-per-share
+  // The proven (shrunk) per-share edge that earns a perfect SCORE_MAX. 0.10 = a 10-cents-per-share
   // edge over the market's implied price. Placeholder — calibrate from the shrunk-edge distribution
   // after the first real ingest so SCORE_MAX is reserved for the genuine top. Changing this (or
   // EDGE_SHRINKAGE_K) requires updating the exact score constants in metrics.test.ts.
-  EDGE_FOR_TEN: 0.05,
+  EDGE_FOR_TEN: 0.1,
   BOT: {
     // Calibrated against a working trades/day denominator (see MIN_RATE_WINDOW_DAYS). The old 50
     // was a dead constant: activity is capped at ACTIVITY_LIMIT and the rate used to be divided by

@@ -183,20 +183,20 @@ test("computeSkillScore is null when a single win dominates PnL", () => {
 });
 
 // --- computeSkillScore: Bayesian-shrunk edge (0–10) -------------------------
-// Constants below assume EDGE_SHRINKAGE_K = 20, EDGE_FOR_TEN = 0.05, SCORE_MAX = 10.
+// Constants below assume EDGE_SHRINKAGE_K = 20, EDGE_FOR_TEN = 0.10, SCORE_MAX = 10.
 
 test("computeSkillScore scales the shrunk per-share edge to 0–10", () => {
   // avgEdgePerShare 0.05 over 60 resolved: shrunk = 0.05*60/(60+20) = 0.0375;
-  // score = 10 * 0.0375 / 0.05 = 7.5.
+  // score = 10 * 0.0375 / 0.10 = 3.75.
   const score = computeSkillScore(metrics({ avgEdgePerShare: 0.05, nResolved: 60 }), CONFIG);
-  approx(score, 7.5);
+  approx(score, 3.75);
 });
 
 test("computeSkillScore shrinks a thin resolved sample toward 0", () => {
-  // Same edge, fewer resolved bets => lower score. n=20: shrunk = 0.05*20/40 = 0.025; score = 5.0.
+  // Same edge, fewer resolved bets => lower score. n=20: shrunk = 0.05*20/40 = 0.025; score = 2.5.
   const thin = computeSkillScore(metrics({ avgEdgePerShare: 0.05, nResolved: 20 }), CONFIG);
   const full = computeSkillScore(metrics({ avgEdgePerShare: 0.05, nResolved: 60 }), CONFIG);
-  approx(thin, 5.0);
+  approx(thin, 2.5);
   assert.ok(thin !== null && full !== null && thin < full);
 });
 
@@ -205,8 +205,8 @@ test("computeSkillScore floors negative edge to 0", () => {
 });
 
 test("computeSkillScore clamps at SCORE_MAX", () => {
-  // avgEdgePerShare 0.1 over 200: shrunk = 0.1*200/220 = 0.0909; raw score 18.2 -> clamped to 10.
-  assert.equal(computeSkillScore(metrics({ avgEdgePerShare: 0.1, nResolved: 200 }), CONFIG), CONFIG.SCORE_MAX);
+  // avgEdgePerShare 0.2 over 200: shrunk = 0.2*200/220 = 0.1818; raw score 18.2 -> clamped to 10.
+  assert.equal(computeSkillScore(metrics({ avgEdgePerShare: 0.2, nResolved: 200 }), CONFIG), CONFIG.SCORE_MAX);
 });
 
 test("computeSkillScore is 0 with no resolved positions", () => {
