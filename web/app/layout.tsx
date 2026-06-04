@@ -137,7 +137,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         `}</style>
         <div className="shell">
           <nav className="sidebar" aria-label="Primary">
-            <div className="brand-mark mono">EDGEBOARD</div>
+            <div className="brand-mark mono">WHALEWATCHER</div>
             <SidebarNav />
           </nav>
           <div className="content">{children}</div>

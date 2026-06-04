@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import SkillScoreBadge from "@/components/SkillScoreBadge";
-import { formatPrice, formatTimeAgo, formatUsd, shortenAddress } from "@/lib/format";
+import { formatDateTime, formatPrice, formatUsd, shortenAddress } from "@/lib/format";
 import type { RecentTrade, RecentTradesFeed as RecentTradesFeedData } from "@/lib/types";
 
 interface RecentTradesFeedProps {
@@ -87,7 +87,7 @@ export default function RecentTradesFeed({ initialTrades, initialTraderCount }: 
               <th style={{ padding: "12px" }}>SIDE</th>
               <th style={{ padding: "12px" }}>PRICE</th>
               <th style={{ padding: "12px" }}>AMOUNT</th>
-              <th style={{ padding: "12px" }}>WHEN</th>
+              <th style={{ padding: "12px" }}>TIME</th>
             </tr>
           </thead>
           <tbody>
@@ -122,8 +122,8 @@ export default function RecentTradesFeed({ initialTrades, initialTraderCount }: 
                 <td className="mono" style={{ padding: "12px" }}>
                   {trade.usdcSize === null ? "—" : formatUsd(trade.usdcSize)}
                 </td>
-                <td className="mono muted" style={{ padding: "12px" }} title={trade.tradedAt}>
-                  {formatTimeAgo(trade.tradedAt)}
+                <td className="mono muted" style={{ padding: "12px" }} title={trade.tradedAt} suppressHydrationWarning>
+                  {formatDateTime(trade.tradedAt)}
                 </td>
               </tr>
             ))}

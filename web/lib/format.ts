@@ -46,22 +46,17 @@ export function formatPrice(value: number): string {
   return `${(value * 100).toFixed(1)}¢`;
 }
 
-// Compact relative time for the activity feed, e.g. "now", "3m", "5h", "2d". Input is an ISO string.
-// nowMs is injectable for testing.
-export function formatTimeAgo(iso: string, nowMs: number = Date.now()): string {
-  const diffMs = nowMs - Date.parse(iso);
-  if (!Number.isFinite(diffMs) || diffMs < 60_000) {
-    return "now";
+// Local time of day a trade happened, e.g. "2:45 PM" (follows the viewer's locale and timezone).
+// Used by the activity feed's TIME column.
+export function formatDateTime(iso: string): string {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) {
+    return "—";
   }
-  const minutes = Math.floor(diffMs / 60_000);
-  if (minutes < 60) {
-    return `${minutes}m`;
-  }
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours}h`;
-  }
-  return `${Math.floor(hours / 24)}d`;
+  return new Date(ms).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit"
+  });
 }
 
 export function isValidAddress(address: string): boolean {
