@@ -76,6 +76,7 @@ export interface EventSummary {
   currentPrice: number | null;
   topOutcome: string | null;
   spread: number | null;
+  oneDayPriceChange: number | null;
   endDate: string | null;
   image: string | null;
   active: boolean;
@@ -380,13 +381,15 @@ interface LeadingOutcome {
   price: number | null;
   label: string | null;
   spread: number | null;
+  // Change in the leading outcome's price over the last 24h, as a 0–1 fraction (e.g. 0.03 = +3pts).
+  oneDayPriceChange: number | null;
 }
 
 // An event has many outcome markets (e.g. one per team). There's no single event price, so we
 // surface the *favorite*: the market with the highest implied "Yes" probability. Its label is the
 // market's groupItemTitle ("Spain"), or the first outcome name for a plain binary market ("Yes").
 function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
-  let leading: LeadingOutcome = { price: null, label: null, spread: null };
+  let leading: LeadingOutcome = { price: null, label: null, spread: null, oneDayPriceChange: null };
   let bestPrice = -Infinity;
 
   for (const market of markets) {
@@ -405,7 +408,8 @@ function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
     leading = {
       price: yesPrice,
       label: groupTitle || outcomes[0] || "Yes",
-      spread: readOptionalNumber(market, ["spread"])
+      spread: readOptionalNumber(market, ["spread"]),
+      oneDayPriceChange: readOptionalNumber(market, ["oneDayPriceChange"])
     };
   }
 
@@ -432,6 +436,7 @@ export function mapEvent(record: JsonRecord): EventSummary {
     currentPrice: leading.price,
     topOutcome: leading.label,
     spread: leading.spread,
+    oneDayPriceChange: leading.oneDayPriceChange,
     endDate: readString(record, ["endDate", "endDateIso"]) || null,
     image: readString(record, ["image", "icon"]) || null,
     active: record.active === true,

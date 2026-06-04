@@ -56,6 +56,23 @@ test("mapEvent surfaces the leading (highest-probability) outcome and its spread
   assert.equal(event.spread, 0.003);
 });
 
+test("mapEvent surfaces the leading outcome's 24h price change", () => {
+  const event = mapEvent(
+    eventRecord({
+      markets: [
+        nestedMarket({ groupItemTitle: "France", outcomePrices: "[\"0.22\", \"0.78\"]", oneDayPriceChange: 0.05 }),
+        nestedMarket({ groupItemTitle: "Spain", outcomePrices: "[\"0.17\", \"0.83\"]", oneDayPriceChange: -0.01 })
+      ]
+    })
+  );
+  // From the leading outcome (France, 0.22), not Spain.
+  assert.equal(event.oneDayPriceChange, 0.05);
+});
+
+test("mapEvent yields null 24h change when the field is absent", () => {
+  assert.equal(mapEvent(eventRecord()).oneDayPriceChange, null);
+});
+
 test("mapEvent labels a plain binary market by its first outcome", () => {
   const event = mapEvent(
     eventRecord({

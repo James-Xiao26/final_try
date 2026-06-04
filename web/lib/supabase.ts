@@ -31,7 +31,7 @@ type MarketSelectRow = Pick<
   | "volume_1wk_usd"
   | "last_trade_price"
   | "top_outcome"
-  | "spread"
+  | "one_day_price_change"
   | "end_date"
   | "image"
 >;
@@ -228,8 +228,8 @@ const MARKET_SORT_COLUMNS: Record<MarketSort, keyof MarketSelectRow> = {
   liquidity: "liquidity_usd",
   volume: "volume_usd",
   volume_24hr: "volume_24hr_usd",
-  // Volatility uses the stored bid/ask spread, which Postgres can order directly.
-  volatility: "spread"
+  // 24h change orders by the stored leading-outcome one-day price change.
+  change: "one_day_price_change"
 };
 
 export async function getMarkets(
@@ -241,7 +241,7 @@ export async function getMarkets(
 
   let query = supabase
     .from("markets")
-    .select("id, question, slug, category, liquidity_usd, volume_usd, volume_24hr_usd, volume_1wk_usd, last_trade_price, top_outcome, spread, end_date, image")
+    .select("id, question, slug, category, liquidity_usd, volume_usd, volume_24hr_usd, volume_1wk_usd, last_trade_price, top_outcome, one_day_price_change, end_date, image")
     .eq("active", true)
     .eq("closed", false)
     .order(column, { ascending: false, nullsFirst: false })
@@ -273,7 +273,7 @@ export async function getMarkets(
     volume1wkUsd: toNumber(row.volume_1wk_usd),
     currentPrice: row.last_trade_price,
     topOutcome: row.top_outcome,
-    spread: row.spread,
+    oneDayPriceChange: row.one_day_price_change,
     endDate: row.end_date,
     image: row.image
   }));

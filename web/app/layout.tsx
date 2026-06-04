@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
-import { IBM_Plex_Mono } from "next/font/google";
+import { Inter, IBM_Plex_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 import SidebarNav from "@/components/SidebarNav";
+
+// Inter: the closest freely-licensed match to Coinbase Sans — a neutral, modern grotesque that
+// reads as clean and trustworthy. IBM Plex Mono stays for tabular data (numbers, prices, addresses).
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap"
+});
 
 const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
@@ -17,7 +24,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${plexMono.variable}`}>
       <body>
         <style>{`
           :root {
@@ -41,8 +48,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               var(--bg);
             background-size: 24px 24px;
             color: var(--text);
-            font-family: var(--font-geist-sans), Inter, system-ui, sans-serif;
-            letter-spacing: 0;
+            font-family: var(--font-inter), system-ui, sans-serif;
+            letter-spacing: -0.006em;
+            -webkit-font-smoothing: antialiased;
           }
           a { color: inherit; text-decoration: none; }
           button, input { font: inherit; }
@@ -91,7 +99,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             gap: 20px;
             margin-bottom: 28px;
           }
-          .brand { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: 0; }
+          .brand { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
           .subtitle { margin: 6px 0 0; color: var(--muted); max-width: 680px; line-height: 1.5; }
           .panel {
             border: 1px solid var(--line);

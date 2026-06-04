@@ -41,13 +41,13 @@ export interface WalletProfile {
   badges: { label: string; horizonDays: number }[];
 }
 
-// Sortable columns on the Markets page. "volatility" maps to the bid/ask spread (the orderable
-// proxy stored on each market). Kept as a const array so the API route can validate against it.
-export const MARKET_SORTS = ["liquidity", "volume", "volume_24hr", "volatility"] as const;
+// Sortable columns on the Markets page. "change" maps to the leading outcome's 24h price change.
+// Kept as a const array so the API route can validate against it.
+export const MARKET_SORTS = ["liquidity", "volume", "volume_24hr", "change"] as const;
 export type MarketSort = (typeof MARKET_SORTS)[number];
 
 // One grouped Polymarket event, as shown on the Markets page. currentPrice/topOutcome describe the
-// leading (favorite) outcome; spread is its bid/ask spread (volatility proxy).
+// leading (favorite) outcome; oneDayPriceChange is that outcome's price change over the last 24h.
 export interface MarketRow {
   id: string;
   question: string;
@@ -59,7 +59,7 @@ export interface MarketRow {
   volume1wkUsd: number;
   currentPrice: number | null;
   topOutcome: string | null;
-  spread: number | null;
+  oneDayPriceChange: number | null;
   endDate: string | null;
   image: string | null;
 }

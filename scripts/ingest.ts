@@ -525,6 +525,7 @@ async function ingestMarkets(supabase: SupabaseClient, client: PolymarketClient)
       volume_24hr_usd: event.volume24hrUsd,
       volume_1wk_usd: event.volume1wkUsd,
       spread: event.spread,
+      one_day_price_change: event.oneDayPriceChange,
       last_trade_price: event.currentPrice,
       top_outcome: event.topOutcome,
       end_date: event.endDate,
