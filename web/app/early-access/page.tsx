@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import LaunchCountdown from "@/components/LaunchCountdown";
 import WaitlistForm from "@/components/WaitlistForm";
 
 export const metadata: Metadata = {
@@ -83,8 +84,13 @@ export default function EarlyAccessPage() {
         </div>
       </section>
 
+      {/* launch countdown */}
+      <section className="ea-wrap reveal" style={{ animationDelay: ".38s" }}>
+        <LaunchCountdown />
+      </section>
+
       {/* stat strip */}
-      <section className="ea-wrap reveal" style={{ animationDelay: ".4s" }}>
+      <section className="ea-wrap reveal" style={{ animationDelay: ".46s", marginTop: "18px" }}>
         <div className="ea-strip">
           <div className="cell">
             <div className="k">Skill range</div>
