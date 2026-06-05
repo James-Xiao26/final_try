@@ -1,154 +1,56 @@
 import type { Metadata } from "next";
-import { Inter, IBM_Plex_Mono } from "next/font/google";
+import { Chakra_Petch, IBM_Plex_Mono } from "next/font/google";
 import type { ReactNode } from "react";
+import OceanScene from "@/components/OceanScene";
 import SidebarNav from "@/components/SidebarNav";
+import "./globals.css";
 
-// Inter: the closest freely-licensed match to Coinbase Sans — a neutral, modern grotesque that
-// reads as clean and trustworthy. IBM Plex Mono stays for tabular data (numbers, prices, addresses).
-const inter = Inter({
+// Chakra Petch: a squared, technical display face that reads like an instrument console — used for
+// the wordmark, nav, headings, and key figures. IBM Plex Mono carries body text and tabular data.
+const display = Chakra_Petch({
   subsets: ["latin"],
-  variable: "--font-inter",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-display",
   display: "swap"
 });
 
 const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700"],
   variable: "--font-plex-mono"
 });
 
 export const metadata: Metadata = {
   title: "WhaleWatcher",
-  description: "Risk-adjusted Polymarket trader leaderboard."
+  description: "Polymarket trader leaderboard, ranked by forecasting edge."
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`${display.variable} ${plexMono.variable}`}>
       <body>
-        <style>{`
-          :root {
-            --bg: #0A0B0E;
-            --panel: #101217;
-            --line: #262A33;
-            --text: #F2F5F7;
-            --muted: #8D95A3;
-            --green: #00FF88;
-            --red: #FF3B5C;
-            --yellow: #FFD166;
-          }
-          * { box-sizing: border-box; }
-          html { color-scheme: dark; background: var(--bg); }
-          body {
-            margin: 0;
-            min-height: 100vh;
-            background:
-              linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px),
-              var(--bg);
-            background-size: 24px 24px;
-            color: var(--text);
-            font-family: var(--font-inter), system-ui, sans-serif;
-            letter-spacing: -0.006em;
-            -webkit-font-smoothing: antialiased;
-          }
-          a { color: inherit; text-decoration: none; }
-          button, input { font: inherit; }
-          button { cursor: pointer; }
-          .mono { font-family: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace; }
-          .shell { display: flex; min-height: 100vh; }
-          .sidebar {
-            width: 220px;
-            flex-shrink: 0;
-            border-right: 1px solid var(--line);
-            background: rgba(16, 18, 23, 0.9);
-            padding: 24px 14px;
-            position: sticky;
-            top: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-          }
-          .brand-mark { font-size: 15px; font-weight: 700; letter-spacing: 1px; color: var(--text); }
-          .nav-links { display: flex; flex-direction: column; gap: 4px; }
-          .nav-link {
-            display: block;
-            padding: 10px 12px;
-            color: var(--muted);
-            border: 1px solid transparent;
-            font-size: 13px;
-          }
-          .nav-link:hover { color: var(--text); }
-          .nav-link[aria-current=page] {
-            color: var(--text);
-            border-color: var(--line);
-            background: rgba(0, 255, 136, 0.06);
-          }
-          /* min-width:0 lets wide tables inside scroll instead of stretching the flex layout. */
-          .content { flex: 1; min-width: 0; }
-          .page {
-            width: min(1180px, calc(100vw - 32px));
-            margin: 0 auto;
-            padding: 32px 0 56px;
-          }
-          .topbar {
-            display: flex;
-            align-items: end;
-            justify-content: space-between;
-            gap: 20px;
-            margin-bottom: 28px;
-          }
-          .brand { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
-          .subtitle { margin: 6px 0 0; color: var(--muted); max-width: 680px; line-height: 1.5; }
-          .panel {
-            border: 1px solid var(--line);
-            background: rgba(16, 18, 23, 0.9);
-            box-shadow: 0 0 0 1px rgba(0,255,136,0.04);
-          }
-          .toolbar {
-            display: flex;
-            justify-content: space-between;
-            gap: 16px;
-            padding: 14px;
-            border-bottom: 1px solid var(--line);
-          }
-          .muted { color: var(--muted); }
-          .positive { color: var(--green); }
-          .negative { color: var(--red); }
-          .warning { color: var(--yellow); }
-          @keyframes pulse { 50% { opacity: 0.45; } }
-          .skeleton {
-            background: linear-gradient(90deg, #151922, #202632, #151922);
-            background-size: 200% 100%;
-            animation: pulse 1.2s ease-in-out infinite;
-          }
-          @media (max-width: 760px) {
-            .shell { flex-direction: column; }
-            .sidebar {
-              width: auto;
-              height: auto;
-              position: static;
-              flex-direction: row;
-              align-items: center;
-              gap: 14px;
-              border-right: 0;
-              border-bottom: 1px solid var(--line);
-              padding: 14px 16px;
-              overflow-x: auto;
-            }
-            .nav-links { flex-direction: row; }
-            .page { width: min(100vw - 20px, 1180px); padding-top: 18px; }
-            .topbar, .toolbar { align-items: stretch; flex-direction: column; }
-            .brand { font-size: 24px; }
-          }
-        `}</style>
+        <OceanScene />
+
         <div className="shell">
-          <nav className="sidebar" aria-label="Primary">
-            <div className="brand-mark mono">WHALEWATCHER</div>
-            <SidebarNav />
-          </nav>
-          <div className="content">{children}</div>
+          <header className="topnav">
+            <div className="topnav-inner">
+              <a className="brand-mark" href="/" aria-label="WhaleWatcher home">
+                <svg viewBox="0 0 48 48" fill="none" aria-hidden>
+                  <circle cx="24" cy="24" r="21" stroke="#36ecd0" strokeWidth="1" opacity="0.35" />
+                  <circle cx="24" cy="24" r="14" stroke="#36ecd0" strokeWidth="1" opacity="0.5" />
+                  <circle cx="24" cy="24" r="7" stroke="#36ecd0" strokeWidth="1" opacity="0.7" />
+                  <path d="M11 27c5 2 9 2 13-1 3-2 6-3 10-1-1 3-4 5-8 5-3 0-5-1-6-2-3 2-6 2-9-1z" fill="#36ecd0" />
+                  <circle cx="30" cy="24" r="1.4" fill="#03141d" />
+                </svg>
+                <div>
+                  <div className="wm"><b>WHALE</b><span className="light">WATCHER</span></div>
+                  <div className="tag">Hydrophone Console</div>
+                </div>
+              </a>
+              <SidebarNav />
+            </div>
+          </header>
+          <main className="content">{children}</main>
         </div>
       </body>
     </html>

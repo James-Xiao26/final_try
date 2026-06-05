@@ -12,7 +12,7 @@ interface HorizonToggleProps {
 export default function HorizonToggle({ value, onChange, horizons = HORIZONS }: HorizonToggleProps) {
   const lastHorizon = horizons[horizons.length - 1];
   return (
-    <div role="tablist" aria-label="Leaderboard horizon" style={{ display: "flex", border: "1px solid var(--line)" }}>
+    <div role="tablist" aria-label="Leaderboard horizon" style={{ display: "flex", border: "1px solid var(--line)", borderRadius: 3, overflow: "hidden" }}>
       {horizons.map((horizon) => (
         <button
           key={horizon}
@@ -25,7 +25,8 @@ export default function HorizonToggle({ value, onChange, horizons = HORIZONS }: 
             border: 0,
             borderRight: horizon === lastHorizon ? 0 : "1px solid var(--line)",
             background: value === horizon ? "var(--green)" : "transparent",
-            color: value === horizon ? "#06100B" : "var(--text)",
+            color: value === horizon ? "#03141d" : "var(--text)",
+            boxShadow: value === horizon ? "0 0 18px rgba(54,236,208,0.5)" : "none",
             padding: "10px 12px",
             minWidth: 68,
             fontWeight: 700

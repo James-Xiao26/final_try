@@ -8,15 +8,16 @@ export default async function HomePage() {
 
   return (
     <main className="page">
-      <header className="topbar">
+      <div className="act-page-head">
         <div>
-          <h1 className="brand">Live Activity</h1>
+          <h1 className="brand">Hydrophone <span className="g">Feed</span></h1>
           <p className="subtitle">
-            Trades placed in the last 24 hours by wallets currently on the leaderboard — who traded, at what price, how much, and when. Auto-refreshes every minute.
+            Live acoustic intercepts — every fill placed in the last 24 hours by a contact currently on the board. Who transmitted, on what bearing, at what depth, and how long ago. Auto-refreshes every minute.
           </p>
         </div>
-        <div className="mono muted">LIVE / LAST 24H</div>
-      </header>
+        <span className="act-live"><span className="dot" /> Live · Last 24h</span>
+      </div>
+
       <RecentTradesFeed initialTrades={trades} initialTraderCount={traderCount} />
     </main>
   );

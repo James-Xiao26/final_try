@@ -118,6 +118,13 @@
   .brand .sub { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.34em; text-transform: uppercase;
                 color: var(--muted); margin-top: 4px; }
 
+  .nav { display: flex; gap: 6px; background: var(--panel); border: 1px solid var(--panel-edge);
+         border-radius: 4px; padding: 4px; }
+  .nav a { font-family: var(--disp); font-weight: 600; font-size: 13px; letter-spacing: 0.06em;
+           color: var(--muted); padding: 8px 18px; border-radius: 2px; transition: all .2s; }
+  .nav a:hover { color: var(--abyss-text); }
+  .nav a.active { color: #03141d; background: var(--bio); box-shadow: 0 0 16px rgba(54,236,208,0.45); }
+
   .status-strip { display: flex; align-items: center; gap: 22px; }
   .stat { text-align: right; }
   .stat .k { font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-d); }
@@ -338,6 +345,7 @@
     .hero { grid-template-columns: 1fr; }
     .ops { grid-template-columns: 1fr; }
     td.signal, td.class { display: none; }
+    .nav { order: 3; width: 100%; justify-content: center; }
   }
   @media (max-width: 640px) {
     .wrap { padding: 0 16px 64px; }
@@ -364,7 +372,7 @@
   <!-- ============== CONSOLE BAR ============== -->
   <header>
     <div class="console-bar">
-      <div class="brand">
+      <a class="brand" href="whalewatcher-index.html">
         <svg class="mark" viewBox="0 0 48 48" fill="none">
           <circle cx="24" cy="24" r="21" stroke="#36ecd0" stroke-width="1" opacity="0.35"/>
           <circle cx="24" cy="24" r="14" stroke="#36ecd0" stroke-width="1" opacity="0.5"/>
@@ -376,7 +384,12 @@
           <div class="name"><b>WHALE</b><span class="light">WATCHER</span></div>
           <div class="sub">Hydrophone Console · Polymarket Deep Scan</div>
         </div>
-      </div>
+      </a>
+      <nav class="nav">
+        <a href="whalewatcher-activity.html">Activity</a>
+        <a href="whalewatcher-sonar.html" class="active">Leaderboard</a>
+        <a href="whalewatcher-markets.html">Markets</a>
+      </nav>
       <div class="status-strip">
         <div class="stat"><div class="k">Contacts</div><div class="v" id="stat-contacts">412</div></div>
         <div class="stat"><div class="k">Apex Signal</div><div class="v" id="stat-apex">9.4</div></div>

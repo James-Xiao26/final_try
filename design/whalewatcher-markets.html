@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WhaleWatcher — Open Water</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+<style>
+  /* ===== WhaleWatcher shared sonar-console theme ===== */
+  :root{
+    --bg0:#03101a;--bg1:#062132;--bg2:#0a2c40;
+    --panel:rgba(8,36,52,0.55);--panel-edge:rgba(60,224,200,0.18);
+    --bio:#36ecd0;--bio-d:#1fa994;--teal:#2bb3c9;
+    --abyss-text:#d4f3f0;--muted:#6c97a3;--muted-d:#4a6f7a;
+    --coral:#ff7a59;--amber:#ffd27a;--grid:rgba(54,236,208,0.08);
+    --disp:"Chakra Petch",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace;
+    --maxw:1240px;
+  }
+  *{box-sizing:border-box}html{-webkit-font-smoothing:antialiased}
+  body{margin:0;min-height:100vh;background:var(--bg0);color:var(--abyss-text);
+       font-family:var(--mono);font-size:14px;line-height:1.5;overflow-x:hidden;position:relative}
+  .scene{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .scene .gradient{position:absolute;inset:0;background:
+    radial-gradient(120% 80% at 50% -10%,rgba(54,236,208,0.10),transparent 55%),
+    radial-gradient(90% 70% at 80% 110%,rgba(43,179,201,0.10),transparent 60%),
+    linear-gradient(180deg,#04141f 0%,#03101a 40%,#020a12 100%)}
+  .scene .mesh{position:absolute;inset:0;opacity:0.5;
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:64px 64px;mask-image:radial-gradient(110% 90% at 50% 30%,#000 30%,transparent 85%)}
+  .scene .grain{position:absolute;inset:0;opacity:0.06;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+  .plankton{position:fixed;inset:0;z-index:0;pointer-events:none}
+  .plankton span{position:absolute;bottom:-10px;border-radius:50%;background:var(--bio);
+    box-shadow:0 0 6px var(--bio);opacity:0;animation:rise-bubble linear infinite}
+  @keyframes rise-bubble{0%{transform:translateY(0) translateX(0);opacity:0}10%{opacity:.7}90%{opacity:.5}
+    100%{transform:translateY(-105vh) translateX(20px);opacity:0}}
+  .wrap{position:relative;z-index:2;max-width:var(--maxw);margin:0 auto;padding:0 28px 90px}
+  ::selection{background:var(--bio);color:#03141d}a{color:inherit;text-decoration:none}
+
+  .console-bar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:22px 0 16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:14px}
+  .brand .mark{width:46px;height:46px;flex:none;filter:drop-shadow(0 0 8px rgba(54,236,208,0.5))}
+  .brand .name{font-family:var(--disp);font-weight:700;font-size:26px;letter-spacing:0.04em;line-height:1}
+  .brand .name b{color:var(--bio)}.brand .name .light{font-weight:300}
+  .brand .sub{font-family:var(--mono);font-size:9.5px;letter-spacing:0.34em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+  .nav{display:flex;gap:6px;background:var(--panel);border:1px solid var(--panel-edge);border-radius:4px;padding:4px}
+  .nav a{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:0.06em;color:var(--muted);padding:8px 18px;border-radius:2px;transition:all .2s}
+  .nav a:hover{color:var(--abyss-text)}
+  .nav a.active{color:#03141d;background:var(--bio);box-shadow:0 0 16px rgba(54,236,208,0.45)}
+  .status-strip{display:flex;align-items:center;gap:22px}
+  .online{display:inline-flex;align-items:center;gap:8px;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;
+    color:var(--bio);border:1px solid var(--panel-edge);padding:7px 13px;border-radius:2px;background:var(--panel)}
+  .online .ping{width:7px;height:7px;border-radius:50%;background:var(--bio);box-shadow:0 0 8px var(--bio);animation:blink 1.6s steps(1) infinite}
+  @keyframes blink{0%,60%{opacity:1}61%,100%{opacity:.25}}
+  .bar-rule{height:1px;background:linear-gradient(90deg,transparent,var(--panel-edge) 12%,var(--panel-edge) 88%,transparent)}
+  .panel{background:var(--panel);border:1px solid var(--panel-edge);border-radius:6px;backdrop-filter:blur(8px);position:relative}
+
+  .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin:24px 0 8px;flex-wrap:wrap}
+  .page-head h1{font-family:var(--disp);font-weight:700;font-size:30px;letter-spacing:0.06em;margin:0;text-transform:uppercase}
+  .page-head h1 .g{color:var(--bio)}
+  .page-head p{margin:8px 0 0;color:var(--muted);font-size:13px;max-width:62ch;line-height:1.6}
+
+  /* aggregate readout strip */
+  .readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:16px}
+  .ro{padding:18px 20px}
+  .ro .k{font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-d)}
+  .ro .v{font-family:var(--disp);font-weight:600;font-size:28px;color:var(--bio);margin-top:6px;letter-spacing:0.02em;
+    text-shadow:0 0 14px rgba(54,236,208,0.3)}
+  .ro .s{font-size:10px;color:var(--muted);letter-spacing:0.06em;margin-top:3px}
+  .ro.alt .v{color:var(--abyss-text);text-shadow:none}
+
+  .grid-table{margin-top:26px}
+  .gt-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
+  .gt-head h2{font-family:var(--disp);font-weight:600;font-size:16px;letter-spacing:0.14em;text-transform:uppercase;margin:0}
+  .gt-head h2 .g{color:var(--bio)}
+  .gt-head .meta{font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted)}
+
+  table{width:100%;border-collapse:collapse}
+  thead th{font-family:var(--mono);font-size:9.5px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-d);
+    font-weight:500;text-align:left;padding:0;border-bottom:1px solid var(--panel-edge);white-space:nowrap}
+  thead th .lbl{padding:13px 16px;display:block}
+  thead th.sortable button{appearance:none;border:0;background:transparent;cursor:pointer;width:100%;
+    display:flex;justify-content:flex-end;align-items:center;gap:5px;padding:13px 16px;
+    font-family:var(--mono);font-size:9.5px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-d);transition:color .2s}
+  thead th.sortable button:hover{color:var(--abyss-text)}
+  thead th.sortable.active button{color:var(--bio)}
+  thead th.sortable .ar{font-size:8px;visibility:hidden}
+  thead th.sortable.active .ar{visibility:visible}
+
+  tbody tr{border-bottom:1px solid rgba(54,236,208,0.07);position:relative;transition:background .2s}
+  tbody tr:hover{background:linear-gradient(90deg,rgba(54,236,208,0.07),transparent 70%)}
+  tbody tr::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--bio);
+    box-shadow:0 0 10px var(--bio);transform:scaleY(0);transition:transform .2s}
+  tbody tr:hover::before{transform:scaleY(1)}
+  tbody td{padding:16px;vertical-align:middle}
+
+  td.mkt{max-width:380px}
+  td.mkt .q{display:flex;align-items:center;gap:7px;color:var(--abyss-text);font-size:14.5px;line-height:1.35}
+  td.mkt .q .ext{color:var(--muted-d);flex:none;transition:color .15s}
+  tbody tr:hover td.mkt .q .ext{color:var(--bio)}
+  td.mkt .cat{font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted-d);margin-top:6px}
+  td.fav{width:210px}
+  td.fav .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  td.fav .out{font-family:var(--disp);font-weight:600;font-size:14px;color:var(--abyss-text)}
+  td.fav .pct{font-family:var(--disp);font-weight:600;font-size:15px;color:var(--bio)}
+  td.fav .probar{height:4px;margin-top:8px;background:rgba(54,236,208,0.12);border-radius:3px;overflow:hidden;width:180px}
+  td.fav .probar i{display:block;height:100%;width:0;border-radius:3px;background:linear-gradient(90deg,var(--bio-d),var(--bio));
+    box-shadow:0 0 8px rgba(54,236,208,0.6);transition:width .9s cubic-bezier(.2,.8,.2,1)}
+  td.num{text-align:right;font-family:var(--disp);font-weight:600;font-size:15px;color:var(--abyss-text)}
+  td.chg{text-align:right;font-family:var(--disp);font-weight:600;font-size:15px}
+  td.chg .up{color:var(--bio)}td.chg .dn{color:var(--coral)}td.chg .flat{color:var(--muted-d)}
+
+  tbody tr.reveal{opacity:0;transform:translateY(8px);animation:surface .5s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes surface{to{opacity:1;transform:none}}
+
+  .signoff{display:flex;align-items:center;gap:14px;margin-top:40px;font-size:9.5px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-d)}
+  .signoff .line{flex:1;height:1px;background:var(--panel-edge)}
+
+  @media(max-width:980px){.readouts{grid-template-columns:1fr 1fr}.nav{order:3;width:100%;justify-content:center}td.fav{display:none}}
+  @media(max-width:680px){.wrap{padding:0 16px 64px}td.num.vol{display:none}}
+</style>
+</head>
+<body>
+<div class="scene"><div class="gradient"></div><div class="mesh"></div><div class="grain"></div></div>
+<div class="plankton" id="plankton"></div>
+
+<div class="wrap">
+  <header>
+    <div class="console-bar">
+      <a class="brand" href="whalewatcher-index.html">
+        <svg class="mark" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="21" stroke="#36ecd0" stroke-width="1" opacity="0.35"/>
+          <circle cx="24" cy="24" r="14" stroke="#36ecd0" stroke-width="1" opacity="0.5"/>
+          <circle cx="24" cy="24" r="7" stroke="#36ecd0" stroke-width="1" opacity="0.7"/>
+          <path d="M11 27c5 2 9 2 13-1 3-2 6-3 10-1-1 3-4 5-8 5-3 0-5-1-6-2-3 2-6 2-9-1z" fill="#36ecd0"/>
+          <circle cx="30" cy="24" r="1.4" fill="#03141d"/>
+        </svg>
+        <div><div class="name"><b>WHALE</b><span class="light">WATCHER</span></div>
+          <div class="sub">Hydrophone Console · Polymarket Deep Scan</div></div>
+      </a>
+      <nav class="nav">
+        <a href="whalewatcher-activity.html">Activity</a>
+        <a href="whalewatcher-sonar.html">Leaderboard</a>
+        <a href="whalewatcher-markets.html" class="active">Markets</a>
+      </nav>
+      <div class="status-strip">
+        <div class="online"><span class="ping"></span> Charting</div>
+      </div>
+    </div>
+    <div class="bar-rule"></div>
+  </header>
+
+  <div class="page-head">
+    <div>
+      <h1>Open <span class="g">Water</span></h1>
+      <p>The hunting grounds — active Polymarket events where the whales feed. Sounded for depth (liquidity), current (volume), and drift (24-hour move on the favored outcome).</p>
+    </div>
+  </div>
+
+  <!-- aggregate readouts -->
+  <div class="readouts">
+    <div class="panel ro"><div class="k">Open Markets</div><div class="v" id="agg-n">10</div><div class="s">sounded this scan</div></div>
+    <div class="panel ro"><div class="k">Total Depth</div><div class="v" id="agg-liq">—</div><div class="s">aggregate liquidity</div></div>
+    <div class="panel ro alt"><div class="k">24h Current</div><div class="v" id="agg-24">—</div><div class="s">volume traded</div></div>
+    <div class="panel ro alt"><div class="k">Strongest Drift</div><div class="v" id="agg-drift">—</div><div class="s" id="agg-drift-s">favored outcome</div></div>
+  </div>
+
+  <!-- table -->
+  <section class="grid-table">
+    <div class="gt-head">
+      <h2>Sounding <span class="g">Chart</span></h2>
+      <span class="meta" id="sort-meta">sorted by 24h current</span>
+    </div>
+    <div class="panel" style="padding:4px 8px 8px">
+      <table>
+        <thead><tr>
+          <th><span class="lbl">Market</span></th>
+          <th><span class="lbl">Favored</span></th>
+          <th class="sortable" data-col="liquidity"><button>Depth <span class="ar">▼</span></button></th>
+          <th class="sortable active" data-col="volume_24hr"><button>24h Current <span class="ar">▼</span></button></th>
+          <th class="sortable" data-col="volume"><button>Volume <span class="ar">▼</span></button></th>
+          <th class="sortable" data-col="change"><button>24h Drift <span class="ar">▼</span></button></th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="signoff"><span class="line"></span><span>WhaleWatcher · Open-water sounding · auto-refresh ~1 min</span></div>
+</div>
+
+<script>
+/* ---- mock markets (mirror MarketRow) ---- */
+const MARKETS = [
+  {q:"Will BTC close above $100k on June 30?", slug:"btc-100k-june", cat:"Crypto", liq:2_400_000, vol:48_200_000, vol24:1_820_000, price:0.64, out:"Yes",  chg:0.072},
+  {q:"Fed cuts rates at the July FOMC meeting?", slug:"fed-july", cat:"Economy", liq:3_100_000, vol:61_500_000, vol24:2_410_000, price:0.38, out:"Yes",  chg:-0.041},
+  {q:"2026 NBA Finals champion", slug:"nba-2026", cat:"Sports", liq:1_900_000, vol:22_900_000, vol24:980_000, price:0.21, out:"Celtics", chg:0.018},
+  {q:"US recession declared before 2027?", slug:"recession-2027", cat:"Economy", liq:1_500_000, vol:14_700_000, vol24:640_000, price:0.33, out:"Yes",  chg:-0.012},
+  {q:"Will GPT-6 launch before October 2026?", slug:"gpt6-oct", cat:"Tech", liq:2_900_000, vol:40_100_000, vol24:3_220_000, price:0.47, out:"Yes",  chg:0.110},
+  {q:"Spain to win Euro 2028 qualifying group?", slug:"spain-euro28", cat:"Sports", liq:840_000, vol:9_400_000, vol24:312_000, price:0.71, out:"Spain", chg:0.006},
+  {q:"Ethereum above $5,000 by Q3 2026?", slug:"eth-5k-q3", cat:"Crypto", liq:2_100_000, vol:33_500_000, vol24:1_440_000, price:0.29, out:"Yes",  chg:-0.028},
+  {q:"OpenAI valued over $1T by year end?", slug:"openai-1t", cat:"Tech", liq:1_700_000, vol:18_600_000, vol24:1_090_000, price:0.52, out:"Yes",  chg:0.034},
+  {q:"Trump approval above 45% in August?", slug:"approval-aug", cat:"Politics", liq:1_200_000, vol:12_300_000, vol24:560_000, price:0.41, out:"Yes",  chg:-0.009},
+  {q:"Will it rain in NYC on July 4?", slug:"nyc-rain-jul4", cat:"Weather", liq:420_000, vol:3_700_000, vol24:201_000, price:0.36, out:"Yes",  chg:0.052},
+];
+
+/* ---- formatters ---- */
+const fmtCompact = v => "$"+new Intl.NumberFormat("en-US",{notation:"compact",maximumFractionDigits:1}).format(v);
+const fmtPct  = (v,signed=false)=>{const p=v*100;const s=signed&&p>0?"+":"";return s+p.toFixed(1)+"%";};
+
+let sortCol = "volume_24hr";
+const SORT_KEY = { liquidity:"liq", volume:"vol", volume_24hr:"vol24", change:"chg" };
+
+/* ---- plankton ---- */
+(function(){const h=document.getElementById("plankton");for(let i=0;i<22;i++){const s=document.createElement("span");
+  const d=14+Math.random()*16;s.style.left=Math.random()*100+"vw";s.style.animationDuration=d+"s";
+  s.style.animationDelay=(-Math.random()*d)+"s";const z=1.5+Math.random()*3;s.style.width=s.style.height=z+"px";
+  s.style.opacity=.3+Math.random()*.4;h.appendChild(s);}})();
+
+/* ---- aggregate readouts ---- */
+(function aggregates(){
+  const liq = MARKETS.reduce((a,m)=>a+m.liq,0);
+  const v24 = MARKETS.reduce((a,m)=>a+m.vol24,0);
+  const top = MARKETS.reduce((a,m)=> Math.abs(m.chg)>Math.abs(a.chg)?m:a);
+  document.getElementById("agg-n").textContent = MARKETS.length;
+  document.getElementById("agg-liq").textContent = fmtCompact(liq);
+  document.getElementById("agg-24").textContent = fmtCompact(v24);
+  const d=document.getElementById("agg-drift");
+  d.textContent = fmtPct(top.chg,true); d.style.color = top.chg>=0?"var(--bio)":"var(--coral)";
+  document.getElementById("agg-drift-s").textContent = top.out + " · " + top.q.slice(0,28) + (top.q.length>28?"…":"");
+})();
+
+/* ---- render rows ---- */
+function render(){
+  const key = SORT_KEY[sortCol];
+  const rows = [...MARKETS].sort((a,b)=> sortCol==="change" ? b.chg - a.chg : b[key] - a[key]);
+  const tb = document.getElementById("rows");
+  tb.innerHTML = rows.map((m,i)=>{
+    const chgCls = m.chg>0?"up":m.chg<0?"dn":"flat";
+    const chgTxt = m.chg===0?"—":fmtPct(m.chg,true);
+    return `<tr class="reveal" style="animation-delay:${i*45}ms">
+      <td class="mkt">
+        <div class="q"><a href="https://polymarket.com/event/${m.slug}" target="_blank" rel="noopener noreferrer">${m.q}</a>
+          <svg class="ext" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-9 9M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></svg>
+        </div>
+        <div class="cat">${m.cat}</div>
+      </td>
+      <td class="fav">
+        <div class="top"><span class="out">${m.out}</span><span class="pct">${fmtPct(m.price)}</span></div>
+        <div class="probar"><i data-w="${(m.price*100).toFixed(0)}"></i></div>
+      </td>
+      <td class="num">${fmtCompact(m.liq)}</td>
+      <td class="num">${fmtCompact(m.vol24)}</td>
+      <td class="num vol">${fmtCompact(m.vol)}</td>
+      <td class="chg"><span class="${chgCls}">${chgTxt}</span></td>
+    </tr>`;
+  }).join("");
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    tb.querySelectorAll(".probar i").forEach(el=> el.style.width = el.dataset.w + "%");
+  }));
+  // header active state
+  document.querySelectorAll("th.sortable").forEach(th=> th.classList.toggle("active", th.dataset.col===sortCol));
+  const labels={liquidity:"depth",volume:"total volume",volume_24hr:"24h current",change:"24h drift"};
+  document.getElementById("sort-meta").textContent = "sorted by " + labels[sortCol];
+}
+render();
+
+/* ---- sort interaction ---- */
+document.querySelectorAll("th.sortable").forEach(th=>{
+  th.querySelector("button").addEventListener("click", ()=>{ sortCol = th.dataset.col; render(); });
+});
+</script>
+</body>
+</html>

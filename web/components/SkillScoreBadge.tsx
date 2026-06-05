@@ -20,6 +20,8 @@ export default function SkillScoreBadge({ score }: SkillScoreBadgeProps) {
         minWidth: 72,
         justifyContent: "center",
         border: `1px solid ${color}`,
+        borderRadius: 2,
+        background: "rgba(54, 236, 208, 0.04)",
         color,
         padding: "5px 8px",
         fontWeight: 700

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WhaleWatcher — Polymarket Deep-Scan Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+<style>
+  /* ===== WhaleWatcher shared sonar-console theme ===== */
+  :root{
+    --bg0:#03101a;--bg1:#062132;--bg2:#0a2c40;
+    --panel:rgba(8,36,52,0.55);--panel-edge:rgba(60,224,200,0.18);
+    --bio:#36ecd0;--bio-d:#1fa994;--teal:#2bb3c9;
+    --abyss-text:#d4f3f0;--muted:#6c97a3;--muted-d:#4a6f7a;
+    --coral:#ff7a59;--amber:#ffd27a;--grid:rgba(54,236,208,0.08);
+    --disp:"Chakra Petch",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace;
+    --maxw:1240px;
+  }
+  *{box-sizing:border-box}html{-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+  body{margin:0;min-height:100vh;background:var(--bg0);color:var(--abyss-text);
+       font-family:var(--mono);font-size:14px;line-height:1.5;overflow-x:hidden;position:relative}
+  .scene{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .scene .gradient{position:absolute;inset:0;background:
+    radial-gradient(120% 80% at 50% -10%,rgba(54,236,208,0.12),transparent 55%),
+    radial-gradient(90% 70% at 82% 8%,rgba(43,179,201,0.12),transparent 55%),
+    radial-gradient(90% 70% at 18% 105%,rgba(43,179,201,0.10),transparent 60%),
+    linear-gradient(180deg,#04141f 0%,#03101a 45%,#020a12 100%)}
+  .scene .mesh{position:absolute;inset:0;opacity:0.5;
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:64px 64px;mask-image:radial-gradient(120% 100% at 50% 20%,#000 35%,transparent 85%)}
+  .scene .grain{position:absolute;inset:0;opacity:0.06;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+  .plankton{position:fixed;inset:0;z-index:0;pointer-events:none}
+  .plankton span{position:absolute;bottom:-10px;border-radius:50%;background:var(--bio);
+    box-shadow:0 0 6px var(--bio);opacity:0;animation:rise-bubble linear infinite}
+  @keyframes rise-bubble{0%{transform:translateY(0) translateX(0);opacity:0}10%{opacity:.7}90%{opacity:.5}
+    100%{transform:translateY(-105vh) translateX(20px);opacity:0}}
+  .wrap{position:relative;z-index:2;max-width:var(--maxw);margin:0 auto;padding:0 28px}
+  ::selection{background:var(--bio);color:#03141d}a{color:inherit;text-decoration:none}
+
+  /* console bar + nav */
+  .console-bar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:22px 0 16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:14px}
+  .brand .mark{width:46px;height:46px;flex:none;filter:drop-shadow(0 0 8px rgba(54,236,208,0.5))}
+  .brand .name{font-family:var(--disp);font-weight:700;font-size:26px;letter-spacing:0.04em;line-height:1}
+  .brand .name b{color:var(--bio)}.brand .name .light{font-weight:300}
+  .brand .sub{font-family:var(--mono);font-size:9.5px;letter-spacing:0.34em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+  .nav{display:flex;gap:6px;background:var(--panel);border:1px solid var(--panel-edge);border-radius:4px;padding:4px}
+  .nav a{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:0.06em;color:var(--muted);padding:8px 18px;border-radius:2px;transition:all .2s}
+  .nav a:hover{color:var(--abyss-text)}
+  .nav a.cta{color:#03141d;background:var(--bio);box-shadow:0 0 16px rgba(54,236,208,0.45)}
+  .bar-rule{height:1px;background:linear-gradient(90deg,transparent,var(--panel-edge) 12%,var(--panel-edge) 88%,transparent)}
+  .panel{background:var(--panel);border:1px solid var(--panel-edge);border-radius:6px;backdrop-filter:blur(8px);position:relative}
+
+  /* ===== HERO ===== */
+  .hero{display:grid;grid-template-columns:1fr 460px;gap:48px;align-items:center;min-height:78vh;padding:36px 0 20px}
+  .kicker{display:inline-flex;align-items:center;gap:10px;font-size:10.5px;letter-spacing:0.28em;text-transform:uppercase;
+    color:var(--bio);border:1px solid var(--panel-edge);background:var(--panel);border-radius:2px;padding:7px 14px}
+  .kicker .dot{width:7px;height:7px;border-radius:50%;background:var(--bio);box-shadow:0 0 8px var(--bio);animation:blink 1.6s steps(1) infinite}
+  @keyframes blink{0%,60%{opacity:1}61%,100%{opacity:.25}}
+  h1.hero-word{font-family:var(--disp);font-weight:700;font-size:clamp(44px,8vw,92px);line-height:0.94;letter-spacing:0.02em;
+    margin:22px 0 0;text-transform:uppercase}
+  h1.hero-word b{color:var(--bio);text-shadow:0 0 40px rgba(54,236,208,0.35)}
+  h1.hero-word .light{font-weight:300;color:var(--abyss-text)}
+  .tagline{font-family:var(--disp);font-weight:500;font-size:clamp(18px,2.4vw,26px);color:var(--abyss-text);
+    margin:22px 0 0;line-height:1.32;max-width:30ch}
+  .tagline em{font-style:italic;color:var(--bio)}
+  .lede{color:var(--muted);font-size:14.5px;line-height:1.7;margin:18px 0 0;max-width:54ch}
+  .lede b{color:var(--abyss-text);font-weight:500}
+  .cta-row{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap}
+  .btn{font-family:var(--disp);font-weight:600;font-size:14px;letter-spacing:0.06em;padding:14px 26px;border-radius:3px;
+    display:inline-flex;align-items:center;gap:10px;transition:all .22s;cursor:pointer;border:1px solid transparent}
+  .btn .ar{transition:transform .22s}
+  .btn:hover .ar{transform:translateX(4px)}
+  .btn-primary{background:var(--bio);color:#03141d;box-shadow:0 0 24px rgba(54,236,208,0.4)}
+  .btn-primary:hover{box-shadow:0 0 38px rgba(54,236,208,0.6)}
+  .btn-ghost{border-color:var(--panel-edge);color:var(--abyss-text);background:var(--panel)}
+  .btn-ghost:hover{border-color:var(--bio);color:var(--bio)}
+
+  /* ticker */
+  .ticker{display:flex;gap:0;margin-top:38px;border:1px solid var(--panel-edge);border-radius:4px;background:var(--panel);overflow:hidden}
+  .ticker .cell{flex:1;padding:16px 18px;border-left:1px solid var(--panel-edge)}
+  .ticker .cell:first-child{border-left:0}
+  .ticker .k{font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-d)}
+  .ticker .v{font-family:var(--disp);font-weight:600;font-size:24px;color:var(--bio);margin-top:4px;text-shadow:0 0 12px rgba(54,236,208,0.3)}
+  .ticker .v.alt{color:var(--amber);text-shadow:0 0 12px rgba(255,210,122,0.3)}
+
+  /* hero scope */
+  .hero-scope{position:relative;width:100%;aspect-ratio:1}
+  .hero-scope > svg{width:100%;height:100%;display:block}
+  .hs-sweep{position:absolute;inset:0;border-radius:50%;
+    background:conic-gradient(from 0deg,rgba(54,236,208,0.42),rgba(54,236,208,0.04) 38deg,transparent 60deg,transparent 360deg);
+    mask:radial-gradient(circle at center,transparent 0,#000 1%);animation:sweep 4s linear infinite}
+  @keyframes sweep{to{transform:rotate(360deg)}}
+  .hs-blip{position:absolute;width:12px;height:12px;border-radius:50%;transform:translate(-50%,-50%);
+    background:var(--bio);box-shadow:0 0 10px var(--bio),0 0 22px var(--bio)}
+  .hs-blip.apex{width:16px;height:16px;background:var(--amber);box-shadow:0 0 12px var(--amber),0 0 30px var(--amber)}
+  .hs-blip::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:1px solid currentColor;color:inherit;
+    opacity:0;animation:ping 4s ease-out infinite}
+  @keyframes ping{0%{transform:scale(.5);opacity:.9}80%,100%{transform:scale(3.4);opacity:0}}
+  .hs-blip .lab{position:absolute;left:16px;top:-5px;font-size:9px;letter-spacing:0.08em;white-space:nowrap;
+    color:var(--abyss-text);text-shadow:0 0 6px #03141d}
+
+  /* ===== STATIONS ===== */
+  .section{padding:64px 0}
+  .sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+  .sec-head h2{font-family:var(--disp);font-weight:700;font-size:26px;letter-spacing:0.06em;text-transform:uppercase;margin:0}
+  .sec-head h2 .g{color:var(--bio)}
+  .sec-head .lbl{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-d)}
+  .stations{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .station{padding:26px 28px;display:flex;flex-direction:column;gap:0;transition:transform .25s,border-color .25s,box-shadow .25s;overflow:hidden}
+  .station:hover{transform:translateY(-4px);border-color:var(--bio);box-shadow:0 14px 40px rgba(54,236,208,0.12)}
+  .station .ic{width:42px;height:42px;border:1px solid var(--panel-edge);border-radius:3px;display:grid;place-items:center;
+    color:var(--bio);background:rgba(54,236,208,0.05);transition:all .25s}
+  .station:hover .ic{border-color:var(--bio);box-shadow:0 0 18px rgba(54,236,208,0.3)}
+  .station .ic svg{width:20px;height:20px}
+  .station .role{font-family:var(--mono);font-size:9.5px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-d);margin-top:18px}
+  .station h3{font-family:var(--disp);font-weight:600;font-size:21px;letter-spacing:0.04em;margin:4px 0 0}
+  .station p{color:var(--muted);font-size:13px;line-height:1.6;margin:10px 0 0}
+  .station .enter{margin-top:18px;font-family:var(--disp);font-weight:600;font-size:12.5px;letter-spacing:0.1em;
+    text-transform:uppercase;color:var(--bio);display:inline-flex;align-items:center;gap:8px}
+  .station .enter .ar{transition:transform .22s}
+  .station:hover .enter .ar{transform:translateX(5px)}
+
+  /* ===== HOW IT READS ===== */
+  .reads{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .read{padding:24px 26px}
+  .read .num{font-family:var(--disp);font-weight:700;font-size:13px;letter-spacing:0.1em;color:var(--bio);
+    border:1px solid var(--panel-edge);border-radius:50%;width:34px;height:34px;display:grid;place-items:center}
+  .read h4{font-family:var(--disp);font-weight:600;font-size:17px;letter-spacing:0.03em;margin:16px 0 0}
+  .read p{color:var(--muted);font-size:13px;line-height:1.65;margin:10px 0 0}
+  .read code{font-family:var(--mono);color:var(--abyss-text);background:rgba(54,236,208,0.1);padding:1px 5px;border-radius:2px;font-size:12px}
+
+  /* ===== CTA BAND ===== */
+  .band{position:relative;text-align:center;padding:56px 30px;overflow:hidden;margin-top:8px}
+  .band::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(80% 140% at 50% 0%,rgba(54,236,208,0.12),transparent 60%)}
+  .band h2{position:relative;font-family:var(--disp);font-weight:700;font-size:clamp(26px,4vw,42px);letter-spacing:0.04em;
+    text-transform:uppercase;margin:0}
+  .band h2 .g{color:var(--bio);text-shadow:0 0 30px rgba(54,236,208,0.4)}
+  .band p{position:relative;color:var(--muted);margin:14px auto 0;max-width:52ch;font-size:14px;line-height:1.6}
+  .band .cta-row{position:relative;justify-content:center}
+
+  /* footer */
+  footer{padding:40px 0 56px}
+  .signoff{display:flex;align-items:center;gap:14px;font-size:9.5px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-d)}
+  .signoff .line{flex:1;height:1px;background:var(--panel-edge)}
+  .foot-grid{display:flex;justify-content:space-between;gap:24px;margin-top:24px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+  .foot-grid a:hover{color:var(--bio)}
+
+  .reveal{opacity:0;transform:translateY(14px);animation:rise .6s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  @media(max-width:980px){
+    .hero{grid-template-columns:1fr;gap:30px;min-height:auto}
+    .hero-scope{max-width:380px;margin:0 auto;order:-1}
+    .stations{grid-template-columns:1fr}.reads{grid-template-columns:1fr}
+    .nav{order:3}
+  }
+  @media(max-width:560px){.wrap{padding:0 16px}.ticker{flex-wrap:wrap}.ticker .cell{flex:1 1 50%}
+    .ticker .cell:nth-child(3){border-left:0}}
+</style>
+</head>
+<body>
+<div class="scene"><div class="gradient"></div><div class="mesh"></div><div class="grain"></div></div>
+<div class="plankton" id="plankton"></div>
+
+<div class="wrap">
+  <!-- console bar -->
+  <header>
+    <div class="console-bar">
+      <a class="brand" href="whalewatcher-index.html">
+        <svg class="mark" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="21" stroke="#36ecd0" stroke-width="1" opacity="0.35"/>
+          <circle cx="24" cy="24" r="14" stroke="#36ecd0" stroke-width="1" opacity="0.5"/>
+          <circle cx="24" cy="24" r="7" stroke="#36ecd0" stroke-width="1" opacity="0.7"/>
+          <path d="M11 27c5 2 9 2 13-1 3-2 6-3 10-1-1 3-4 5-8 5-3 0-5-1-6-2-3 2-6 2-9-1z" fill="#36ecd0"/>
+          <circle cx="30" cy="24" r="1.4" fill="#03141d"/>
+        </svg>
+        <div><div class="name"><b>WHALE</b><span class="light">WATCHER</span></div>
+          <div class="sub">Hydrophone Console · Polymarket Deep Scan</div></div>
+      </a>
+      <nav class="nav">
+        <a href="whalewatcher-activity.html">Activity</a>
+        <a href="whalewatcher-sonar.html">Leaderboard</a>
+        <a href="whalewatcher-markets.html">Markets</a>
+        <a href="whalewatcher-sonar.html" class="cta">Enter Console</a>
+      </nav>
+    </div>
+    <div class="bar-rule"></div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-copy">
+      <span class="kicker reveal"><span class="dot"></span> Polymarket Deep-Scan Intelligence</span>
+      <h1 class="hero-word reveal" style="animation-delay:.06s"><b>Whale</b><span class="light">Watcher</span></h1>
+      <p class="tagline reveal" style="animation-delay:.12s">We don't rank traders by how much they <em>win</em>. We rank them by how well they <em>see</em>.</p>
+      <p class="lede reveal" style="animation-delay:.18s">WhaleWatcher listens to every fill on Polymarket and surfaces the rare wallets whose entry prices <b>consistently beat the market's own resolution</b> — pure forecasting edge, Bayesian-shrunk for sample size, scored 0–10. Not PnL. Foresight.</p>
+      <div class="cta-row reveal" style="animation-delay:.24s">
+        <a href="whalewatcher-sonar.html" class="btn btn-primary">Open the Leaderboard <span class="ar">→</span></a>
+        <a href="whalewatcher-activity.html" class="btn btn-ghost">Watch Live Activity <span class="ar">↓</span></a>
+      </div>
+      <div class="ticker reveal" style="animation-delay:.3s">
+        <div class="cell"><div class="k">Contacts Tracked</div><div class="v" data-count="412">0</div></div>
+        <div class="cell"><div class="k">Apex Signal</div><div class="v alt" data-count="9.4" data-dec="1">0</div></div>
+        <div class="cell"><div class="k">Intercepts · 24h</div><div class="v" data-count="214">0</div></div>
+        <div class="cell"><div class="k">Active Now</div><div class="v" data-count="38">0</div></div>
+      </div>
+    </div>
+
+    <div class="hero-scope reveal" style="animation-delay:.18s" id="hero-scope">
+      <svg viewBox="0 0 200 200">
+        <defs><radialGradient id="sg" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#0a3346"/><stop offset="100%" stop-color="#04161f"/></radialGradient></defs>
+        <circle cx="100" cy="100" r="98" fill="url(#sg)" stroke="#36ecd0" stroke-opacity="0.25"/>
+        <circle cx="100" cy="100" r="72" fill="none" stroke="#36ecd0" stroke-opacity="0.14"/>
+        <circle cx="100" cy="100" r="46" fill="none" stroke="#36ecd0" stroke-opacity="0.14"/>
+        <circle cx="100" cy="100" r="20" fill="none" stroke="#36ecd0" stroke-opacity="0.14"/>
+        <line x1="100" y1="2" x2="100" y2="198" stroke="#36ecd0" stroke-opacity="0.1"/>
+        <line x1="2" y1="100" x2="198" y2="100" stroke="#36ecd0" stroke-opacity="0.1"/>
+        <line x1="30" y1="30" x2="170" y2="170" stroke="#36ecd0" stroke-opacity="0.06"/>
+        <line x1="170" y1="30" x2="30" y2="170" stroke="#36ecd0" stroke-opacity="0.06"/>
+      </svg>
+      <div class="hs-sweep"></div>
+      <div class="hs-blip apex" style="left:60%;top:37%"><span class="lab">@oracle.eth · 9.4</span></div>
+      <div class="hs-blip" style="left:41%;top:56%"><span class="lab">@mistral_fades</span></div>
+      <div class="hs-blip" style="left:62%;top:64%"><span class="lab">@vig_collector</span></div>
+      <div class="hs-blip" style="left:35%;top:38%"><span class="lab">@NateSilverFan</span></div>
+      <div class="hs-blip" style="left:70%;top:52%"><span class="lab"></span></div>
+    </div>
+  </section>
+
+  <!-- STATIONS -->
+  <section class="section">
+    <div class="sec-head">
+      <h2>Four <span class="g">Stations</span></h2>
+      <span class="lbl">Console / Navigation</span>
+    </div>
+    <div class="stations">
+      <a class="panel station" href="whalewatcher-activity.html">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2-7 4 14 2-7h7"/></svg></div>
+        <div class="role">Hydrophone Feed</div>
+        <h3>Live Activity</h3>
+        <p>Every fill from a ranked wallet in the last 24 hours, streaming in as acoustic intercepts — bearing, depth, and tonnage in real time.</p>
+        <span class="enter">Open feed <span class="ar">→</span></span>
+      </a>
+      <a class="panel station" href="whalewatcher-sonar.html">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></div>
+        <div class="role">Contact Log</div>
+        <h3>Leaderboard</h3>
+        <p>The board itself — wallets ranked by signal strength, classed from porpoise to blue whale, sounded on the sonar scope.</p>
+        <span class="enter">Open log <span class="ar">→</span></span>
+      </a>
+      <a class="panel station" href="whalewatcher-markets.html">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12c2-3 4-3 6 0s4 3 6 0 4-3 6 0M2 18c2-3 4-3 6 0s4 3 6 0 4-3 6 0M2 6c2-3 4-3 6 0s4 3 6 0 4-3 6 0"/></svg></div>
+        <div class="role">Open Water</div>
+        <h3>Markets</h3>
+        <p>The hunting grounds — active Polymarket events sounded for depth, current, and 24-hour drift. Sortable, live-refreshed.</p>
+        <span class="enter">Open water <span class="ar">→</span></span>
+      </a>
+      <a class="panel station" href="whalewatcher-wallet.html">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v5a8 8 0 0 1-16 0z"/><path d="M8 21h8M12 17v4"/></svg></div>
+        <div class="role">Deep Scan</div>
+        <h3>Contact Dossier</h3>
+        <p>A full workup on a single whale — signal gauge, telemetry by window, and the dive profile of its cumulative catch.</p>
+        <span class="enter">Open dossier <span class="ar">→</span></span>
+      </a>
+    </div>
+  </section>
+
+  <!-- HOW IT READS -->
+  <section class="section" style="padding-top:0">
+    <div class="sec-head">
+      <h2>How the <span class="g">Sonar</span> Reads</h2>
+      <span class="lbl">Methodology</span>
+    </div>
+    <div class="reads">
+      <div class="panel read">
+        <div class="num">01</div>
+        <h4>Signal is skill</h4>
+        <p>A contact's signal strength is its Skill Score (0–10): how reliably entry prices beat the market's eventual resolution, Bayesian-shrunk so a few lucky pings can't fake a strong return.</p>
+      </div>
+      <div class="panel read">
+        <div class="num">02</div>
+        <h4>Edge, not winnings</h4>
+        <p>We score the per-position mean of <code>resolution − entry</code> across resolved markets — pure foresight. A whale can bleed money on size and still read the future cleanly.</p>
+      </div>
+      <div class="panel read">
+        <div class="num">03</div>
+        <h4>Bots never surface</h4>
+        <p>Suspected automata, sub-threshold wallets, and sub-cent longshot farmers are filtered before ranking. Only genuine forecasting contacts make the board.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA BAND -->
+  <section class="section" style="padding-top:0">
+    <div class="panel band">
+      <h2>Descend into the <span class="g">data</span></h2>
+      <p>The board updates continuously from Polymarket's public data. Pick a station and start listening.</p>
+      <div class="cta-row">
+        <a href="whalewatcher-sonar.html" class="btn btn-primary">Enter the Console <span class="ar">→</span></a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="signoff"><span class="line"></span><span>✦</span><span class="line"></span></div>
+    <div class="foot-grid">
+      <span>WhaleWatcher · Polymarket Deep-Scan Intelligence</span>
+      <span>
+        <a href="whalewatcher-activity.html">Activity</a> ·
+        <a href="whalewatcher-sonar.html">Leaderboard</a> ·
+        <a href="whalewatcher-markets.html">Markets</a> ·
+        <a href="whalewatcher-wallet.html">Dossier</a>
+      </span>
+      <span style="color:var(--muted-d)">Hydrophone array nominal · <span id="yr"></span></span>
+    </div>
+  </footer>
+</div>
+
+<script>
+  /* plankton */
+  (function(){const h=document.getElementById("plankton");for(let i=0;i<26;i++){const s=document.createElement("span");
+    const d=14+Math.random()*16;s.style.left=Math.random()*100+"vw";s.style.animationDuration=d+"s";
+    s.style.animationDelay=(-Math.random()*d)+"s";const z=1.5+Math.random()*3;s.style.width=s.style.height=z+"px";
+    s.style.opacity=.3+Math.random()*.4;h.appendChild(s);}})();
+
+  /* count-up tickers */
+  (function(){
+    const els=[...document.querySelectorAll("[data-count]")];
+    const run=el=>{
+      const target=parseFloat(el.dataset.count), dec=+(el.dataset.dec||0), dur=1100, t0=performance.now();
+      const tick=now=>{ const p=Math.min(1,(now-t0)/dur); const e=1-Math.pow(1-p,3);
+        el.textContent=(target*e).toFixed(dec); if(p<1)requestAnimationFrame(tick); else el.textContent=target.toFixed(dec); };
+      requestAnimationFrame(tick);
+    };
+    setTimeout(()=>els.forEach(run), 350);
+  })();
+
+  /* footer year */
+  document.getElementById("yr").textContent = new Date().getFullYear();
+</script>
+</body>
+</html>

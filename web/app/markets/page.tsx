@@ -8,15 +8,13 @@ export default async function MarketsPage() {
 
   return (
     <main className="page">
-      <header className="topbar">
-        <div>
-          <h1 className="brand">Markets</h1>
-          <p className="subtitle">
-            The most active Polymarket markets right now — sort by liquidity, total volume, 24-hour trading, or volatility, and filter by category.
-          </p>
-        </div>
-        <div className="mono muted">MARKETS / LIQUIDITY</div>
-      </header>
+      <div className="mkt-page-head">
+        <h1 className="brand">Open <span className="g">Water</span></h1>
+        <p className="subtitle">
+          The hunting grounds — active Polymarket events where the whales feed. Sounded for depth (liquidity), current (volume), and drift (24-hour move on the favored outcome).
+        </p>
+      </div>
+
       <MarketsTable initialRows={initialRows} initialSort="liquidity" />
     </main>
   );

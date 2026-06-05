@@ -19,7 +19,8 @@ export default function WalletSearch({ value, onChange }: WalletSearchProps) {
         style={{
           width: "100%",
           border: "1px solid var(--line)",
-          background: "#0D0F14",
+          borderRadius: 3,
+          background: "var(--panel)",
           color: "var(--text)",
           padding: "10px 10px 10px 34px",
           outline: "none"

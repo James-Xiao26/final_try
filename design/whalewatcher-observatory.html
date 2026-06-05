@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WhaleWatcher — Observatory</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+
+<style>
+  /* ============================================================
+     WHALEWATCHER — OBSERVATORY  (standalone mockup)
+     A celestial register of the market's most massive movers.
+     "Whale" read as a gravitational body, not the animal:
+       skill  -> stellar magnitude / luminosity
+       volume -> mass (body radius)
+       edge   -> blueshift (+) / redshift (-)
+       class  -> spectral classification (O B A F G K M)
+     Antique star-atlas meets a modern telescope readout.
+     ============================================================ */
+
+  :root {
+    --void:    #0a0712;
+    --void-2:  #110b1e;
+    --panel:   rgba(24, 17, 40, 0.55);
+    --panel-2: rgba(30, 22, 48, 0.7);
+    --edge:    rgba(232, 196, 115, 0.18);
+    --edge-2:  rgba(232, 196, 115, 0.32);
+    --gold:    #e8c473;
+    --gold-br: #f6e2a8;
+    --gold-d:  #b08a3c;
+    --champ:   #efe4cb;
+    --text:    #e7dcc6;
+    --muted:   #9a8fb6;
+    --muted-d: #695f86;
+    --blue:    #8db2ff;   /* blueshift / positive edge */
+    --rose:    #ff7d9b;   /* redshift / negative edge  */
+
+    --disp:  "Cinzel", serif;
+    --serif: "Cormorant Garamond", Georgia, serif;
+    --mono:  "Space Mono", ui-monospace, monospace;
+    --maxw:  1280px;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    margin: 0; min-height: 100vh; position: relative; overflow-x: hidden;
+    background: var(--void); color: var(--text);
+    font-family: var(--serif); font-size: 16px; line-height: 1.5;
+  }
+
+  /* ---------- cosmic atmosphere (fixed layers) ---------- */
+  .sky { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .sky .neb {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(60% 50% at 22% 18%, rgba(120, 84, 196, 0.16), transparent 60%),
+      radial-gradient(55% 55% at 82% 28%, rgba(232, 196, 115, 0.08), transparent 60%),
+      radial-gradient(70% 60% at 50% 108%, rgba(94, 60, 150, 0.18), transparent 60%),
+      linear-gradient(180deg, #0c0816 0%, #0a0712 55%, #07050e 100%);
+  }
+  .sky .grain {
+    position: absolute; inset: 0; opacity: 0.05; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .stars { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .stars span {
+    position: absolute; border-radius: 50%; background: #fff;
+    animation: twinkle var(--tw, 4s) ease-in-out infinite;
+  }
+  @keyframes twinkle { 0%,100% { opacity: var(--o,.5); transform: scale(1); } 50% { opacity: .12; transform: scale(.6); } }
+
+  .wrap { position: relative; z-index: 2; max-width: var(--maxw); margin: 0 auto; padding: 0 30px 96px; }
+  ::selection { background: var(--gold); color: #1a1206; }
+  a { color: inherit; text-decoration: none; }
+
+  /* =========================================================
+     MASTHEAD
+     ========================================================= */
+  .micro { display: flex; justify-content: space-between; padding: 22px 0 12px;
+           font-family: var(--mono); font-size: 10px; letter-spacing: 0.22em;
+           text-transform: uppercase; color: var(--muted); }
+  .micro .g { color: var(--gold-d); }
+  .grule { height: 1px; background: linear-gradient(90deg, transparent, var(--edge-2) 8%, var(--edge-2) 92%, transparent); }
+  .grule.thin { opacity: 0.5; margin-top: 3px; }
+
+  .crown { display: flex; align-items: center; justify-content: center; gap: 26px; padding: 30px 0 10px; }
+  .crown .orn { color: var(--gold); opacity: 0.85; filter: drop-shadow(0 0 10px rgba(232,196,115,0.4)); }
+  .crown svg { width: 34px; height: 34px; }
+  h1.word {
+    margin: 0; font-family: var(--disp); font-weight: 600;
+    font-size: clamp(34px, 6.6vw, 78px); letter-spacing: 0.14em;
+    text-transform: uppercase; text-align: center; color: var(--champ);
+    text-shadow: 0 0 30px rgba(232,196,115,0.18);
+  }
+  h1.word b { color: var(--gold); font-weight: 700; }
+  .deck { text-align: center; font-family: var(--serif); font-style: italic; font-size: 19px;
+          color: var(--muted); letter-spacing: 0.02em; margin: 6px 0 16px; }
+
+  /* =========================================================
+     CONTROLS
+     ========================================================= */
+  .controls { display: flex; align-items: center; justify-content: space-between; gap: 18px;
+              padding: 16px 0 10px; flex-wrap: wrap; }
+  .arc { display: flex; align-items: center; gap: 16px; }
+  .arc .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 0.24em;
+              text-transform: uppercase; color: var(--muted); }
+  .seg { display: flex; border: 1px solid var(--edge); border-radius: 2px; overflow: hidden; background: var(--panel); }
+  .seg button { appearance: none; border: none; background: none; cursor: pointer;
+                font-family: var(--disp); font-weight: 600; font-size: 13px; letter-spacing: 0.14em;
+                color: var(--muted); padding: 9px 22px; transition: all .25s; }
+  .seg button + button { border-left: 1px solid var(--edge); }
+  .seg button:hover { color: var(--champ); }
+  .seg button.active { color: #1a1206; background: linear-gradient(180deg, var(--gold-br), var(--gold));
+                       box-shadow: 0 0 20px rgba(232,196,115,0.4); }
+
+  .resolve { display: flex; align-items: center; gap: 10px; border: 1px solid var(--edge);
+             background: var(--panel); border-radius: 2px; padding: 9px 15px; min-width: 270px; }
+  .resolve svg { width: 15px; height: 15px; stroke: var(--gold); flex: none; }
+  .resolve input { border: none; background: none; outline: none; color: var(--text);
+                   font-family: var(--mono); font-size: 12.5px; width: 100%; letter-spacing: 0.02em; }
+  .resolve input::placeholder { color: var(--muted-d); letter-spacing: 0.16em; text-transform: uppercase; font-size: 10.5px; }
+
+  /* =========================================================
+     HERO : star chart + ephemeris
+     ========================================================= */
+  .hero { display: grid; grid-template-columns: 1fr 400px; gap: 26px; margin-top: 14px; }
+
+  .frame { background: var(--panel); border: 1px solid var(--edge); border-radius: 4px;
+           backdrop-filter: blur(7px); position: relative; }
+  .frame > .corners i { position: absolute; width: 14px; height: 14px; border: 1px solid var(--edge-2); }
+  .frame > .corners i:nth-child(1){ top:8px; left:8px; border-right:0; border-bottom:0; }
+  .frame > .corners i:nth-child(2){ top:8px; right:8px; border-left:0; border-bottom:0; }
+  .frame > .corners i:nth-child(3){ bottom:8px; left:8px; border-right:0; border-top:0; }
+  .frame > .corners i:nth-child(4){ bottom:8px; right:8px; border-left:0; border-top:0; }
+
+  .chart-wrap { padding: 22px; }
+  .chart-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;
+                font-family: var(--mono); }
+  .chart-head .t { font-family: var(--disp); font-weight: 600; font-size: 13px; letter-spacing: 0.18em;
+                   text-transform: uppercase; color: var(--champ); }
+  .chart-head .c { font-size: 10px; letter-spacing: 0.16em; color: var(--muted); text-transform: uppercase; }
+
+  .starmap { position: relative; width: 100%; aspect-ratio: 1 / 0.92; }
+  .starmap > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .ring-rot { transform-box: fill-box; transform-origin: center; animation: spin 160s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* celestial bodies */
+  .body { position: absolute; transform: translate(-50%, -50%); cursor: pointer; }
+  .body .core { border-radius: 50%; background: radial-gradient(circle at 38% 34%, var(--gold-br), var(--gold) 55%, var(--gold-d));
+                box-shadow: 0 0 10px rgba(232,196,115,0.7), 0 0 22px rgba(232,196,115,0.4);
+                transition: transform .3s, box-shadow .3s; }
+  .body .lab { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 6px;
+               font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; white-space: nowrap;
+               color: var(--muted); text-shadow: 0 0 8px #0a0712; transition: color .25s; }
+  .body.flare .core { transform: scale(1.45); box-shadow: 0 0 16px var(--gold-br), 0 0 40px rgba(232,196,115,0.7); }
+  .body.flare .lab { color: var(--gold-br); }
+  .body.bob { animation: bob var(--bd, 7s) ease-in-out infinite; }
+  @keyframes bob { 0%,100% { margin-top: 0; } 50% { margin-top: -5px; } }
+
+  /* primary star (center) */
+  .primary { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); }
+  .primary .star { width: 30px; height: 30px; border-radius: 50%;
+                   background: radial-gradient(circle at 40% 36%, #fff, var(--gold-br) 40%, var(--gold) 70%, var(--gold-d));
+                   box-shadow: 0 0 26px var(--gold-br), 0 0 60px rgba(232,196,115,0.6), 0 0 120px rgba(232,196,115,0.3);
+                   animation: bloom 5s ease-in-out infinite; }
+  @keyframes bloom { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); box-shadow: 0 0 34px #fff, 0 0 80px rgba(232,196,115,0.7), 0 0 150px rgba(232,196,115,0.35); } }
+  .primary .corona { position: absolute; left: 50%; top: 50%; width: 130px; height: 130px;
+                     transform: translate(-50%,-50%); border-radius: 50%;
+                     background: radial-gradient(circle, rgba(232,196,115,0.18), transparent 65%); }
+  .primary .ray { position: absolute; left: 50%; top: 50%; width: 2px; height: 88px;
+                  background: linear-gradient(var(--gold-br), transparent); transform-origin: top center;
+                  opacity: 0.5; }
+  .primary .lab { position: absolute; left: 50%; top: 26px; transform: translateX(-50%);
+                  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; white-space: nowrap;
+                  color: var(--gold-br); text-shadow: 0 0 10px #0a0712; }
+
+  .chart-foot { display: flex; justify-content: space-between; margin-top: 10px;
+                font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em;
+                text-transform: uppercase; color: var(--muted-d); }
+
+  /* --- ephemeris (primary dossier) --- */
+  .ephem { padding: 26px 28px; display: flex; flex-direction: column; }
+  .ephem .ribbon { align-self: flex-start; font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em;
+                   text-transform: uppercase; color: var(--gold); border: 1px solid var(--edge-2);
+                   border-radius: 2px; padding: 5px 12px; background: rgba(232,196,115,0.06); }
+  .ephem .desig { font-family: var(--disp); font-weight: 600; font-size: 30px; letter-spacing: 0.02em;
+                  margin-top: 18px; line-height: 1.1; color: var(--champ); }
+  .ephem .desig .at { color: var(--gold); }
+  .ephem .cat { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 8px;
+                letter-spacing: 0.08em; display: flex; align-items: center; gap: 9px; }
+  .ephem .cat button { appearance: none; border: 1px solid var(--edge); background: none; color: var(--muted);
+                       cursor: pointer; padding: 3px 9px; font-family: var(--mono); font-size: 10px;
+                       letter-spacing: 0.1em; border-radius: 2px; transition: all .2s; }
+  .ephem .cat button:hover { color: var(--gold); border-color: var(--gold); }
+
+  .spectral { display: flex; align-items: center; gap: 12px; margin-top: 20px; padding: 14px 0;
+              border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
+  .spectral .badge { font-family: var(--disp); font-weight: 700; font-size: 22px; color: #1a1206;
+                     background: radial-gradient(circle at 40% 36%, var(--gold-br), var(--gold));
+                     width: 44px; height: 44px; border-radius: 50%; display: grid; place-content: center;
+                     box-shadow: 0 0 16px rgba(232,196,115,0.5); }
+  .spectral .txt .cls { font-family: var(--disp); font-size: 16px; letter-spacing: 0.1em; color: var(--champ); }
+  .spectral .txt .sub { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--muted);
+                        text-transform: uppercase; margin-top: 2px; }
+
+  .magbox { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 22px; }
+  .magbox .big { font-family: var(--disp); font-weight: 700; font-size: 58px; line-height: 0.9; color: var(--champ);
+                 text-shadow: 0 0 30px rgba(232,196,115,0.25); }
+  .magbox .big .u { font-family: var(--serif); font-size: 22px; color: var(--muted); font-weight: 500; }
+  .magbox .ml { text-align: right; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.2em;
+                text-transform: uppercase; color: var(--gold-d); }
+  .lum { height: 5px; margin-top: 12px; border-radius: 3px; background: rgba(232,196,115,0.12); overflow: hidden; }
+  .lum i { display: block; height: 100%; width: 0; border-radius: 3px;
+           background: linear-gradient(90deg, var(--gold-d), var(--gold-br));
+           box-shadow: 0 0 12px rgba(232,196,115,0.6); transition: width 1.1s cubic-bezier(.2,.8,.2,1); }
+
+  .ephem .reads { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin-top: 22px; }
+  .rd { padding: 13px 15px; background: rgba(14,9,26,0.5); border: 1px solid rgba(232,196,115,0.07); }
+  .rd .k { font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-d); }
+  .rd .v { font-family: var(--disp); font-weight: 600; font-size: 22px; margin-top: 4px; color: var(--champ); }
+  .rd .v.blue { color: var(--blue); } .rd .v.rose { color: var(--rose); }
+  .ephem .quote { font-family: var(--serif); font-style: italic; font-size: 16px; color: var(--muted);
+                  line-height: 1.5; margin-top: 20px; }
+
+  /* =========================================================
+     THE REGISTER (table)
+     ========================================================= */
+  .register { margin-top: 32px; }
+  .reg-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  .reg-head h2 { font-family: var(--disp); font-weight: 600; font-size: 22px; letter-spacing: 0.12em;
+                 text-transform: uppercase; margin: 0; color: var(--champ); }
+  .reg-head h2 .g { color: var(--gold); }
+  .reg-head .meta { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em;
+                    text-transform: uppercase; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase;
+             color: var(--muted-d); font-weight: 400; text-align: left; padding: 13px 16px;
+             border-bottom: 1px solid var(--edge-2); white-space: nowrap; }
+  thead th.r { text-align: right; }
+
+  tbody tr { border-bottom: 1px solid rgba(232,196,115,0.08); position: relative; transition: background .2s; }
+  tbody tr:hover, tbody tr.lit { background: linear-gradient(90deg, rgba(232,196,115,0.08), transparent 72%); }
+  tbody tr::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+                     background: var(--gold); box-shadow: 0 0 12px var(--gold); transform: scaleY(0); transition: transform .22s; }
+  tbody tr:hover::before, tbody tr.lit::before { transform: scaleY(1); }
+  tbody td { padding: 17px 16px; vertical-align: middle; }
+
+  td.cat { width: 96px; }
+  td.cat .id { font-family: var(--disp); font-weight: 600; font-size: 18px; color: var(--text); letter-spacing: 0.06em; }
+  td.cat.apex .id { color: var(--gold); text-shadow: 0 0 14px rgba(232,196,115,0.4); }
+  td.cat .pm { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; color: var(--muted-d);
+               margin-top: 3px; text-transform: uppercase; }
+  td.cat .pm.up { color: var(--blue); } td.cat .pm.dn { color: var(--rose); }
+
+  td.body-c .name { font-family: var(--disp); font-weight: 600; font-size: 18px; color: var(--text);
+                    letter-spacing: 0.02em; transition: color .15s; }
+  tbody tr:hover td.body-c .name, tbody tr.lit td.body-c .name { color: var(--gold-br); }
+  td.body-c .name .at { color: var(--gold); }
+  td.body-c .co { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 4px;
+                  letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px; }
+  td.body-c .co button { appearance: none; border: 1px solid var(--edge); background: none; color: var(--muted-d);
+                         cursor: pointer; width: 22px; height: 22px; border-radius: 2px; display: inline-grid;
+                         place-items: center; transition: all .18s; }
+  td.body-c .co button:hover { color: var(--gold); border-color: var(--gold); }
+  td.body-c .co button svg { width: 11px; height: 11px; }
+
+  td.spec .chip { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+                  color: var(--gold); border: 1px solid var(--edge-2); border-radius: 2px; padding: 4px 9px;
+                  background: rgba(232,196,115,0.05); display: inline-block; }
+  td.spec .chip.apex { background: rgba(232,196,115,0.1); }
+  td.spec .mass { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 5px; letter-spacing: 0.06em; }
+
+  /* magnitude: luminous orb + number + bar */
+  td.mag { width: 200px; }
+  .mag-wrap { display: flex; align-items: center; gap: 13px; }
+  .mag-orb { border-radius: 50%; flex: none;
+             background: radial-gradient(circle at 38% 34%, var(--gold-br), var(--gold) 60%, var(--gold-d));
+             box-shadow: 0 0 var(--glow, 8px) rgba(232,196,115,0.7); }
+  .mag-meta { flex: 1; }
+  .mag-num { font-family: var(--disp); font-weight: 600; font-size: 21px; color: var(--champ); }
+  .mag-bar { height: 3px; margin-top: 5px; background: rgba(232,196,115,0.12); border-radius: 2px; width: 96px; overflow: hidden; }
+  .mag-bar i { display: block; height: 100%; width: 0; border-radius: 2px;
+               background: linear-gradient(90deg, var(--gold-d), var(--gold-br)); box-shadow: 0 0 8px rgba(232,196,115,0.5);
+               transition: width .9s cubic-bezier(.2,.8,.2,1); }
+
+  td.shift .v { font-family: var(--disp); font-weight: 600; font-size: 17px; }
+  td.shift .v.blue { color: var(--blue); } td.shift .v.rose { color: var(--rose); }
+  td.shift .tag { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase;
+                  color: var(--muted-d); margin-top: 3px; }
+
+  td.hit, td.obs { text-align: right; }
+  td.hit .v, td.obs .v { font-family: var(--disp); font-weight: 600; font-size: 18px; color: var(--text); }
+  td.obs .s { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+              color: var(--muted-d); margin-top: 3px; }
+
+  tbody tr.reveal { opacity: 0; transform: translateY(10px); animation: dawn .55s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes dawn { to { opacity: 1; transform: none; } }
+  .empty { display: none; text-align: center; padding: 54px; font-family: var(--serif); font-style: italic;
+           font-size: 19px; color: var(--muted); }
+
+  /* =========================================================
+     FOOTER
+     ========================================================= */
+  footer { margin-top: 52px; }
+  .notes-rule { display: flex; align-items: center; gap: 14px; font-family: var(--mono); font-size: 10px;
+                letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-d); }
+  .notes-rule .line { flex: 1; height: 1px; background: var(--edge); }
+  .notes-rule .orn { color: var(--gold); }
+  .notes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: 22px 0 0; }
+  .notes .card { padding: 22px 24px; }
+  .notes h3 { font-family: var(--disp); font-weight: 600; font-size: 13px; letter-spacing: 0.14em;
+              text-transform: uppercase; color: var(--gold); margin: 0 0 10px; }
+  .notes p { font-family: var(--serif); font-size: 16px; line-height: 1.55; color: var(--muted); margin: 0; }
+  .notes p .drop { float: left; font-family: var(--disp); font-size: 40px; line-height: 0.8; color: var(--gold);
+                   padding: 4px 10px 0 0; }
+  .notes code { font-family: var(--mono); font-size: 12px; color: var(--champ); background: rgba(232,196,115,0.08);
+                padding: 1px 5px; border-radius: 2px; }
+
+  /* =========================================================
+     RESPONSIVE
+     ========================================================= */
+  @media (max-width: 1000px) {
+    .hero { grid-template-columns: 1fr; }
+    .notes { grid-template-columns: 1fr; }
+    td.mag, td.spec { display: none; }
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 0 16px 64px; }
+    td.shift, td.hit { display: none; }
+    .micro { font-size: 8.5px; letter-spacing: 0.14em; }
+    .ephem .reads { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- cosmic atmosphere -->
+<div class="sky"><div class="neb"></div><div class="grain"></div></div>
+<div class="stars" id="stars"></div>
+
+<div class="wrap">
+
+  <!-- ============== MASTHEAD ============== -->
+  <header>
+    <div class="micro">
+      <span>WhaleWatcher Observatory <span class="g">·</span> Est. MMXXIV</span>
+      <span id="epoch">Epoch J2026.4 <span class="g">·</span> 412 Bodies Charted</span>
+    </div>
+    <div class="grule"></div><div class="grule thin"></div>
+
+    <div class="crown">
+      <span class="orn"><svg viewBox="0 0 32 32" fill="none"><path d="M16 1l2.6 11.4L30 16l-11.4 2.6L16 30l-2.6-11.4L2 16l11.4-2.6z" fill="currentColor"/></svg></span>
+      <h1 class="word">Whale<b>Watcher</b></h1>
+      <span class="orn"><svg viewBox="0 0 32 32" fill="none"><path d="M16 1l2.6 11.4L30 16l-11.4 2.6L16 30l-2.6-11.4L2 16l11.4-2.6z" fill="currentColor"/></svg></span>
+    </div>
+    <p class="deck">A celestial register of the market's most massive movers.</p>
+    <div class="grule thin"></div>
+  </header>
+
+  <!-- ============== CONTROLS ============== -->
+  <div class="controls">
+    <div class="arc">
+      <span class="lbl">Observation Arc</span>
+      <div class="seg">
+        <button class="active" data-h="30">30 Nights</button>
+        <button data-h="90">90 Nights</button>
+      </div>
+    </div>
+    <label class="resolve">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="text" placeholder="Resolve a body" autocomplete="off" />
+    </label>
+  </div>
+
+  <!-- ============== HERO ============== -->
+  <section class="hero">
+
+    <!-- star chart -->
+    <div class="frame chart-wrap">
+      <div class="corners"><i></i><i></i><i></i><i></i></div>
+      <div class="chart-head">
+        <span class="t">Sky Chart · Northern Field</span>
+        <span class="c" id="chart-c">Arc · 30 Nights</span>
+      </div>
+      <div class="starmap" id="starmap">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+          <g class="ring-rot" id="degree-ring"></g>
+          <g id="orbits" stroke="rgba(232,196,115,0.10)" fill="none"></g>
+          <path id="constellation" stroke="rgba(232,196,115,0.22)" stroke-width="0.25"
+                fill="none" stroke-dasharray="1.4 1.2"
+                style="stroke-dashoffset: 220; transition: stroke-dashoffset 2.4s ease" />
+        </svg>
+        <!-- primary star -->
+        <div class="primary" id="primary">
+          <div class="corona"></div>
+          <div class="star"></div>
+          <div class="lab" id="primary-lab">—</div>
+        </div>
+        <!-- orbiting bodies injected by JS -->
+      </div>
+      <div class="chart-foot">
+        <span>Brighter = stronger forecasting edge</span>
+        <span id="chart-foot-r">7 bodies plotted</span>
+      </div>
+    </div>
+
+    <!-- ephemeris -->
+    <div class="frame ephem" id="ephem">
+      <div class="corners"><i></i><i></i><i></i><i></i></div>
+      <!-- filled by JS -->
+    </div>
+  </section>
+
+  <!-- ============== REGISTER ============== -->
+  <section class="register">
+    <div class="reg-head">
+      <h2>The <span class="g">Register</span></h2>
+      <span class="meta" id="reg-meta">Bodies 02–12 · ranked by apparent magnitude</span>
+    </div>
+    <div class="frame" style="padding: 4px 10px 10px;">
+      <div class="corners"><i></i><i></i><i></i><i></i></div>
+      <table>
+        <thead>
+          <tr>
+            <th>Cat. №</th>
+            <th>Body</th>
+            <th class="spec-col">Spectral Class</th>
+            <th>Magnitude · Skill</th>
+            <th>Shift · Edge</th>
+            <th class="r">Hit Rate</th>
+            <th class="r">Obs.</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty">No body in the register resolves to that designation.</div>
+    </div>
+  </section>
+
+  <!-- ============== OBSERVER'S NOTES ============== -->
+  <footer>
+    <div class="notes-rule"><span>Observer's Notes</span><span class="line"></span><span class="orn">✦</span></div>
+    <div class="notes">
+      <div class="frame card">
+        <div class="corners"><i></i><i></i><i></i><i></i></div>
+        <h3>Magnitude is skill</h3>
+        <p><span class="drop">A</span> body's apparent magnitude is its Skill Score (0–10): how reliably entry prices anticipate a market's resolution, Bayesian-shrunk so a brief flash of luck cannot pass for a fixed star.</p>
+      </div>
+      <div class="frame card">
+        <div class="corners"><i></i><i></i><i></i><i></i></div>
+        <h3>Spectral shift</h3>
+        <p>Shift is edge per share — the mean of <code>resolution − entry</code> over resolved markets, in cents. A <span style="color:var(--blue)">blueshift</span> is positive edge approaching; a <span style="color:var(--rose)">redshift</span>, edge receding.</p>
+      </div>
+      <div class="frame card">
+        <div class="corners"><i></i><i></i><i></i><i></i></div>
+        <h3>Charting the field</h3>
+        <p>Class follows magnitude — <code>O</code> supergiants (≥9) down to <code>M</code> dwarfs. Suspected automata and sub-threshold bodies are never admitted to the register.</p>
+      </div>
+    </div>
+    <div class="notes-rule" style="margin-top:34px"><span class="orn">✦</span><span class="line"></span><span>WhaleWatcher Observatory · Cinzel · Cormorant · Space Mono</span></div>
+  </footer>
+
+</div>
+
+<script>
+/* ----------------------------------------------------------
+   Mock data — two observation arcs (30 / 90 nights). Fields
+   mirror LeaderboardRow + a `vol` (mass, USD). edge in
+   dollars/share, win in 0–1.
+   ---------------------------------------------------------- */
+const DATA = {
+  30: [
+    { rank:1, handle:"oracle.eth",     addr:"0x9f3a2c1be8d740a5c2f0913ab6e7d4519c8a0f21", skill:9.4, edge:0.114, win:0.71, n:284, resolved:201, vol:8.4e6, delta:0,  brief:"A fixed star — concentrated, contrarian, and never early. It takes conviction at a discount and lets resolution close the distance." },
+    { rank:2, handle:"mistral_fades",  addr:"0x4c71e0a93f5b21d8c0e6a47fb2901d3e5a8c6b14", skill:8.7, edge:0.092, win:0.66, n:512, resolved:388, vol:6.1e6, delta:2 },
+    { rank:3, handle:"NateSilverFan",  addr:"0x1d88f0c3a72be450196d8af2c0e3b7415d9a6e02", skill:8.1, edge:0.081, win:0.69, n:147, resolved:118, vol:2.3e6, delta:-1 },
+    { rank:4, handle:null,             addr:"0xae02b6c91f3d7048a25e0c8b194f6d320a7e9c55", skill:7.6, edge:0.073, win:0.62, n:333, resolved:240, vol:4.0e6, delta:5 },
+    { rank:5, handle:"size_in_silence",addr:"0x7b41902ce8a3f5d06b2e1f49c70d8a3516e2b9f0", skill:7.2, edge:0.067, win:0.64, n:198, resolved:151, vol:3.2e6, delta:-2 },
+    { rank:6, handle:"vig_collector",  addr:"0x33c8e1a0b7f249de5108963ac4e2f70b1d6a8e93", skill:6.9, edge:0.061, win:0.59, n:441, resolved:312, vol:5.5e6, delta:1 },
+    { rank:7, handle:"bayes_or_bust",  addr:"0x0a59f2d8c14b6e037a9d2510fce84b2630a7c1d6", skill:6.4, edge:0.054, win:0.61, n:165, resolved:122, vol:1.8e6, delta:-3 },
+    { rank:8, handle:null,             addr:"0xc7e10f4a92b3d65082f1ac74e0b9d3516a280f47", skill:6.0, edge:0.048, win:0.57, n:276, resolved:198, vol:2.9e6, delta:4 },
+    { rank:9, handle:"longtail_lucy",  addr:"0x5f2b80d1a6c43e790b18f2c50ad6e93417b0c8a2", skill:5.6, edge:0.041, win:0.55, n:389, resolved:271, vol:3.7e6, delta:0 },
+    { rank:10,handle:"edge_or_exit",   addr:"0x82a4c0e15b9d3f6708e2a14c6d0b97f3215e8a0c", skill:5.1, edge:0.034, win:0.58, n:213, resolved:160, vol:2.1e6, delta:-2 },
+    { rank:11,handle:null,             addr:"0x6d10b3f8a2c54e09d71f0a26b4e8c93517d2a0f6", skill:4.7, edge:0.027, win:0.53, n:301, resolved:214, vol:2.6e6, delta:1 },
+    { rank:12,handle:"meanrev_mike",   addr:"0x29e7c0a4b1f8d35062a9e147c0d3b86415f2e0a9", skill:4.2, edge:0.019, win:0.51, n:174, resolved:129, vol:1.4e6, delta:3 },
+  ],
+  90: [
+    { rank:1, handle:"mistral_fades",  addr:"0x4c71e0a93f5b21d8c0e6a47fb2901d3e5a8c6b14", skill:9.1, edge:0.103, win:0.68, n:1480, resolved:1102, vol:21.0e6, delta:0,  brief:"A metronome across two thousand resolved markets — small, relentless edges compounded into the steadiest light on the field." },
+    { rank:2, handle:"oracle.eth",     addr:"0x9f3a2c1be8d740a5c2f0913ab6e7d4519c8a0f21", skill:8.9, edge:0.097, win:0.70, n:842,  resolved:611,  vol:18.2e6, delta:0 },
+    { rank:3, handle:"vig_collector",  addr:"0x33c8e1a0b7f249de5108963ac4e2f70b1d6a8e93", skill:8.3, edge:0.084, win:0.63, n:1320, resolved:944,  vol:16.5e6, delta:3 },
+    { rank:4, handle:"NateSilverFan",  addr:"0x1d88f0c3a72be450196d8af2c0e3b7415d9a6e02", skill:7.8, edge:0.076, win:0.67, n:436,  resolved:331,  vol:7.1e6,  delta:-1 },
+    { rank:5, handle:"bayes_or_bust",  addr:"0x0a59f2d8c14b6e037a9d2510fce84b2630a7c1d6", skill:7.3, edge:0.069, win:0.62, n:588,  resolved:447,  vol:6.4e6,  delta:2 },
+    { rank:6, handle:null,             addr:"0xae02b6c91f3d7048a25e0c8b194f6d320a7e9c55", skill:6.7, edge:0.058, win:0.60, n:910,  resolved:672,  vol:9.0e6,  delta:-2 },
+    { rank:7, handle:"size_in_silence",addr:"0x7b41902ce8a3f5d06b2e1f49c70d8a3516e2b9f0", skill:6.2, edge:0.050, win:0.61, n:521,  resolved:402,  vol:5.6e6,  delta:-2 },
+    { rank:8, handle:"longtail_lucy",  addr:"0x5f2b80d1a6c43e790b18f2c50ad6e93417b0c8a2", skill:5.8, edge:0.044, win:0.56, n:1041, resolved:760,  vol:8.3e6,  delta:1 },
+    { rank:9, handle:"meanrev_mike",   addr:"0x29e7c0a4b1f8d35062a9e147c0d3b86415f2e0a9", skill:5.3, edge:0.037, win:0.54, n:402,  resolved:298,  vol:3.9e6,  delta:4 },
+    { rank:10,handle:"edge_or_exit",   addr:"0x82a4c0e15b9d3f6708e2a14c6d0b97f3215e8a0c", skill:4.9, edge:0.030, win:0.57, n:633,  resolved:471,  vol:5.0e6,  delta:-1 },
+    { rank:11,handle:null,             addr:"0xc7e10f4a92b3d65082f1ac74e0b9d3516a280f47", skill:4.4, edge:0.022, win:0.52, n:744,  resolved:540,  vol:5.8e6,  delta:0 },
+    { rank:12,handle:"deepcurrent",    addr:"0x6d10b3f8a2c54e09d71f0a26b4e8c93517d2a0f6", skill:3.9, edge:0.015, win:0.50, n:289,  resolved:211,  vol:2.7e6,  delta:-3 },
+  ],
+};
+
+/* ---- formatters (mirror web/lib/format.ts) ---- */
+const fmtEdge = v => (v>0?"+":"") + (v*100).toFixed(1) + "¢";
+const fmtPct  = v => (v*100).toFixed(0) + "%";
+const fmtN    = v => new Intl.NumberFormat("en-US").format(v);
+const fmtUsd  = v => "$" + new Intl.NumberFormat("en-US",{notation:"compact",maximumFractionDigits:1}).format(v);
+const shorten = a => a.slice(0,6) + "…" + a.slice(-4);
+const display = r => r.handle ? `<span class="at">@</span>${r.handle}` : shorten(r.addr);
+const catNo   = rank => "WW-" + String(rank).padStart(3,"0");
+
+/* ---- spectral class by magnitude ---- */
+function spectral(skill){
+  if (skill >= 9) return { L:"O", name:"Supergiant" };
+  if (skill >= 8) return { L:"B", name:"Blue Giant" };
+  if (skill >= 7) return { L:"A", name:"Bright Star" };
+  if (skill >= 6) return { L:"F", name:"Yellow-White" };
+  if (skill >= 5) return { L:"G", name:"Main Sequence" };
+  if (skill >= 4) return { L:"K", name:"Orange Dwarf" };
+  return            { L:"M", name:"Red Dwarf" };
+}
+
+let currentH = 30, query = "";
+
+/* ---- starfield ---- */
+(function makeStars(){
+  const host = document.getElementById("stars");
+  for (let i=0;i<150;i++){
+    const s = document.createElement("span");
+    const sz = Math.random()*2 + 0.6;
+    s.style.width = s.style.height = sz + "px";
+    s.style.left = Math.random()*100 + "vw";
+    s.style.top  = Math.random()*100 + "vh";
+    s.style.setProperty("--o", (0.25 + Math.random()*0.6).toFixed(2));
+    s.style.setProperty("--tw", (2.5 + Math.random()*5).toFixed(1) + "s");
+    s.style.animationDelay = (-Math.random()*6) + "s";
+    if (Math.random() > 0.86) s.style.boxShadow = "0 0 6px #fff";
+    host.appendChild(s);
+  }
+})();
+
+/* ---- degree ring (engraved ticks) ---- */
+(function degreeRing(){
+  const g = document.getElementById("degree-ring");
+  const cx=50, cy=50, R=49;
+  let svg = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="rgba(232,196,115,0.22)" stroke-width="0.3"/>`;
+  for (let a=0; a<360; a+=5){
+    const major = a % 30 === 0;
+    const r1 = major ? R-3 : R-1.4;
+    const rad = a*Math.PI/180;
+    const x1 = cx + Math.cos(rad)*r1, y1 = cy + Math.sin(rad)*r1;
+    const x2 = cx + Math.cos(rad)*R,  y2 = cy + Math.sin(rad)*R;
+    svg += `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"
+            stroke="rgba(232,196,115,${major?0.4:0.18})" stroke-width="${major?0.35:0.2}"/>`;
+  }
+  g.innerHTML = svg;
+})();
+
+/* ---- compute orbit positions for top bodies (rank 2..7) ---- */
+function bodyLayout(all){
+  const orbit = all.slice(1, 7); // 6 bodies around the primary
+  const cx=50, cy=50;
+  return orbit.map((r, i) => {
+    const ang = (-128 + i*64) * Math.PI/180;       // spread around
+    const rad = 17 + i*5.0;                          // increasing radius
+    const x = cx + Math.cos(ang)*rad;
+    const y = cy + Math.sin(ang)*rad*0.86;           // slight ellipse
+    return { r, x, y };
+  });
+}
+
+/* ---- render the star chart ---- */
+function renderChart(all){
+  const map = document.getElementById("starmap");
+  map.querySelectorAll(".body").forEach(b=>b.remove());
+
+  // primary label
+  const p = all[0];
+  document.getElementById("primary-lab").textContent = p.handle ? "@"+p.handle : shorten(p.addr);
+  // primary rays
+  const prim = document.getElementById("primary");
+  prim.querySelectorAll(".ray").forEach(r=>r.remove());
+  for (let k=0;k<8;k++){
+    const ray = document.createElement("div");
+    ray.className = "ray";
+    ray.style.transform = `translateX(-50%) rotate(${k*45}deg)`;
+    ray.style.height = (k%2 ? 70 : 92) + "px";
+    prim.appendChild(ray);
+  }
+
+  // orbit ellipses
+  const orbits = document.getElementById("orbits");
+  orbits.innerHTML = [22, 31, 40].map(rx =>
+    `<ellipse cx="50" cy="50" rx="${rx}" ry="${(rx*0.86).toFixed(1)}"/>`).join("");
+
+  const layout = bodyLayout(all);
+
+  // constellation path through the bodies (+ from primary to first)
+  const cpath = `M50 50 L` + layout.map(b => `${b.x.toFixed(1)} ${b.y.toFixed(1)}`).join(" L ");
+  const con = document.getElementById("constellation");
+  con.setAttribute("d", cpath);
+  requestAnimationFrame(()=> requestAnimationFrame(()=> con.style.strokeDashoffset = "0"));
+
+  // body nodes
+  layout.forEach((b, i) => {
+    const size = 7 + Math.min(11, (b.r.vol/22e6)*22);     // mass -> radius
+    const glow = 6 + (b.r.skill/10)*16;                   // skill -> glow
+    const el = document.createElement("div");
+    el.className = "body bob";
+    el.style.left = b.x + "%"; el.style.top = b.y + "%";
+    el.style.setProperty("--bd", (5 + Math.random()*4).toFixed(1) + "s");
+    el.style.animationDelay = (-Math.random()*4) + "s";
+    el.dataset.addr = b.r.addr;
+    el.innerHTML = `<div class="core" style="width:${size}px;height:${size}px;box-shadow:0 0 ${glow}px rgba(232,196,115,0.7),0 0 ${glow*2}px rgba(232,196,115,0.35)"></div>
+                    <div class="lab">${b.r.handle ? "@"+b.r.handle : shorten(b.r.addr)}</div>`;
+    // link hover to register row
+    el.addEventListener("mouseenter", ()=> highlight(b.r.addr, true));
+    el.addEventListener("mouseleave", ()=> highlight(b.r.addr, false));
+    map.appendChild(el);
+  });
+
+  document.getElementById("chart-foot-r").textContent = (layout.length+1) + " bodies plotted";
+}
+
+/* ---- cross-highlight chart <-> register ---- */
+function highlight(addr, on){
+  document.querySelectorAll(`.body[data-addr="${addr}"]`).forEach(b=> b.classList.toggle("flare", on));
+  document.querySelectorAll(`tr[data-addr="${addr}"]`).forEach(t=> t.classList.toggle("lit", on));
+}
+
+/* ---- ephemeris (primary dossier) ---- */
+function renderEphem(r){
+  const sp = spectral(r.skill);
+  const el = document.getElementById("ephem");
+  el.innerHTML = `
+    <div class="corners"><i></i><i></i><i></i><i></i></div>
+    <div class="ribbon">✦ Primary · ${catNo(r.rank)}</div>
+    <div class="desig">${r.handle ? `<span class="at">@</span>${r.handle}` : shorten(r.addr)}</div>
+    <div class="cat">${shorten(r.addr)} <button data-copy="${r.addr}">COPY</button></div>
+    <div class="spectral">
+      <div class="badge">${sp.L}</div>
+      <div class="txt"><div class="cls">Class ${sp.L} · ${sp.name}</div><div class="sub">Mass ≈ ${fmtUsd(r.vol)} · ${fmtN(r.resolved)} resolved</div></div>
+    </div>
+    <div class="magbox">
+      <div class="big">${r.skill.toFixed(1)}<span class="u"> mag</span></div>
+      <div class="ml">Apparent<br/>Magnitude</div>
+    </div>
+    <div class="lum"><i id="lum-fill"></i></div>
+    <div class="reads">
+      <div class="rd"><div class="k">Shift · Edge</div><div class="v ${r.edge>=0?'blue':'rose'}">${fmtEdge(r.edge)}</div></div>
+      <div class="rd"><div class="k">Hit Rate</div><div class="v">${fmtPct(r.win)}</div></div>
+      <div class="rd"><div class="k">Observations</div><div class="v">${fmtN(r.n)}</div></div>
+      <div class="rd"><div class="k">Mass</div><div class="v">${fmtUsd(r.vol)}</div></div>
+    </div>
+    ${r.brief ? `<div class="quote">“${r.brief}”</div>` : ``}`;
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    const f = document.getElementById("lum-fill"); if (f) f.style.width = (r.skill/10*100) + "%";
+  }));
+}
+
+/* ---- register rows ---- */
+function renderRows(list){
+  const tb = document.getElementById("rows");
+  const empty = document.getElementById("empty");
+  tb.innerHTML = "";
+  if(!list.length){ empty.style.display="block"; return; }
+  empty.style.display="none";
+
+  list.forEach((r,i)=>{
+    const sp = spectral(r.skill);
+    const apex = r.rank===1 ? "apex" : "";
+    const dCls = r.delta>0?"up":r.delta<0?"dn":"";
+    const dTxt = r.delta>0?`▲ ${r.delta} pm`:r.delta<0?`▼ ${Math.abs(r.delta)} pm`:"— pm";
+    const eCls = r.edge>=0?"blue":"rose";
+    const eTag = r.edge>=0?"blueshift":"redshift";
+    const ePct = Math.min(100, Math.abs(r.edge)/0.12*100);
+    const orbSize = 12 + (r.skill/10)*12;
+    const orbGlow = 4 + (r.skill/10)*16;
+
+    const tr = document.createElement("tr");
+    tr.className = "reveal"; tr.style.animationDelay = (i*55)+"ms";
+    tr.dataset.addr = r.addr;
+    tr.innerHTML = `
+      <td class="cat ${apex}">
+        <div class="id">${catNo(r.rank)}</div>
+        <div class="pm ${dCls}">${dTxt}</div>
+      </td>
+      <td class="body-c">
+        <div class="name">${display(r)}</div>
+        <div class="co">${shorten(r.addr)} <button data-copy="${r.addr}" title="Copy address">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M5 15V5a1.5 1.5 0 0 1 1.5-1.5H15"/></svg>
+        </button></div>
+      </td>
+      <td class="spec">
+        <span class="chip ${apex}">${sp.L} · ${sp.name}</span>
+        <div class="mass">mass ≈ ${fmtUsd(r.vol)}</div>
+      </td>
+      <td class="mag">
+        <div class="mag-wrap">
+          <span class="mag-orb" style="width:${orbSize}px;height:${orbSize}px;--glow:${orbGlow}px"></span>
+          <span class="mag-meta">
+            <span class="mag-num">${r.skill.toFixed(1)}</span>
+            <span class="mag-bar"><i data-w="${(r.skill/10*100).toFixed(0)}"></i></span>
+          </span>
+        </div>
+      </td>
+      <td class="shift">
+        <div class="v ${eCls}">${fmtEdge(r.edge)}</div>
+        <div class="tag">${eTag}</div>
+      </td>
+      <td class="hit"><div class="v">${fmtPct(r.win)}</div></td>
+      <td class="obs"><div class="v">${fmtN(r.n)}</div><div class="s">${fmtN(r.resolved)} resolved</div></td>`;
+
+    tr.addEventListener("mouseenter", ()=> highlight(r.addr, true));
+    tr.addEventListener("mouseleave", ()=> highlight(r.addr, false));
+    tb.appendChild(tr);
+  });
+
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    tb.querySelectorAll(".mag-bar i").forEach(el=> el.style.width = el.dataset.w + "%");
+  }));
+}
+
+/* ---- compose render ---- */
+function render(){
+  const all = DATA[currentH];
+  const q = query.trim().toLowerCase();
+  const match = r => !q || r.addr.toLowerCase().startsWith(q) || (r.handle||"").toLowerCase().includes(q);
+
+  const primary = all[0];
+  const rest = all.slice(1).filter(match);
+
+  const showHero = !q || match(primary);
+  document.getElementById("ephem").style.opacity = showHero ? "1" : "0.3";
+  if (showHero) renderEphem(primary);
+  renderChart(all);
+  renderRows(rest);
+
+  document.getElementById("chart-c").textContent = "Arc · " + currentH + " Nights";
+  document.getElementById("epoch").innerHTML =
+    `Epoch J2026.${currentH===30?"4":"7"} <span class="g">·</span> 412 Bodies Charted`;
+  document.getElementById("reg-meta").textContent = q
+    ? `${rest.length} resolved`
+    : `Bodies 02–${String(all.length).padStart(2,"0")} · ranked by apparent magnitude`;
+}
+
+/* ---- arc tabs ---- */
+document.querySelectorAll(".seg button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll(".seg button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    currentH = +b.dataset.h;
+    render();
+  });
+});
+
+/* ---- search ---- */
+document.getElementById("search").addEventListener("input", e=>{ query=e.target.value; render(); });
+
+/* ---- copy (delegated) ---- */
+document.addEventListener("click", e=>{
+  const b = e.target.closest("[data-copy]"); if(!b) return;
+  e.preventDefault();
+  navigator.clipboard?.writeText(b.dataset.copy);
+  if (b.textContent.trim()==="COPY"){ const p=b.textContent; b.textContent="COPIED"; setTimeout(()=>b.textContent=p,1100); }
+});
+
+render();
+</script>
+</body>
+</html>

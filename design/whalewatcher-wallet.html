@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WhaleWatcher — Contact Dossier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+<style>
+  /* ===== WhaleWatcher shared sonar-console theme ===== */
+  :root{
+    --bg0:#03101a;--bg1:#062132;--bg2:#0a2c40;
+    --panel:rgba(8,36,52,0.55);--panel-edge:rgba(60,224,200,0.18);
+    --bio:#36ecd0;--bio-d:#1fa994;--teal:#2bb3c9;
+    --abyss-text:#d4f3f0;--muted:#6c97a3;--muted-d:#4a6f7a;
+    --coral:#ff7a59;--amber:#ffd27a;--grid:rgba(54,236,208,0.08);
+    --disp:"Chakra Petch",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace;
+    --maxw:1240px;
+  }
+  *{box-sizing:border-box}html{-webkit-font-smoothing:antialiased}
+  body{margin:0;min-height:100vh;background:var(--bg0);color:var(--abyss-text);
+       font-family:var(--mono);font-size:14px;line-height:1.5;overflow-x:hidden;position:relative}
+  .scene{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .scene .gradient{position:absolute;inset:0;background:
+    radial-gradient(120% 80% at 50% -10%,rgba(54,236,208,0.10),transparent 55%),
+    radial-gradient(90% 70% at 80% 110%,rgba(43,179,201,0.10),transparent 60%),
+    linear-gradient(180deg,#04141f 0%,#03101a 40%,#020a12 100%)}
+  .scene .mesh{position:absolute;inset:0;opacity:0.5;
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:64px 64px;mask-image:radial-gradient(110% 90% at 50% 30%,#000 30%,transparent 85%)}
+  .scene .grain{position:absolute;inset:0;opacity:0.06;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+  .plankton{position:fixed;inset:0;z-index:0;pointer-events:none}
+  .plankton span{position:absolute;bottom:-10px;border-radius:50%;background:var(--bio);
+    box-shadow:0 0 6px var(--bio);opacity:0;animation:rise-bubble linear infinite}
+  @keyframes rise-bubble{0%{transform:translateY(0) translateX(0);opacity:0}10%{opacity:.7}90%{opacity:.5}
+    100%{transform:translateY(-105vh) translateX(20px);opacity:0}}
+  .wrap{position:relative;z-index:2;max-width:var(--maxw);margin:0 auto;padding:0 28px 90px}
+  ::selection{background:var(--bio);color:#03141d}a{color:inherit;text-decoration:none}
+
+  .console-bar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:22px 0 16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:14px}
+  .brand .mark{width:46px;height:46px;flex:none;filter:drop-shadow(0 0 8px rgba(54,236,208,0.5))}
+  .brand .name{font-family:var(--disp);font-weight:700;font-size:26px;letter-spacing:0.04em;line-height:1}
+  .brand .name b{color:var(--bio)}.brand .name .light{font-weight:300}
+  .brand .sub{font-family:var(--mono);font-size:9.5px;letter-spacing:0.34em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+  .nav{display:flex;gap:6px;background:var(--panel);border:1px solid var(--panel-edge);border-radius:4px;padding:4px}
+  .nav a{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:0.06em;color:var(--muted);padding:8px 18px;border-radius:2px;transition:all .2s}
+  .nav a:hover{color:var(--abyss-text)}
+  .nav a.active{color:#03141d;background:var(--bio);box-shadow:0 0 16px rgba(54,236,208,0.45)}
+  .status-strip{display:flex;align-items:center;gap:22px}
+  .online{display:inline-flex;align-items:center;gap:8px;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;
+    color:var(--bio);border:1px solid var(--panel-edge);padding:7px 13px;border-radius:2px;background:var(--panel)}
+  .online .ping{width:7px;height:7px;border-radius:50%;background:var(--bio);box-shadow:0 0 8px var(--bio);animation:blink 1.6s steps(1) infinite}
+  @keyframes blink{0%,60%{opacity:1}61%,100%{opacity:.25}}
+  .bar-rule{height:1px;background:linear-gradient(90deg,transparent,var(--panel-edge) 12%,var(--panel-edge) 88%,transparent)}
+  .panel{background:var(--panel);border:1px solid var(--panel-edge);border-radius:6px;backdrop-filter:blur(8px);position:relative}
+
+  .back{display:inline-flex;align-items:center;gap:8px;margin-top:22px;font-size:10.5px;letter-spacing:0.18em;
+    text-transform:uppercase;color:var(--muted);transition:color .2s}
+  .back:hover{color:var(--bio)}
+
+  /* dossier header card */
+  .dossier{display:grid;grid-template-columns:1fr 280px;gap:0;margin-top:16px;overflow:hidden}
+  .dossier .left{padding:30px 32px}
+  .dossier .ribbon{display:inline-flex;align-items:center;gap:8px;font-family:var(--disp);font-weight:600;font-size:11px;
+    letter-spacing:0.2em;text-transform:uppercase;color:var(--bio);border:1px solid var(--panel-edge);border-radius:2px;
+    padding:5px 12px;background:rgba(54,236,208,0.06)}
+  .dossier .desig{font-family:var(--disp);font-weight:700;font-size:42px;line-height:1;margin-top:16px;letter-spacing:0.01em}
+  .dossier .desig .at{color:var(--bio);font-weight:400}
+  .dossier .addr{font-size:12px;color:var(--muted);margin-top:12px;letter-spacing:0.04em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .dossier .addr button{appearance:none;border:1px solid var(--panel-edge);background:none;color:var(--muted);cursor:pointer;
+    padding:3px 9px;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;border-radius:2px;transition:all .2s}
+  .dossier .addr button:hover{color:var(--bio);border-color:var(--bio)}
+  .dossier .bio{font-size:13.5px;color:var(--muted);margin-top:14px;max-width:54ch;line-height:1.6;font-style:italic}
+  .tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+  .tag{font-family:var(--disp);font-weight:600;font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;
+    padding:5px 11px;border-radius:2px;border:1px solid rgba(54,236,208,0.3);color:var(--bio);background:rgba(54,236,208,0.06)}
+  .tag.warn{color:var(--coral);border-color:rgba(255,122,89,0.4);background:rgba(255,122,89,0.07)}
+
+  /* class/gauge sidebar */
+  .dossier .right{padding:28px 26px;border-left:1px solid var(--panel-edge);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;background:rgba(4,20,30,0.35)}
+  .gauge{position:relative;width:150px;height:150px}
+  .gauge svg{transform:rotate(-90deg)}
+  .gauge .center{position:absolute;inset:0;display:grid;place-content:center}
+  .gauge .center .num{font-family:var(--disp);font-weight:700;font-size:46px;line-height:1;text-shadow:0 0 18px rgba(54,236,208,0.4)}
+  .gauge .center .of{font-size:10px;color:var(--muted);letter-spacing:0.1em;margin-top:2px}
+  .right .class{font-family:var(--disp);font-weight:600;font-size:16px;letter-spacing:0.16em;text-transform:uppercase;
+    color:var(--bio);margin-top:16px;text-shadow:0 0 14px rgba(54,236,208,0.3)}
+  .right .clsub{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+
+  /* horizon toggle (shared) */
+  .seg{display:flex;border:1px solid var(--panel-edge);border-radius:3px;overflow:hidden;background:var(--panel)}
+  .seg button{appearance:none;border:none;background:none;cursor:pointer;font-family:var(--disp);font-weight:600;font-size:13px;
+    letter-spacing:0.08em;color:var(--muted);padding:9px 20px;transition:all .2s}
+  .seg button+button{border-left:1px solid var(--panel-edge)}
+  .seg button:hover{color:var(--abyss-text)}
+  .seg button.active{color:#03141d;background:var(--bio);box-shadow:0 0 18px rgba(54,236,208,0.5)}
+
+  /* metric instrument panels */
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+  .mcard{padding:22px 24px}
+  .mcard .mh{display:flex;justify-content:space-between;align-items:center}
+  .mcard .mh .hz{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:0.14em;color:var(--muted);text-transform:uppercase}
+  .mcard .mh .sk{font-family:var(--disp);font-weight:700;font-size:20px;color:var(--bio);text-shadow:0 0 12px rgba(54,236,208,0.35)}
+  .mcard dl{display:grid;grid-template-columns:auto 1fr;gap:13px 14px;margin:20px 0 0}
+  .mcard dt{color:var(--muted-d);font-size:11px;letter-spacing:0.06em}
+  .mcard dd{margin:0;text-align:right;font-family:var(--disp);font-weight:600;font-size:14.5px}
+  .mcard dd.pos{color:var(--bio)}.mcard dd.neg{color:var(--coral)}
+  .mcard dd .sub{color:var(--muted);font-weight:400;font-size:12px}
+
+  /* dive profile (equity curve) */
+  .dive{margin-top:24px;padding:24px 26px 18px}
+  .dive-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+  .dive-head h2{font-family:var(--disp);font-weight:600;font-size:17px;letter-spacing:0.14em;text-transform:uppercase;margin:0}
+  .dive-head h2 .g{color:var(--bio)}
+  .dive-head .now{text-align:right}
+  .dive-head .now .k{font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-d)}
+  .dive-head .now .v{font-family:var(--disp);font-weight:700;font-size:24px}
+  .chartbox{position:relative;height:300px;margin-top:4px}
+  .chartbox svg{width:100%;height:100%;display:block;overflow:visible}
+  .axis-lbl{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;fill:var(--muted-d)}
+  .blip-now{filter:drop-shadow(0 0 6px var(--bio))}
+  .dive-foot{display:flex;justify-content:space-between;margin-top:10px;font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted-d)}
+
+  .signoff{display:flex;align-items:center;gap:14px;margin-top:42px;font-size:9.5px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-d)}
+  .signoff .line{flex:1;height:1px;background:var(--panel-edge)}
+
+  @media(max-width:920px){.dossier{grid-template-columns:1fr}.dossier .right{border-left:0;border-top:1px solid var(--panel-edge)}
+    .metrics{grid-template-columns:1fr}.nav{order:3;width:100%;justify-content:center}}
+  @media(max-width:560px){.wrap{padding:0 16px 64px}.dossier .desig{font-size:32px}}
+</style>
+</head>
+<body>
+<div class="scene"><div class="gradient"></div><div class="mesh"></div><div class="grain"></div></div>
+<div class="plankton" id="plankton"></div>
+
+<div class="wrap">
+  <header>
+    <div class="console-bar">
+      <a class="brand" href="whalewatcher-index.html">
+        <svg class="mark" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="21" stroke="#36ecd0" stroke-width="1" opacity="0.35"/>
+          <circle cx="24" cy="24" r="14" stroke="#36ecd0" stroke-width="1" opacity="0.5"/>
+          <circle cx="24" cy="24" r="7" stroke="#36ecd0" stroke-width="1" opacity="0.7"/>
+          <path d="M11 27c5 2 9 2 13-1 3-2 6-3 10-1-1 3-4 5-8 5-3 0-5-1-6-2-3 2-6 2-9-1z" fill="#36ecd0"/>
+          <circle cx="30" cy="24" r="1.4" fill="#03141d"/>
+        </svg>
+        <div><div class="name"><b>WHALE</b><span class="light">WATCHER</span></div>
+          <div class="sub">Hydrophone Console · Polymarket Deep Scan</div></div>
+      </a>
+      <nav class="nav">
+        <a href="whalewatcher-activity.html">Activity</a>
+        <a href="whalewatcher-sonar.html" class="active">Leaderboard</a>
+        <a href="whalewatcher-markets.html">Markets</a>
+      </nav>
+      <div class="status-strip">
+        <div class="online"><span class="ping"></span> Tracking</div>
+      </div>
+    </div>
+    <div class="bar-rule"></div>
+  </header>
+
+  <a href="whalewatcher-sonar.html" class="back">← Return to Contact Log</a>
+
+  <!-- dossier card -->
+  <section class="panel dossier" id="dossier"><!-- filled by JS --></section>
+
+  <!-- horizon toggle + metrics -->
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:24px;flex-wrap:wrap">
+    <div style="font-family:var(--disp);font-weight:600;font-size:15px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted)">Telemetry Window</div>
+    <div class="seg" id="hz-seg">
+      <button data-h="30">30 Day</button>
+      <button class="active" data-h="90">90 Day</button>
+    </div>
+  </div>
+
+  <div class="metrics" id="metrics"></div>
+
+  <!-- dive profile -->
+  <section class="panel dive">
+    <div class="dive-head">
+      <h2>Dive <span class="g">Profile</span></h2>
+      <div class="now"><div class="k">Net Catch · <span id="dive-hz">90D</span></div><div class="v" id="dive-now">—</div></div>
+    </div>
+    <div class="chartbox"><svg id="chart" viewBox="0 0 920 300" preserveAspectRatio="none"></svg></div>
+    <div class="dive-foot"><span>Depth = cumulative realized P/L</span><span id="dive-span">90-day trace</span></div>
+  </section>
+
+  <div class="signoff"><span class="line"></span><span>WhaleWatcher · Contact under continuous observation</span></div>
+</div>
+
+<script>
+/* ----------------------------------------------------------
+   One tracked contact. metrics[] mirror WalletMetrics;
+   equity curves generated per horizon (cumulative P/L).
+   ---------------------------------------------------------- */
+const PROFILE = {
+  handle:"oracle.eth",
+  addr:"0x9f3a2c1be8d740a5c2f0913ab6e7d4519c8a0f21",
+  bio:"Concentrated, contrarian, and almost never early. Surfaces at depth, takes conviction at a discount, and lets resolution do the work.",
+  botSuspected:false,
+  tags:["Apex · 30D","Top 1% Edge"],
+  metrics:{
+    30:{ skill:9.4, pctReturn:0.41, winRate:0.71, edge:0.114, resolved:201, pnl:1_840_000, vol:8_400_000, n:284 },
+    90:{ skill:8.9, pctReturn:0.63, winRate:0.70, edge:0.097, resolved:611, pnl:5_120_000, vol:18_200_000, n:842 },
+  },
+};
+
+/* ---- formatters (mirror web/lib/format.ts) ---- */
+const fmtEdge = v => (v>0?"+":"")+(v*100).toFixed(1)+"¢";
+const fmtPct  = (v,signed=false)=>{const p=v*100;const s=signed&&p>0?"+":"";return s+p.toFixed(1)+"%";};
+const fmtN    = v => new Intl.NumberFormat("en-US").format(v);
+const fmtUsd  = v => "$"+new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(v);
+const fmtUsdC = v => "$"+new Intl.NumberFormat("en-US",{notation:"compact",maximumFractionDigits:1}).format(v);
+const shorten = a => a.slice(0,6)+"…"+a.slice(-4);
+function whaleClass(s){if(s>=9)return"Blue Whale";if(s>=8)return"Sperm Whale";if(s>=7)return"Orca";if(s>=6)return"Humpback";if(s>=5)return"Beluga";if(s>=4)return"Narwhal";return"Porpoise";}
+
+let hz = 90;
+
+/* ---- plankton ---- */
+(function(){const h=document.getElementById("plankton");for(let i=0;i<22;i++){const s=document.createElement("span");
+  const d=14+Math.random()*16;s.style.left=Math.random()*100+"vw";s.style.animationDuration=d+"s";
+  s.style.animationDelay=(-Math.random()*d)+"s";const z=1.5+Math.random()*3;s.style.width=s.style.height=z+"px";
+  s.style.opacity=.3+Math.random()*.4;h.appendChild(s);}})();
+
+/* ---- generate equity curves (cumulative P/L random walk to the metric total) ---- */
+function genCurve(days, target){
+  const pts=[]; let v=0; let s=days*7+13;
+  for(let i=0;i<=days;i++){ s=(s*9301+49297)%233280; const r=s/233280;
+    v += (r-0.42)* (target/days) * 3.0; if(v<-(target*0.18)) v=-(target*0.18);
+    pts.push(v);
+  }
+  // normalize last point to the actual target
+  const scale = target / (pts[pts.length-1] || 1);
+  return pts.map(p => p*scale);
+}
+const CURVES = { 30: genCurve(30, PROFILE.metrics[30].pnl), 90: genCurve(90, PROFILE.metrics[90].pnl) };
+
+/* ---- dossier ---- */
+function renderDossier(){
+  const m90 = PROFILE.metrics[90];
+  const dash=326.7, pct=m90.skill/10;
+  const el=document.getElementById("dossier");
+  el.innerHTML = `
+    <div class="left">
+      <div class="ribbon">◆ Contact Dossier</div>
+      <div class="desig">${PROFILE.handle?`<span class="at">@</span>${PROFILE.handle}`:shorten(PROFILE.addr)}</div>
+      <div class="addr">${PROFILE.addr} <button data-copy="${PROFILE.addr}">COPY</button></div>
+      ${PROFILE.bio?`<div class="bio">“${PROFILE.bio}”</div>`:``}
+      <div class="tags">
+        ${PROFILE.tags.map(t=>`<span class="tag">${t}</span>`).join("")}
+        ${PROFILE.botSuspected?`<span class="tag warn">Automaton Suspected</span>`:``}
+      </div>
+    </div>
+    <div class="right">
+      <div class="gauge">
+        <svg width="150" height="150" viewBox="0 0 150 150">
+          <circle cx="75" cy="75" r="52" fill="none" stroke="rgba(54,236,208,0.12)" stroke-width="8"/>
+          <circle cx="75" cy="75" r="52" fill="none" stroke="#36ecd0" stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="${dash}" stroke-dashoffset="${dash}" id="gauge-arc"
+            style="filter:drop-shadow(0 0 6px rgba(54,236,208,0.6));transition:stroke-dashoffset 1.2s cubic-bezier(.2,.8,.2,1)"/>
+        </svg>
+        <div class="center"><div class="num">${m90.skill.toFixed(1)}</div><div class="of">/ 10 · 90D</div></div>
+      </div>
+      <div class="class">${whaleClass(m90.skill)}</div>
+      <div class="clsub">Class · est. size ${fmtUsdC(m90.vol)}</div>
+    </div>`;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const a=document.getElementById("gauge-arc"); if(a) a.style.strokeDashoffset=(dash*(1-pct)).toFixed(1);
+  }));
+}
+
+/* ---- metric instrument cards (both horizons) ---- */
+function renderMetrics(){
+  const host=document.getElementById("metrics");
+  host.innerHTML = [30,90].map(h=>{
+    const m=PROFILE.metrics[h];
+    return `<div class="panel mcard">
+      <div class="mh"><span class="hz">${h}-Day Window</span><span class="sk">${m.skill.toFixed(1)} <span style="font-size:11px;color:var(--muted)">SIG</span></span></div>
+      <dl>
+        <dt>Edge / share</dt><dd class="${m.edge>=0?'pos':'neg'}">${fmtEdge(m.edge)} <span class="sub">· ${fmtN(m.resolved)} resolved</span></dd>
+        <dt>Hit rate</dt><dd>${fmtPct(m.winRate)}</dd>
+        <dt>Net P/L · Vol</dt><dd>${fmtUsdC(m.pnl)} <span class="sub">/ ${fmtUsdC(m.vol)}</span></dd>
+        <dt>% return</dt><dd class="${m.pctReturn>=0?'pos':'neg'}">${fmtPct(m.pctReturn,true)}</dd>
+        <dt>Observations</dt><dd>${fmtN(m.n)}</dd>
+      </dl>
+    </div>`;
+  }).join("");
+}
+
+/* ---- dive profile chart ---- */
+function renderChart(){
+  const pts = CURVES[hz];
+  const W=920,H=300,padL=8,padR=8,padT=18,padB=24;
+  const min=Math.min(...pts,0), max=Math.max(...pts,0);
+  const nx=i=> padL + (i/(pts.length-1))*(W-padL-padR);
+  const ny=v=> padT + (1-(v-min)/((max-min)||1))*(H-padT-padB);
+  const zeroY = ny(0);
+
+  const line = pts.map((v,i)=>(i?"L":"M")+nx(i).toFixed(1)+" "+ny(v).toFixed(1)).join(" ");
+  const area = line + ` L ${nx(pts.length-1).toFixed(1)} ${ny(min).toFixed(1)} L ${nx(0).toFixed(1)} ${ny(min).toFixed(1)} Z`;
+
+  // depth gridlines (4)
+  let grid="";
+  for(let g=0;g<=4;g++){ const y=padT+(g/4)*(H-padT-padB);
+    const val = max - (g/4)*(max-min);
+    grid += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="rgba(54,236,208,0.08)"/>
+             <text class="axis-lbl" x="${padL+2}" y="${(y-4).toFixed(1)}">${fmtUsdC(val)}</text>`;
+  }
+  const lastX=nx(pts.length-1), lastY=ny(pts[pts.length-1]);
+  const len = 2400; // for draw-in animation
+
+  document.getElementById("chart").innerHTML = `
+    <defs>
+      <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="rgba(54,236,208,0.28)"/><stop offset="100%" stop-color="rgba(54,236,208,0)"/>
+      </linearGradient>
+    </defs>
+    ${grid}
+    <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${W-padR}" y2="${zeroY.toFixed(1)}" stroke="rgba(255,122,89,0.35)" stroke-dasharray="4 4"/>
+    <path d="${area}" fill="url(#dg)" opacity="0" id="dive-area"/>
+    <path d="${line}" fill="none" stroke="#36ecd0" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"
+      style="filter:drop-shadow(0 0 5px rgba(54,236,208,0.6));stroke-dasharray:${len};stroke-dashoffset:${len};transition:stroke-dashoffset 1.6s ease" id="dive-line"/>
+    <circle class="blip-now" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="5" fill="#36ecd0"/>
+    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="5" fill="none" stroke="#36ecd0" opacity="0.6">
+      <animate attributeName="r" from="5" to="16" dur="2.2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" from="0.6" to="0" dur="2.2s" repeatCount="indefinite"/>
+    </circle>`;
+
+  const total = PROFILE.metrics[hz].pnl;
+  const nowEl=document.getElementById("dive-now");
+  nowEl.textContent = (total>=0?"+":"")+fmtUsd(total);
+  nowEl.style.color = total>=0?"var(--bio)":"var(--coral)";
+  document.getElementById("dive-hz").textContent = hz+"D";
+  document.getElementById("dive-span").textContent = hz+"-day trace";
+
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const l=document.getElementById("dive-line"); if(l) l.style.strokeDashoffset="0";
+    const a=document.getElementById("dive-area"); if(a){ a.style.transition="opacity 1.4s ease .4s"; a.style.opacity="1"; }
+  }));
+}
+
+/* ---- horizon toggle ---- */
+document.querySelectorAll("#hz-seg button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll("#hz-seg button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active"); hz=+b.dataset.h; renderChart();
+  });
+});
+
+/* ---- copy ---- */
+document.addEventListener("click",e=>{const b=e.target.closest("[data-copy]");if(!b)return;e.preventDefault();
+  navigator.clipboard?.writeText(b.dataset.copy);
+  if(b.textContent.trim()==="COPY"){const p=b.textContent;b.textContent="COPIED";setTimeout(()=>b.textContent=p,1100);}});
+
+renderDossier();
+renderMetrics();
+renderChart();
+</script>
+</body>
+</html>
