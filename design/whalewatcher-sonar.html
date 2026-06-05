@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WhaleWatcher — Hydrophone Console</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+
+<style>
+  /* ============================================================
+     WHALEWATCHER — Hydrophone Console (standalone mockup)
+     Abyssal bioluminescent sonar dashboard. Top traders are
+     "whale contacts" detected at depth: rotating sweep, glowing
+     blips, signal-strength meters, plankton drift, caustic light.
+     ============================================================ */
+
+  :root {
+    --bg0:   #03101a;
+    --bg1:   #062132;
+    --bg2:   #0a2c40;
+    --panel: rgba(8, 36, 52, 0.55);
+    --panel-edge: rgba(60, 224, 200, 0.18);
+    --bio:   #36ecd0;   /* bioluminescent aqua             */
+    --bio-d: #1fa994;
+    --teal:  #2bb3c9;
+    --abyss-text: #d4f3f0;
+    --muted: #6c97a3;
+    --muted-d:#4a6f7a;
+    --coral: #ff7a59;   /* alert / negative                */
+    --amber: #ffd27a;   /* apex / rank-1 highlight          */
+    --grid:  rgba(54, 236, 208, 0.08);
+
+    --disp: "Chakra Petch", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --maxw: 1240px;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: var(--bg0);
+    color: var(--abyss-text);
+    font-family: var(--mono);
+    font-size: 14px; line-height: 1.5;
+    overflow-x: hidden; position: relative;
+  }
+
+  /* ---------- deep-ocean atmosphere (layered, fixed) ---------- */
+  .scene { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .scene .gradient {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgba(54,236,208,0.10), transparent 55%),
+      radial-gradient(90% 70% at 80% 110%, rgba(43,179,201,0.10), transparent 60%),
+      linear-gradient(180deg, #04141f 0%, #03101a 40%, #020a12 100%);
+  }
+  /* caustic light rays slowly drifting down */
+  .scene .rays {
+    position: absolute; inset: -20% -10% 0; opacity: 0.5;
+    background:
+      linear-gradient(102deg, transparent 0 12%, rgba(110,240,220,0.05) 13% 15%, transparent 16% 30%,
+                      rgba(110,240,220,0.04) 31% 33%, transparent 34% 55%,
+                      rgba(110,240,220,0.05) 56% 58%, transparent 59% 78%,
+                      rgba(110,240,220,0.03) 79% 81%, transparent 82%);
+    animation: drift 22s ease-in-out infinite alternate;
+    transform-origin: top center;
+  }
+  @keyframes drift { from { transform: translateX(-3%) skewX(-2deg); } to { transform: translateX(3%) skewX(2deg); } }
+  /* faint sonar grid */
+  .scene .mesh {
+    position: absolute; inset: 0; opacity: 0.5;
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px),
+                      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(110% 90% at 50% 30%, #000 30%, transparent 85%);
+  }
+  /* grain */
+  .scene .grain {
+    position: absolute; inset: 0; opacity: 0.06; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* drifting plankton particles */
+  .plankton { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .plankton span {
+    position: absolute; bottom: -10px; width: 3px; height: 3px; border-radius: 50%;
+    background: var(--bio); box-shadow: 0 0 6px var(--bio); opacity: 0;
+    animation: rise-bubble linear infinite;
+  }
+  @keyframes rise-bubble {
+    0% { transform: translateY(0) translateX(0); opacity: 0; }
+    10% { opacity: 0.7; }
+    90% { opacity: 0.5; }
+    100% { transform: translateY(-105vh) translateX(20px); opacity: 0; }
+  }
+
+  .wrap { position: relative; z-index: 2; max-width: var(--maxw); margin: 0 auto; padding: 0 28px 90px; }
+  ::selection { background: var(--bio); color: #03141d; }
+  a { color: inherit; text-decoration: none; }
+
+  /* =========================================================
+     CONSOLE BAR
+     ========================================================= */
+  .console-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 22px 0 18px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand .mark { width: 46px; height: 46px; flex: none; filter: drop-shadow(0 0 8px rgba(54,236,208,0.5)); }
+  .brand .name { font-family: var(--disp); font-weight: 700; font-size: 26px; letter-spacing: 0.04em;
+                 line-height: 1; }
+  .brand .name b { color: var(--bio); font-weight: 700; }
+  .brand .name .light { color: var(--abyss-text); font-weight: 300; }
+  .brand .sub { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.34em; text-transform: uppercase;
+                color: var(--muted); margin-top: 4px; }
+
+  .status-strip { display: flex; align-items: center; gap: 22px; }
+  .stat { text-align: right; }
+  .stat .k { font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-d); }
+  .stat .v { font-family: var(--disp); font-size: 18px; font-weight: 600; color: var(--bio);
+             letter-spacing: 0.03em; text-shadow: 0 0 12px rgba(54,236,208,0.35); }
+  .online { display: inline-flex; align-items: center; gap: 8px; font-size: 10px; letter-spacing: 0.18em;
+            text-transform: uppercase; color: var(--bio); border: 1px solid var(--panel-edge);
+            padding: 7px 13px; border-radius: 2px; background: var(--panel); }
+  .online .ping { width: 7px; height: 7px; border-radius: 50%; background: var(--bio);
+                  box-shadow: 0 0 8px var(--bio); animation: blink 1.6s steps(1) infinite; }
+  @keyframes blink { 0%,60% { opacity:1; } 61%,100% { opacity:0.25; } }
+
+  .bar-rule { height: 1px; background: linear-gradient(90deg, transparent, var(--panel-edge) 12%, var(--panel-edge) 88%, transparent); }
+
+  /* =========================================================
+     SCAN CONTROLS
+     ========================================================= */
+  .scan-controls { display: flex; align-items: center; justify-content: space-between; gap: 18px;
+                   padding: 18px 0; flex-wrap: wrap; }
+  .range { display: flex; align-items: center; gap: 14px; }
+  .range .lbl { font-size: 9.5px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--muted); }
+  .seg { display: flex; border: 1px solid var(--panel-edge); border-radius: 3px; overflow: hidden;
+         background: var(--panel); }
+  .seg button { appearance: none; border: none; background: none; cursor: pointer;
+                font-family: var(--disp); font-weight: 600; font-size: 13px; letter-spacing: 0.08em;
+                color: var(--muted); padding: 9px 20px; transition: all .2s; position: relative; }
+  .seg button + button { border-left: 1px solid var(--panel-edge); }
+  .seg button:hover { color: var(--abyss-text); }
+  .seg button.active { color: #03141d; background: var(--bio); text-shadow: none;
+                       box-shadow: 0 0 18px rgba(54,236,208,0.5); }
+
+  .lookup { display: flex; align-items: center; gap: 10px; border: 1px solid var(--panel-edge);
+            background: var(--panel); border-radius: 3px; padding: 8px 14px; min-width: 260px; }
+  .lookup svg { width: 14px; height: 14px; stroke: var(--bio); flex: none; }
+  .lookup input { border: none; background: none; outline: none; color: var(--abyss-text);
+                  font-family: var(--mono); font-size: 13px; width: 100%; letter-spacing: 0.03em; }
+  .lookup input::placeholder { color: var(--muted-d); letter-spacing: 0.14em; text-transform: uppercase; font-size: 11px; }
+
+  /* =========================================================
+     HERO : sonar scope + apex contact dossier
+     ========================================================= */
+  .hero { display: grid; grid-template-columns: 380px 1fr; gap: 26px; margin-top: 8px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 6px;
+           backdrop-filter: blur(8px); position: relative; }
+  .panel::after { /* corner ticks */
+    content: ""; position: absolute; inset: 8px; border: 1px solid rgba(54,236,208,0.06);
+    border-radius: 3px; pointer-events: none; }
+
+  /* --- sonar scope --- */
+  .scope-panel { padding: 22px; }
+  .scope-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+  .scope-head .t { font-family: var(--disp); font-weight: 600; letter-spacing: 0.1em; font-size: 13px;
+                   text-transform: uppercase; }
+  .scope-head .d { font-size: 10px; color: var(--muted); letter-spacing: 0.16em; }
+  .scope { position: relative; width: 100%; aspect-ratio: 1; }
+  .scope svg { width: 100%; height: 100%; display: block; }
+  .scope .sweep {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: conic-gradient(from 0deg, rgba(54,236,208,0.42), rgba(54,236,208,0.04) 38deg, transparent 60deg, transparent 360deg);
+    mask: radial-gradient(circle at center, transparent 0, #000 1%);
+    animation: sweep 4s linear infinite;
+  }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+  .blip { position: absolute; width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%,-50%);
+          background: var(--bio); box-shadow: 0 0 10px var(--bio), 0 0 22px var(--bio); }
+  .blip.apex { width: 16px; height: 16px; background: var(--amber);
+               box-shadow: 0 0 12px var(--amber), 0 0 30px var(--amber); }
+  .blip::after { content: ""; position: absolute; inset: -6px; border-radius: 50%;
+                 border: 1px solid currentColor; color: inherit; opacity: 0; animation: ping 4s ease-out infinite; }
+  .blip.apex::after { animation-delay: 0s; }
+  @keyframes ping { 0% { transform: scale(0.5); opacity: 0.9; } 80%,100% { transform: scale(3.4); opacity: 0; } }
+  .blip .tag { position: absolute; left: 16px; top: -6px; font-size: 9px; letter-spacing: 0.1em;
+               white-space: nowrap; color: var(--abyss-text); text-shadow: 0 0 6px #03141d; }
+  .scope-foot { display: flex; justify-content: space-between; margin-top: 14px; font-size: 10px;
+                letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; }
+
+  /* --- apex dossier --- */
+  .dossier { padding: 26px 30px; display: flex; flex-direction: column; overflow: hidden; }
+  .dossier .ribbon { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+                     font-family: var(--disp); font-weight: 600; font-size: 11px; letter-spacing: 0.2em;
+                     text-transform: uppercase; color: var(--amber);
+                     border: 1px solid rgba(255,210,122,0.35); border-radius: 2px; padding: 5px 12px;
+                     background: rgba(255,210,122,0.06); }
+  .dossier .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;
+                  margin-top: 18px; }
+  .dossier .who .desig { font-family: var(--disp); font-weight: 700; font-size: 40px; line-height: 1;
+                         letter-spacing: 0.01em; }
+  .dossier .who .desig .at { color: var(--bio); font-weight: 400; }
+  .dossier .who .id { font-size: 12px; color: var(--muted); margin-top: 10px; letter-spacing: 0.06em;
+                      display: flex; align-items: center; gap: 9px; }
+  .dossier .who .id button { appearance: none; border: 1px solid var(--panel-edge); background: none;
+                             color: var(--muted); cursor: pointer; padding: 3px 9px; font-family: var(--mono);
+                             font-size: 10px; letter-spacing: 0.1em; border-radius: 2px; transition: all .2s; }
+  .dossier .who .id button:hover { color: var(--bio); border-color: var(--bio); }
+  .dossier .who .class { margin-top: 14px; font-family: var(--disp); font-size: 15px; letter-spacing: 0.18em;
+                         text-transform: uppercase; color: var(--bio); text-shadow: 0 0 14px rgba(54,236,208,0.3); }
+  .dossier .who .class .em { color: var(--muted); font-size: 11px; letter-spacing: 0.1em; }
+
+  .gauge { text-align: right; flex: none; }
+  .gauge .ring { position: relative; width: 124px; height: 124px; }
+  .gauge .ring svg { transform: rotate(-90deg); }
+  .gauge .ring .center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+  .gauge .ring .center .num { font-family: var(--disp); font-weight: 700; font-size: 38px; line-height: 1;
+                              text-shadow: 0 0 16px rgba(54,236,208,0.4); }
+  .gauge .ring .center .of { font-size: 10px; color: var(--muted); letter-spacing: 0.1em; }
+  .gauge .glbl { font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); margin-top: 8px; }
+
+  .dossier .readouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+                       margin-top: auto; padding-top: 24px; }
+  .ro { padding: 14px 16px; background: rgba(4,20,30,0.4); border: 1px solid rgba(54,236,208,0.07); }
+  .ro .k { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-d); }
+  .ro .v { font-family: var(--disp); font-weight: 600; font-size: 24px; margin-top: 4px; letter-spacing: 0.02em; }
+  .ro .v.pos { color: var(--bio); } .ro .v.neg { color: var(--coral); }
+  .ro .s { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; margin-top: 2px; }
+
+  /* =========================================================
+     CONTACT LOG (table)
+     ========================================================= */
+  .log { margin-top: 30px; }
+  .log-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+  .log-head h2 { font-family: var(--disp); font-weight: 600; font-size: 17px; letter-spacing: 0.14em;
+                 text-transform: uppercase; margin: 0; }
+  .log-head h2 .accent { color: var(--bio); }
+  .log-head .meta { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase;
+             color: var(--muted-d); font-weight: 500; text-align: left; padding: 12px 16px;
+             border-bottom: 1px solid var(--panel-edge); white-space: nowrap; }
+  thead th.r { text-align: right; }
+
+  tbody tr { border-bottom: 1px solid rgba(54,236,208,0.07); position: relative;
+             transition: background .2s; }
+  tbody tr:hover { background: linear-gradient(90deg, rgba(54,236,208,0.07), transparent 70%); }
+  tbody tr::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+                     background: var(--bio); box-shadow: 0 0 10px var(--bio); transform: scaleY(0);
+                     transition: transform .2s; }
+  tbody tr:hover::before { transform: scaleY(1); }
+  tbody td { padding: 16px; vertical-align: middle; }
+
+  /* contact id */
+  td.cid { width: 92px; }
+  td.cid .hex { font-family: var(--disp); font-weight: 700; font-size: 26px; line-height: 1;
+                color: var(--abyss-text); letter-spacing: 0.04em; }
+  td.cid.apex .hex { color: var(--amber); text-shadow: 0 0 14px rgba(255,210,122,0.4); }
+  td.cid .bear { font-size: 9px; letter-spacing: 0.14em; color: var(--muted-d); margin-top: 3px; text-transform: uppercase; }
+  td.cid .bear.up { color: var(--bio); } td.cid .bear.dn { color: var(--coral); }
+
+  /* designation */
+  td.desig .name { font-family: var(--disp); font-weight: 600; font-size: 19px; color: var(--abyss-text);
+                   letter-spacing: 0.01em; transition: color .15s; }
+  tbody tr:hover td.desig .name { color: var(--bio); }
+  td.desig .name .at { color: var(--bio); font-weight: 400; }
+  td.desig .meta { font-size: 11px; color: var(--muted); margin-top: 4px; letter-spacing: 0.05em;
+                   display: flex; align-items: center; gap: 8px; }
+  td.desig .meta button { appearance: none; border: 1px solid var(--panel-edge); background: none;
+                          color: var(--muted-d); cursor: pointer; width: 22px; height: 22px; border-radius: 2px;
+                          display: inline-grid; place-items: center; transition: all .18s; }
+  td.desig .meta button:hover { color: var(--bio); border-color: var(--bio); }
+  td.desig .meta button svg { width: 11px; height: 11px; }
+
+  /* whale class chip */
+  td.class .chip { display: inline-block; font-family: var(--disp); font-weight: 600; font-size: 11px;
+                   letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 11px; border-radius: 2px;
+                   border: 1px solid rgba(54,236,208,0.3); color: var(--bio); background: rgba(54,236,208,0.06); }
+  td.class .chip.apex { color: var(--amber); border-color: rgba(255,210,122,0.4); background: rgba(255,210,122,0.07); }
+  td.class .size { font-size: 10px; color: var(--muted); margin-top: 5px; letter-spacing: 0.08em; }
+
+  /* signal strength (skill) */
+  td.signal { width: 200px; }
+  .sig-wrap { display: flex; align-items: center; gap: 12px; }
+  .sig-num { font-family: var(--disp); font-weight: 700; font-size: 22px; min-width: 42px; }
+  .bars { display: flex; align-items: flex-end; gap: 3px; height: 26px; }
+  .bars i { width: 6px; background: rgba(54,236,208,0.14); border-radius: 1px;
+            transform: scaleY(0.08); transform-origin: bottom; transition: transform .55s cubic-bezier(.2,.8,.2,1); }
+  .bars i.on { background: var(--bio); box-shadow: 0 0 6px rgba(54,236,208,0.6); }
+  .bars.lit i { transform: scaleY(1); }
+
+  /* edge depth */
+  td.edge .v { font-family: var(--disp); font-weight: 600; font-size: 17px; }
+  td.edge .v.pos { color: var(--bio); } td.edge .v.neg { color: var(--coral); }
+  td.edge .track { width: 96px; height: 3px; background: rgba(54,236,208,0.12); margin-top: 7px; position: relative; }
+  td.edge .track i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--bio);
+                     box-shadow: 0 0 6px var(--bio); transition: width .8s cubic-bezier(.2,.8,.2,1); }
+  td.edge .track i.neg { background: var(--coral); box-shadow: 0 0 6px var(--coral); }
+
+  td.win, td.sample { text-align: right; }
+  td.win .v, td.sample .v { font-family: var(--disp); font-weight: 600; font-size: 17px; }
+  td.sample .s { font-size: 9.5px; color: var(--muted-d); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 3px; }
+
+  tbody tr.reveal { opacity: 0; transform: translateY(10px);
+                    animation: surface .55s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes surface { to { opacity: 1; transform: none; } }
+
+  .empty { display: none; text-align: center; padding: 52px; color: var(--muted);
+           font-family: var(--disp); letter-spacing: 0.12em; font-size: 16px; }
+
+  /* =========================================================
+     FOOTER
+     ========================================================= */
+  footer { margin-top: 50px; }
+  .ops { display: grid; grid-template-columns: repeat(3,1fr); gap: 22px; margin-top: 18px; }
+  .ops .card { padding: 20px 22px; }
+  .ops h3 { font-family: var(--disp); font-weight: 600; font-size: 11px; letter-spacing: 0.2em;
+            text-transform: uppercase; color: var(--bio); margin: 0 0 10px; }
+  .ops p { font-size: 12.5px; line-height: 1.6; color: var(--muted); margin: 0; }
+  .ops code { font-family: var(--mono); color: var(--abyss-text); background: rgba(54,236,208,0.1);
+              padding: 1px 5px; border-radius: 2px; font-size: 12px; }
+  .signoff { display: flex; align-items: center; gap: 14px; margin-top: 34px; font-size: 9.5px;
+             letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-d); }
+  .signoff .line { flex: 1; height: 1px; background: var(--panel-edge); }
+
+  /* =========================================================
+     RESPONSIVE
+     ========================================================= */
+  @media (max-width: 980px) {
+    .hero { grid-template-columns: 1fr; }
+    .ops { grid-template-columns: 1fr; }
+    td.signal, td.class { display: none; }
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 0 16px 64px; }
+    td.edge, td.win { display: none; }
+    .console-bar { gap: 14px; }
+    .status-strip { gap: 14px; }
+    .dossier .readouts { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ocean atmosphere -->
+<div class="scene">
+  <div class="gradient"></div>
+  <div class="rays"></div>
+  <div class="mesh"></div>
+  <div class="grain"></div>
+</div>
+<div class="plankton" id="plankton"></div>
+
+<div class="wrap">
+
+  <!-- ============== CONSOLE BAR ============== -->
+  <header>
+    <div class="console-bar">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="21" stroke="#36ecd0" stroke-width="1" opacity="0.35"/>
+          <circle cx="24" cy="24" r="14" stroke="#36ecd0" stroke-width="1" opacity="0.5"/>
+          <circle cx="24" cy="24" r="7"  stroke="#36ecd0" stroke-width="1" opacity="0.7"/>
+          <path d="M11 27c5 2 9 2 13-1 3-2 6-3 10-1-1 3-4 5-8 5-3 0-5-1-6-2-3 2-6 2-9-1z" fill="#36ecd0"/>
+          <circle cx="30" cy="24" r="1.4" fill="#03141d"/>
+        </svg>
+        <div>
+          <div class="name"><b>WHALE</b><span class="light">WATCHER</span></div>
+          <div class="sub">Hydrophone Console · Polymarket Deep Scan</div>
+        </div>
+      </div>
+      <div class="status-strip">
+        <div class="stat"><div class="k">Contacts</div><div class="v" id="stat-contacts">412</div></div>
+        <div class="stat"><div class="k">Apex Signal</div><div class="v" id="stat-apex">9.4</div></div>
+        <div class="online"><span class="ping"></span> Sonar Active</div>
+      </div>
+    </div>
+    <div class="bar-rule"></div>
+  </header>
+
+  <!-- ============== SCAN CONTROLS ============== -->
+  <div class="scan-controls">
+    <div class="range">
+      <span class="lbl">Scan Range</span>
+      <div class="seg">
+        <button class="active" data-h="30">30D</button>
+        <button data-h="90">90D</button>
+      </div>
+    </div>
+    <label class="lookup">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="text" placeholder="Track a designation" autocomplete="off" />
+    </label>
+  </div>
+
+  <!-- ============== HERO ============== -->
+  <section class="hero">
+
+    <!-- sonar scope -->
+    <div class="panel scope-panel">
+      <div class="scope-head">
+        <span class="t">Sonar Scope</span>
+        <span class="d" id="scope-range">RANGE · 30D</span>
+      </div>
+      <div class="scope">
+        <svg viewBox="0 0 200 200">
+          <defs>
+            <radialGradient id="scopebg" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#0a3346"/><stop offset="100%" stop-color="#04161f"/>
+            </radialGradient>
+          </defs>
+          <circle cx="100" cy="100" r="98" fill="url(#scopebg)" stroke="#36ecd0" stroke-opacity="0.25"/>
+          <circle cx="100" cy="100" r="72" fill="none" stroke="#36ecd0" stroke-opacity="0.14"/>
+          <circle cx="100" cy="100" r="46" fill="none" stroke="#36ecd0" stroke-opacity="0.14"/>
+          <circle cx="100" cy="100" r="20" fill="none" stroke="#36ecd0" stroke-opacity="0.14"/>
+          <line x1="100" y1="2" x2="100" y2="198" stroke="#36ecd0" stroke-opacity="0.1"/>
+          <line x1="2" y1="100" x2="198" y2="100" stroke="#36ecd0" stroke-opacity="0.1"/>
+          <line x1="30" y1="30" x2="170" y2="170" stroke="#36ecd0" stroke-opacity="0.06"/>
+          <line x1="170" y1="30" x2="30" y2="170" stroke="#36ecd0" stroke-opacity="0.06"/>
+        </svg>
+        <div class="sweep"></div>
+        <!-- blips positioned by JS -->
+        <div class="blip apex" id="blip-1" style="left:62%; top:38%"><span class="tag" id="tag-1">—</span></div>
+        <div class="blip" id="blip-2" style="left:40%; top:58%"><span class="tag" id="tag-2">—</span></div>
+        <div class="blip" id="blip-3" style="left:58%; top:66%"><span class="tag" id="tag-3">—</span></div>
+      </div>
+      <div class="scope-foot">
+        <span>Depth · 0–10 signal</span>
+        <span id="scope-count">3 strong returns</span>
+      </div>
+    </div>
+
+    <!-- apex contact dossier -->
+    <div class="panel dossier" id="dossier"><!-- filled by JS --></div>
+  </section>
+
+  <!-- ============== CONTACT LOG ============== -->
+  <section class="log">
+    <div class="log-head">
+      <h2>Contact <span class="accent">Log</span></h2>
+      <span class="meta" id="log-meta">Returns 02–12 · sorted by signal strength</span>
+    </div>
+    <div class="panel" style="padding: 4px 8px 8px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Contact</th>
+            <th>Designation</th>
+            <th class="hide-class">Class</th>
+            <th>Signal · Skill</th>
+            <th>Edge / Share</th>
+            <th class="r">Hit Rate</th>
+            <th class="r">Returns</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty">No contact matches that designation on this scan.</div>
+    </div>
+  </section>
+
+  <!-- ============== OPS MANUAL ============== -->
+  <footer>
+    <div class="signoff"><span>Operations Manual</span><span class="line"></span></div>
+    <div class="ops">
+      <div class="panel card">
+        <h3>Signal = Skill</h3>
+        <p>A contact's <em>signal strength</em> is its Skill Score (0–10): how reliably entry prices beat the market's eventual resolution, Bayesian-shrunk so a few lucky pings can't fake a strong return.</p>
+      </div>
+      <div class="panel card">
+        <h3>Edge per share</h3>
+        <p>The per-position mean of <code>resolution − entry</code> across resolved markets, in cents. A whale buying YES at 41¢ on outcomes that resolve true banks <code>+59¢</code> of edge on those shares.</p>
+      </div>
+      <div class="panel card">
+        <h3>Whale class</h3>
+        <p>Class is assigned by signal: <code>BLUE WHALE</code> (≥9), <code>SPERM WHALE</code> (≥8), <code>ORCA</code> (≥7), down to <code>PORPOISE</code>. Suspected bots and sub-threshold wallets never surface.</p>
+      </div>
+    </div>
+    <div class="signoff"><span class="line"></span><span>WhaleWatcher · Chakra Petch &amp; IBM Plex Mono</span></div>
+  </footer>
+
+</div>
+
+<script>
+/* ----------------------------------------------------------
+   Mock data — two scan ranges (30 / 90 day). Fields mirror
+   LeaderboardRow + a whimsical `vol` (est. size, USD) for
+   whale flavour.  edge = dollars/share, win = 0–1.
+   ---------------------------------------------------------- */
+const DATA = {
+  30: [
+    { rank:1, handle:"oracle.eth",     addr:"0x9f3a2c1be8d740a5c2f0913ab6e7d4519c8a0f21", skill:9.4, edge:0.114, win:0.71, n:284, resolved:201, vol:8.4e6, delta:0,  brief:"Concentrated, contrarian, never early — surfaces at depth, takes conviction at a discount, and lets resolution do the work." },
+    { rank:2, handle:"mistral_fades",  addr:"0x4c71e0a93f5b21d8c0e6a47fb2901d3e5a8c6b14", skill:8.7, edge:0.092, win:0.66, n:512, resolved:388, vol:6.1e6, delta:2 },
+    { rank:3, handle:"NateSilverFan",  addr:"0x1d88f0c3a72be450196d8af2c0e3b7415d9a6e02", skill:8.1, edge:0.081, win:0.69, n:147, resolved:118, vol:2.3e6, delta:-1 },
+    { rank:4, handle:null,             addr:"0xae02b6c91f3d7048a25e0c8b194f6d320a7e9c55", skill:7.6, edge:0.073, win:0.62, n:333, resolved:240, vol:4.0e6, delta:5 },
+    { rank:5, handle:"size_in_silence",addr:"0x7b41902ce8a3f5d06b2e1f49c70d8a3516e2b9f0", skill:7.2, edge:0.067, win:0.64, n:198, resolved:151, vol:3.2e6, delta:-2 },
+    { rank:6, handle:"vig_collector",  addr:"0x33c8e1a0b7f249de5108963ac4e2f70b1d6a8e93", skill:6.9, edge:0.061, win:0.59, n:441, resolved:312, vol:5.5e6, delta:1 },
+    { rank:7, handle:"bayes_or_bust",  addr:"0x0a59f2d8c14b6e037a9d2510fce84b2630a7c1d6", skill:6.4, edge:0.054, win:0.61, n:165, resolved:122, vol:1.8e6, delta:-3 },
+    { rank:8, handle:null,             addr:"0xc7e10f4a92b3d65082f1ac74e0b9d3516a280f47", skill:6.0, edge:0.048, win:0.57, n:276, resolved:198, vol:2.9e6, delta:4 },
+    { rank:9, handle:"longtail_lucy",  addr:"0x5f2b80d1a6c43e790b18f2c50ad6e93417b0c8a2", skill:5.6, edge:0.041, win:0.55, n:389, resolved:271, vol:3.7e6, delta:0 },
+    { rank:10,handle:"edge_or_exit",   addr:"0x82a4c0e15b9d3f6708e2a14c6d0b97f3215e8a0c", skill:5.1, edge:0.034, win:0.58, n:213, resolved:160, vol:2.1e6, delta:-2 },
+    { rank:11,handle:null,             addr:"0x6d10b3f8a2c54e09d71f0a26b4e8c93517d2a0f6", skill:4.7, edge:0.027, win:0.53, n:301, resolved:214, vol:2.6e6, delta:1 },
+    { rank:12,handle:"meanrev_mike",   addr:"0x29e7c0a4b1f8d35062a9e147c0d3b86415f2e0a9", skill:4.2, edge:0.019, win:0.51, n:174, resolved:129, vol:1.4e6, delta:3 },
+  ],
+  90: [
+    { rank:1, handle:"mistral_fades",  addr:"0x4c71e0a93f5b21d8c0e6a47fb2901d3e5a8c6b14", skill:9.1, edge:0.103, win:0.68, n:1480, resolved:1102, vol:21.0e6, delta:0,  brief:"A metronome across two thousand resolved markets — small, relentless edges compounded into the cleanest return on the board." },
+    { rank:2, handle:"oracle.eth",     addr:"0x9f3a2c1be8d740a5c2f0913ab6e7d4519c8a0f21", skill:8.9, edge:0.097, win:0.70, n:842,  resolved:611,  vol:18.2e6, delta:0 },
+    { rank:3, handle:"vig_collector",  addr:"0x33c8e1a0b7f249de5108963ac4e2f70b1d6a8e93", skill:8.3, edge:0.084, win:0.63, n:1320, resolved:944,  vol:16.5e6, delta:3 },
+    { rank:4, handle:"NateSilverFan",  addr:"0x1d88f0c3a72be450196d8af2c0e3b7415d9a6e02", skill:7.8, edge:0.076, win:0.67, n:436,  resolved:331,  vol:7.1e6,  delta:-1 },
+    { rank:5, handle:"bayes_or_bust",  addr:"0x0a59f2d8c14b6e037a9d2510fce84b2630a7c1d6", skill:7.3, edge:0.069, win:0.62, n:588,  resolved:447,  vol:6.4e6,  delta:2 },
+    { rank:6, handle:null,             addr:"0xae02b6c91f3d7048a25e0c8b194f6d320a7e9c55", skill:6.7, edge:0.058, win:0.60, n:910,  resolved:672,  vol:9.0e6,  delta:-2 },
+    { rank:7, handle:"size_in_silence",addr:"0x7b41902ce8a3f5d06b2e1f49c70d8a3516e2b9f0", skill:6.2, edge:0.050, win:0.61, n:521,  resolved:402,  vol:5.6e6,  delta:-2 },
+    { rank:8, handle:"longtail_lucy",  addr:"0x5f2b80d1a6c43e790b18f2c50ad6e93417b0c8a2", skill:5.8, edge:0.044, win:0.56, n:1041, resolved:760,  vol:8.3e6,  delta:1 },
+    { rank:9, handle:"meanrev_mike",   addr:"0x29e7c0a4b1f8d35062a9e147c0d3b86415f2e0a9", skill:5.3, edge:0.037, win:0.54, n:402,  resolved:298,  vol:3.9e6,  delta:4 },
+    { rank:10,handle:"edge_or_exit",   addr:"0x82a4c0e15b9d3f6708e2a14c6d0b97f3215e8a0c", skill:4.9, edge:0.030, win:0.57, n:633,  resolved:471,  vol:5.0e6,  delta:-1 },
+    { rank:11,handle:null,             addr:"0xc7e10f4a92b3d65082f1ac74e0b9d3516a280f47", skill:4.4, edge:0.022, win:0.52, n:744,  resolved:540,  vol:5.8e6,  delta:0 },
+    { rank:12,handle:"deepcurrent",    addr:"0x6d10b3f8a2c54e09d71f0a26b4e8c93517d2a0f6", skill:3.9, edge:0.015, win:0.50, n:289,  resolved:211,  vol:2.7e6,  delta:-3 },
+  ],
+};
+
+/* ---- formatters (mirror web/lib/format.ts) ---- */
+const fmtEdge = v => (v>0?"+":"") + (v*100).toFixed(1) + "¢";
+const fmtPct  = v => (v*100).toFixed(0) + "%";
+const fmtN    = v => new Intl.NumberFormat("en-US").format(v);
+const fmtUsd  = v => "$" + new Intl.NumberFormat("en-US",{notation:"compact",maximumFractionDigits:1}).format(v);
+const shorten = a => a.slice(0,6) + "…" + a.slice(-4);
+const display = r => r.handle ? `<span class="at">@</span>${r.handle}` : shorten(r.addr);
+
+/* ---- whale class by signal strength ---- */
+function whaleClass(skill){
+  if (skill >= 9)   return "Blue Whale";
+  if (skill >= 8)   return "Sperm Whale";
+  if (skill >= 7)   return "Orca";
+  if (skill >= 6)   return "Humpback";
+  if (skill >= 5)   return "Beluga";
+  if (skill >= 4)   return "Narwhal";
+  return "Porpoise";
+}
+
+let currentH = 30, query = "";
+
+/* ---- plankton particles ---- */
+(function makePlankton(){
+  const host = document.getElementById("plankton");
+  for (let i=0;i<26;i++){
+    const s = document.createElement("span");
+    const dur = 14 + Math.random()*16;
+    s.style.left = Math.random()*100 + "vw";
+    s.style.animationDuration = dur + "s";
+    s.style.animationDelay = (-Math.random()*dur) + "s";
+    const sz = 1.5 + Math.random()*3;
+    s.style.width = s.style.height = sz + "px";
+    s.style.opacity = 0.3 + Math.random()*0.4;
+    host.appendChild(s);
+  }
+})();
+
+/* ---- apex dossier (#1) ---- */
+function renderDossier(r){
+  const pct = (r.skill/10);
+  const dash = 326.7; // 2*pi*52
+  const el = document.getElementById("dossier");
+  el.innerHTML = `
+    <div class="ribbon">◆ Apex Contact · Pos 01</div>
+    <div class="top">
+      <div class="who">
+        <div class="desig">${r.handle ? `<span class="at">@</span>${r.handle}` : shorten(r.addr)}</div>
+        <div class="id">${shorten(r.addr)} <button data-copy="${r.addr}">COPY</button></div>
+        <div class="class">${whaleClass(r.skill)} <span class="em">· est. size ${fmtUsd(r.vol)}</span></div>
+      </div>
+      <div class="gauge">
+        <div class="ring">
+          <svg width="124" height="124" viewBox="0 0 124 124">
+            <circle cx="62" cy="62" r="52" fill="none" stroke="rgba(54,236,208,0.12)" stroke-width="7"/>
+            <circle cx="62" cy="62" r="52" fill="none" stroke="#36ecd0" stroke-width="7" stroke-linecap="round"
+                    stroke-dasharray="${dash}" stroke-dashoffset="${dash}" id="gauge-arc"
+                    style="filter:drop-shadow(0 0 6px rgba(54,236,208,0.6)); transition:stroke-dashoffset 1.2s cubic-bezier(.2,.8,.2,1)"/>
+          </svg>
+          <div class="center"><div class="num">${r.skill.toFixed(1)}</div><div class="of">/ 10 signal</div></div>
+        </div>
+        <div class="glbl">Skill Score</div>
+      </div>
+    </div>
+    ${r.brief ? `<div style="font-style:italic;color:var(--muted);font-size:13.5px;line-height:1.55;margin-top:18px;max-width:52ch">“${r.brief}”</div>` : ``}
+    <div class="readouts">
+      <div class="ro"><div class="k">Edge / Share</div><div class="v pos">${fmtEdge(r.edge)}</div><div class="s">vs. resolution</div></div>
+      <div class="ro"><div class="k">Hit Rate</div><div class="v">${fmtPct(r.win)}</div><div class="s">${fmtN(r.resolved)} resolved</div></div>
+      <div class="ro"><div class="k">Returns</div><div class="v">${fmtN(r.n)}</div><div class="s">est. ${fmtUsd(r.vol)}</div></div>
+    </div>`;
+  // animate gauge fill
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    const arc = document.getElementById("gauge-arc");
+    if (arc) arc.style.strokeDashoffset = (dash*(1-pct)).toFixed(1);
+  }));
+}
+
+/* ---- sonar blips for top 3 ---- */
+function renderBlips(all){
+  const pos = [
+    { id:1, x:62, y:38 }, { id:2, x:39, y:57 }, { id:3, x:60, y:67 },
+  ];
+  pos.forEach((p,i)=>{
+    const r = all[i]; if(!r) return;
+    const blip = document.getElementById("blip-"+p.id);
+    const tag  = document.getElementById("tag-"+p.id);
+    // radius from center scales inversely with skill (stronger signal = nearer core)
+    const cx=50, cy=50; const radius = 8 + (10 - r.skill)*3.6;
+    const ang = (-58 + i*46) * Math.PI/180;
+    blip.style.left = (cx + Math.cos(ang)*radius) + "%";
+    blip.style.top  = (cy + Math.sin(ang)*radius) + "%";
+    tag.textContent = r.handle ? "@"+r.handle : shorten(r.addr);
+  });
+}
+
+/* ---- contact log rows ---- */
+function renderRows(list){
+  const tb = document.getElementById("rows");
+  const empty = document.getElementById("empty");
+  tb.innerHTML = "";
+  if(!list.length){ empty.style.display="block"; return; }
+  empty.style.display="none";
+
+  list.forEach((r,i)=>{
+    const tr = document.createElement("tr");
+    tr.className = "reveal"; tr.style.animationDelay = (i*55)+"ms";
+    const apex = r.rank===1 ? "apex" : "";
+    const seg = Math.round(r.skill);
+    // 10 bars of increasing height
+    const bars = Array.from({length:10},(_,k)=>{
+      const h = 8 + k*1.8;
+      return `<i class="${k<seg?'on':''}" style="height:${h}px"></i>`;
+    }).join("");
+    const dCls = r.delta>0?"up":r.delta<0?"dn":"";
+    const dTxt = r.delta>0?`▲${r.delta}`:r.delta<0?`▼${Math.abs(r.delta)}`:"·";
+    const eCls = r.edge>=0?"pos":"neg";
+    const ePct = Math.min(100, Math.abs(r.edge)/0.12*100);
+
+    tr.innerHTML = `
+      <td class="cid ${apex}">
+        <div class="hex">C-${String(r.rank).padStart(2,"0")}</div>
+        <div class="bear ${dCls}">${dTxt} bearing</div>
+      </td>
+      <td class="desig">
+        <div class="name">${display(r)}</div>
+        <div class="meta">${shorten(r.addr)} <button data-copy="${r.addr}" title="Copy address">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M5 15V5a1.5 1.5 0 0 1 1.5-1.5H15"/></svg>
+        </button></div>
+      </td>
+      <td class="class">
+        <span class="chip ${apex}">${whaleClass(r.skill)}</span>
+        <div class="size">est. ${fmtUsd(r.vol)}</div>
+      </td>
+      <td class="signal">
+        <div class="sig-wrap">
+          <span class="sig-num">${r.skill.toFixed(1)}</span>
+          <span class="bars">${bars}</span>
+        </div>
+      </td>
+      <td class="edge">
+        <div class="v ${eCls}">${fmtEdge(r.edge)}</div>
+        <div class="track"><i class="${eCls}" data-w="${ePct}"></i></div>
+      </td>
+      <td class="win"><div class="v">${fmtPct(r.win)}</div></td>
+      <td class="sample"><div class="v">${fmtN(r.n)}</div><div class="s">${fmtN(r.resolved)} resolved</div></td>`;
+    tb.appendChild(tr);
+  });
+
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    tb.querySelectorAll(".bars").forEach((b,idx)=> setTimeout(()=>b.classList.add("lit"), 100+idx*55));
+    tb.querySelectorAll("[data-w]").forEach(el=> el.style.width = el.dataset.w + "%");
+  }));
+}
+
+/* ---- compose render ---- */
+function render(){
+  const all = DATA[currentH];
+  const q = query.trim().toLowerCase();
+  const match = r => !q || r.addr.toLowerCase().startsWith(q) || (r.handle||"").toLowerCase().includes(q);
+
+  const apex = all[0];
+  const rest = all.slice(1).filter(match);
+
+  // dossier + scope only when not filtering away the apex
+  const showHero = !q || match(apex);
+  document.getElementById("dossier").style.opacity = showHero ? "1" : "0.25";
+  if (showHero) renderDossier(apex);
+  renderBlips(all);
+  renderRows(rest);
+
+  document.getElementById("stat-apex").textContent = apex.skill.toFixed(1);
+  document.getElementById("scope-range").textContent = "RANGE · " + currentH + "D";
+  document.getElementById("log-meta").textContent = q
+    ? `${rest.length} return${rest.length===1?"":"s"} on scan`
+    : `Returns 02–${String(all.length).padStart(2,"0")} · sorted by signal strength`;
+}
+
+/* ---- range tabs ---- */
+document.querySelectorAll(".seg button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll(".seg button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    currentH = +b.dataset.h;
+    render();
+  });
+});
+
+/* ---- search ---- */
+document.getElementById("search").addEventListener("input", e=>{ query=e.target.value; render(); });
+
+/* ---- copy (delegated) ---- */
+document.addEventListener("click", e=>{
+  const b = e.target.closest("[data-copy]"); if(!b) return;
+  e.preventDefault();
+  navigator.clipboard?.writeText(b.dataset.copy);
+  if (b.textContent.trim()==="COPY"){ const p=b.textContent; b.textContent="COPIED"; setTimeout(()=>b.textContent=p,1100); }
+});
+
+render();
+</script>
+</body>
+</html>

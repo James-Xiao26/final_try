@@ -7,11 +7,10 @@ import HorizonToggle from "@/components/HorizonToggle";
 import SkillScoreBadge from "@/components/SkillScoreBadge";
 import WalletSearch from "@/components/WalletSearch";
 import { formatEdge, formatNumber, formatPercent, shortenAddress } from "@/lib/format";
+import { HORIZONS } from "@/lib/types";
 import type { HorizonDays, LeaderboardRow } from "@/lib/types";
 
-// 365D is intentionally omitted from the leaderboard view (its data is stale /
-// under maintenance and is no longer refreshed by ingest).
-const LEADERBOARD_HORIZONS: readonly HorizonDays[] = [30, 90];
+const LEADERBOARD_HORIZONS: readonly HorizonDays[] = HORIZONS;
 
 interface LeaderboardTableProps {
   initialRows: LeaderboardRow[];

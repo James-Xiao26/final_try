@@ -1,4 +1,4 @@
-export const HORIZONS = [30, 90, 365] as const;
+export const HORIZONS = [30, 90] as const;
 export type HorizonDays = (typeof HORIZONS)[number];
 
 export interface LeaderboardRow {

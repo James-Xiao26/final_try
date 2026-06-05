@@ -297,8 +297,7 @@ function mapMetric(row: Database["public"]["Tables"]["wallet_stats"]["Row"]): Wa
 function emptyCurveMap(): Record<HorizonDays, EquityPoint[]> {
   return {
     30: [],
-    90: [],
-    365: []
+    90: []
   };
 }
 

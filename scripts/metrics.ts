@@ -150,10 +150,11 @@ export function computeMetrics(
  * Skill Score = pure statistical forecasting edge on a 0–SCORE_MAX scale.
  * Each resolved position is a Bernoulli trial whose entry price is the market's implied
  * probability; per-share edge is (outcome − price). We shrink the per-position mean edge toward 0
- * by EDGE_SHRINKAGE_K pseudo-bets, so small/lucky samples can't earn a high score, then map the
- * shrunk edge linearly to the score (EDGE_FOR_TEN per-share edge == SCORE_MAX) and clamp.
- * Negative edge floors to 0. Ineligible wallets receive null (too few trades, too little volume,
- * sub-cent longshot trader, or one win dominating realized PnL).
+ * by EDGE_SHRINKAGE_K pseudo-bets, so small/lucky samples can't earn a high score, then remap the
+ * shrunk edge: zero/negative edge → 0, and any positive shrunk edge lands in
+ * [SCORE_FLOOR, SCORE_MAX] (floor at SCORE_FLOOR, EDGE_FOR_TEN shrunk edge == SCORE_MAX), clamped.
+ * Ineligible wallets receive null (too few trades, too little volume, sub-cent longshot trader, or
+ * one win dominating realized PnL).
  */
 export function computeSkillScore(metrics: WalletMetrics, config: typeof CONFIG): number | null {
   if (
@@ -169,6 +170,11 @@ export function computeSkillScore(metrics: WalletMetrics, config: typeof CONFIG)
   // avgEdgePerShare * nResolved (avgEdgePerShare is the per-position mean), so dividing by
   // nResolved + K pulls the estimate toward 0 — hard for small samples, negligibly for large ones.
   const shrunkEdge = (metrics.avgEdgePerShare * metrics.nResolved) / (metrics.nResolved + config.EDGE_SHRINKAGE_K);
-  const score = config.SCORE_MAX * shrunkEdge / config.EDGE_FOR_TEN;
-  return round(Math.min(config.SCORE_MAX, Math.max(0, score)), 2);
+  // Zero/negative proven edge earns nothing; any positive shrunk edge floors at SCORE_FLOOR and
+  // climbs linearly toward SCORE_MAX (a hard jump at edge = 0, by design).
+  if (shrunkEdge <= 0) {
+    return 0;
+  }
+  const score = config.SCORE_FLOOR + (config.SCORE_MAX - config.SCORE_FLOOR) * shrunkEdge / config.EDGE_FOR_TEN;
+  return round(Math.min(config.SCORE_MAX, Math.max(config.SCORE_FLOOR, score)), 2);
 }

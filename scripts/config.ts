@@ -14,19 +14,27 @@ export const CONFIG = {
   OUTLIER_TRADE_FRACTION: 0.6,
   // Skill Score = pure statistical forecasting edge, on a 0-SCORE_MAX scale. Each resolved
   // position is a Bernoulli trial whose entry price is the market's implied probability; per-share
-  // edge is (outcome - price). The score is the Bayesian-shrunk mean edge:
+  // edge is (outcome - price). The score is the Bayesian-shrunk mean edge, remapped so that any
+  // proven positive edge lands in [SCORE_FLOOR, SCORE_MAX]:
   //   shrunkEdge = sum(outcome - price) / (nResolved + EDGE_SHRINKAGE_K)
-  //   score      = clamp(0, SCORE_MAX, SCORE_MAX * shrunkEdge / EDGE_FOR_TEN)
-  // Shrinkage toward 0 means small/lucky samples can't earn a high score; negative edge floors to 0.
+  //   score      = shrunkEdge <= 0 ? 0
+  //              : clamp(SCORE_FLOOR, SCORE_MAX,
+  //                      SCORE_FLOOR + (SCORE_MAX - SCORE_FLOOR) * shrunkEdge / EDGE_FOR_TEN)
+  // Shrinkage toward 0 means small/lucky samples can't earn a high score; zero/negative edge -> 0,
+  // and any positive shrunk edge floors at SCORE_FLOOR (a hard jump at edge = 0).
   SCORE_MAX: 10,
+  // Floor for any wallet with positive (proven) shrunk edge. Reserves the 0-SCORE_FLOOR band for
+  // zero/negative-edge wallets only: a hair of positive edge jumps to SCORE_FLOOR, then climbs
+  // linearly toward SCORE_MAX. Changing this requires updating the score constants in metrics.test.ts.
+  SCORE_FLOOR: 4,
   // Prior strength: everyone starts as if they had this many zero-edge resolved bets. Higher = more
   // skeptical (slower to reward a short hot streak).
   EDGE_SHRINKAGE_K: 20,
-  // The proven (shrunk) per-share edge that earns a perfect SCORE_MAX. 0.10 = a 10-cents-per-share
-  // edge over the market's implied price. Placeholder — calibrate from the shrunk-edge distribution
-  // after the first real ingest so SCORE_MAX is reserved for the genuine top. Changing this (or
-  // EDGE_SHRINKAGE_K) requires updating the exact score constants in metrics.test.ts.
-  EDGE_FOR_TEN: 0.1,
+  // The proven (shrunk) per-share edge that earns a perfect SCORE_MAX. 0.096 = a ~9.6-cents-per-share
+  // edge over the market's implied price. Calibrated so a ~5-cent shrunk edge lands near 7 given the
+  // SCORE_FLOOR=4 band. Changing this (or EDGE_SHRINKAGE_K / SCORE_FLOOR) requires updating the exact
+  // score constants in metrics.test.ts.
+  EDGE_FOR_TEN: 0.096,
   BOT: {
     // Calibrated against a working trades/day denominator (see MIN_RATE_WINDOW_DAYS). The old 50
     // was a dead constant: activity is capped at ACTIVITY_LIMIT and the rate used to be divided by
