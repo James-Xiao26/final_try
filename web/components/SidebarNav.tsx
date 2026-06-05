@@ -12,6 +12,9 @@ const LINKS = [
 export default function SidebarNav() {
   const pathname = usePathname();
 
+  // The early-access landing is a standalone funnel — no links out to the rest of the app.
+  if (pathname.startsWith("/early-access")) return null;
+
   return (
     <div className="nav-links">
       {LINKS.map((link) => {

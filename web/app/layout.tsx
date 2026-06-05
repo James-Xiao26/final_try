@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Chakra_Petch, IBM_Plex_Mono } from "next/font/google";
 import type { ReactNode } from "react";
+import BrandMark from "@/components/BrandMark";
 import OceanScene from "@/components/OceanScene";
 import SidebarNav from "@/components/SidebarNav";
 import "./globals.css";
@@ -34,19 +35,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <div className="shell">
           <header className="topnav">
             <div className="topnav-inner">
-              <a className="brand-mark" href="/" aria-label="WhaleWatcher home">
-                <svg viewBox="0 0 48 48" fill="none" aria-hidden>
-                  <circle cx="24" cy="24" r="21" stroke="#36ecd0" strokeWidth="1" opacity="0.35" />
-                  <circle cx="24" cy="24" r="14" stroke="#36ecd0" strokeWidth="1" opacity="0.5" />
-                  <circle cx="24" cy="24" r="7" stroke="#36ecd0" strokeWidth="1" opacity="0.7" />
-                  <path d="M11 27c5 2 9 2 13-1 3-2 6-3 10-1-1 3-4 5-8 5-3 0-5-1-6-2-3 2-6 2-9-1z" fill="#36ecd0" />
-                  <circle cx="30" cy="24" r="1.4" fill="#03141d" />
-                </svg>
-                <div>
-                  <div className="wm"><b>WHALE</b><span className="light">WATCHER</span></div>
-                  <div className="tag">Hydrophone Console</div>
-                </div>
-              </a>
+              <BrandMark />
               <SidebarNav />
             </div>
           </header>

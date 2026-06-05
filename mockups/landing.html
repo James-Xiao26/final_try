@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WhaleWatcher — Early Access</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   WhaleWatcher — Early Access landing (mockup)
+   Mirrors the app's sonar / hydrophone console palette + type.
+   ============================================================ */
+:root {
+  --bg: #03101a; --bg-1: #062132;
+  --panel: rgba(8, 36, 52, 0.55); --panel-solid: #0a2436;
+  --line: rgba(60, 224, 200, 0.18); --line-2: rgba(60, 224, 200, 0.32);
+  --text: #d4f3f0; --muted: #6c97a3; --muted-d: #4a6f7a;
+  --green: #36ecd0; --bio-d: #1fa994;
+  --red: #ff7a59; --yellow: #ffd27a;
+  --grid: rgba(54, 236, 208, 0.08);
+  --display: "Chakra Petch", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; background: var(--bg); scroll-behavior: smooth; }
+body {
+  margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+  font-family: var(--mono); font-size: 14px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased; position: relative; overflow-x: hidden;
+}
+a { color: inherit; text-decoration: none; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+::selection { background: var(--green); color: #03141d; }
+.display { font-family: var(--display); }
+
+/* ---- abyssal atmosphere ---- */
+.scene { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.scene-gradient { position: absolute; inset: 0;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(54,236,208,0.10), transparent 55%),
+    radial-gradient(90% 70% at 82% 6%, rgba(43,179,201,0.10), transparent 58%),
+    radial-gradient(90% 70% at 18% 108%, rgba(43,179,201,0.10), transparent 60%),
+    linear-gradient(180deg, #04141f 0%, #03101a 45%, #020a12 100%); }
+.scene-mesh { position: absolute; inset: 0; opacity: 0.5;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(120% 100% at 50% 16%, #000 35%, transparent 86%);
+  mask-image: radial-gradient(120% 100% at 50% 16%, #000 35%, transparent 86%); }
+.scene-grain { position: absolute; inset: 0; opacity: 0.06; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.plankton { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.plankton span { position: absolute; bottom: -10px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 6px var(--green); animation: rise-bubble linear infinite; }
+@keyframes rise-bubble {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 0.7; } 90% { opacity: 0.5; }
+  100% { transform: translateY(-105vh) translateX(20px); opacity: 0; } }
+
+.shell { position: relative; z-index: 1; }
+
+/* ---- top nav ---- */
+.topnav { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--line);
+  background: rgba(4, 18, 27, 0.72); backdrop-filter: blur(10px); }
+.topnav-inner { width: min(1180px, calc(100vw - 32px)); margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 0; }
+.brand-mark { display: flex; align-items: center; gap: 12px; }
+.brand-mark svg { width: 38px; height: 38px; flex: none; filter: drop-shadow(0 0 8px rgba(54,236,208,0.5)); }
+.brand-mark .wm { font-family: var(--display); font-weight: 700; font-size: 21px; letter-spacing: 0.04em; line-height: 1; }
+.brand-mark .wm b { color: var(--green); }
+.brand-mark .wm .light { font-weight: 300; color: var(--text); }
+.brand-mark .tag { font-size: 8.5px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+.nav-cta { font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #03141d; background: var(--green); padding: 10px 18px; border-radius: 3px; border: 0;
+  box-shadow: 0 0 16px rgba(54,236,208,0.35); transition: box-shadow .2s, transform .2s; }
+.nav-cta:hover { box-shadow: 0 0 26px rgba(54,236,208,0.6); transform: translateY(-1px); }
+
+/* ---- page shell ---- */
+.wrap { width: min(1180px, calc(100vw - 32px)); margin: 0 auto; }
+
+/* ---- staggered page-load reveal ---- */
+.reveal { opacity: 0; transform: translateY(18px); animation: reveal .9s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes reveal { to { opacity: 1; transform: none; } }
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero { display: grid; grid-template-columns: 1fr 420px; gap: 54px; align-items: center;
+  padding: 86px 0 78px; }
+.hero-status { display: inline-flex; align-items: center; gap: 9px; font-family: var(--display);
+  font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--yellow);
+  border: 1px solid rgba(255,210,122,0.32); background: rgba(255,210,122,0.06);
+  padding: 6px 13px; border-radius: 2px; }
+.hero-status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--yellow);
+  box-shadow: 0 0 8px var(--yellow); animation: blink 1.4s steps(1) infinite; }
+@keyframes blink { 0%,62% { opacity: 1; } 63%,100% { opacity: 0.28; } }
+
+.hero h1 { font-family: var(--display); font-weight: 700; font-size: clamp(38px, 5.4vw, 64px);
+  line-height: 1.02; letter-spacing: 0.005em; margin: 22px 0 0;
+  text-shadow: 0 0 44px rgba(54,236,208,0.14); }
+.hero h1 .g { color: var(--green); }
+.hero h1 .o { color: var(--text); position: relative; }
+.hero-sub { margin: 22px 0 0; color: var(--muted); font-size: 15.5px; line-height: 1.65; max-width: 52ch; }
+.hero-sub b { color: var(--text); font-weight: 500; }
+
+/* waitlist form */
+.wait { margin-top: 34px; max-width: 480px; }
+.wait-lbl { font-size: 9.5px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--muted-d); margin-bottom: 9px; }
+.wait-row { display: flex; gap: 10px; }
+.wait-input { flex: 1; background: rgba(4,20,30,0.6); border: 1px solid var(--line); color: var(--text);
+  border-radius: 4px; padding: 0 16px; height: 52px; font-family: var(--mono); font-size: 14px;
+  letter-spacing: 0.02em; transition: border-color .2s, box-shadow .2s; min-width: 0; }
+.wait-input::placeholder { color: var(--muted-d); }
+.wait-input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 1px var(--green), 0 0 22px rgba(54,236,208,0.18); }
+.wait-btn { flex: none; font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: #03141d; background: var(--green); border: 0; border-radius: 4px;
+  padding: 0 24px; height: 52px; box-shadow: 0 0 18px rgba(54,236,208,0.4);
+  transition: box-shadow .2s, transform .15s; display: inline-flex; align-items: center; gap: 9px; }
+.wait-btn:hover { box-shadow: 0 0 30px rgba(54,236,208,0.7); transform: translateY(-1px); }
+.wait-btn:active { transform: translateY(0); }
+.wait-btn svg { width: 15px; height: 15px; }
+.wait-foot { margin-top: 12px; font-size: 11px; color: var(--muted-d); letter-spacing: 0.04em;
+  display: flex; align-items: center; gap: 8px; }
+.wait-foot .cnt { color: var(--green); font-family: var(--display); font-weight: 600; }
+
+/* success state */
+.wait-ok { display: none; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 5px;
+  border: 1px solid var(--line-2); background: linear-gradient(90deg, rgba(54,236,208,0.10), transparent 80%);
+  animation: reveal .5s ease forwards; }
+.wait-ok.show { display: flex; }
+.wait-ok .ping { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--green); color: var(--green); box-shadow: 0 0 14px rgba(54,236,208,0.4); }
+.wait-ok .ping svg { width: 18px; height: 18px; }
+.wait-ok .t { font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: 0.06em; color: var(--text); }
+.wait-ok .s { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+/* ---- hero sonar scope ---- */
+.scope-card { border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
+  backdrop-filter: blur(8px); padding: 22px; }
+.scope-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+.scope-head .t { font-family: var(--display); font-weight: 600; letter-spacing: 0.1em; font-size: 12px; text-transform: uppercase; }
+.scope-head .d { font-size: 9.5px; color: var(--muted); letter-spacing: 0.16em; }
+.scope { position: relative; width: 100%; aspect-ratio: 1; }
+.scope svg { width: 100%; height: 100%; display: block; }
+.scope .sweep { position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(54,236,208,0.42), rgba(54,236,208,0.04) 38deg, transparent 60deg, transparent 360deg);
+  -webkit-mask: radial-gradient(circle at center, transparent 0, #000 1%); mask: radial-gradient(circle at center, transparent 0, #000 1%);
+  animation: sweep 4s linear infinite; }
+@keyframes sweep { to { transform: rotate(360deg); } }
+.blip { position: absolute; width: 11px; height: 11px; border-radius: 50%; transform: translate(-50%,-50%);
+  background: var(--green); box-shadow: 0 0 10px var(--green), 0 0 22px var(--green); }
+.blip.apex { width: 15px; height: 15px; background: var(--yellow); box-shadow: 0 0 12px var(--yellow), 0 0 30px var(--yellow); }
+.blip::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1px solid currentColor;
+  color: inherit; opacity: 0; animation: ping 4s ease-out infinite; }
+@keyframes ping { 0% { transform: scale(.5); opacity: .9; } 80%,100% { transform: scale(3.2); opacity: 0; } }
+.blip .tag { position: absolute; left: 15px; top: -6px; font-size: 8.5px; letter-spacing: 0.1em; white-space: nowrap;
+  color: var(--text); text-shadow: 0 0 6px #03141d; }
+.scope-foot { display: flex; justify-content: space-between; margin-top: 14px; font-size: 9.5px;
+  letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; }
+
+/* ============================================================
+   STAT STRIP
+   ============================================================ */
+.strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; border: 1px solid var(--line);
+  border-radius: 6px; overflow: hidden; background: var(--line); }
+.strip .cell { background: rgba(4,20,30,0.55); padding: 22px 24px; backdrop-filter: blur(6px); }
+.strip .k { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-d); }
+.strip .v { font-family: var(--display); font-weight: 700; font-size: 30px; color: var(--green);
+  margin-top: 7px; letter-spacing: 0.02em; text-shadow: 0 0 16px rgba(54,236,208,0.3); }
+.strip .v.alt { color: var(--text); text-shadow: none; }
+.strip .s { font-size: 10.5px; color: var(--muted); letter-spacing: 0.05em; margin-top: 4px; }
+
+/* ============================================================
+   SECTION RULE
+   ============================================================ */
+.rule { display: flex; align-items: center; gap: 14px; font-size: 10px; letter-spacing: 0.24em;
+  text-transform: uppercase; color: var(--muted-d); margin: 78px 0 26px; }
+.rule .line { flex: 1; height: 1px; background: var(--line); }
+.rule .orn { color: var(--green); }
+
+/* ============================================================
+   FEATURES
+   ============================================================ */
+.feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.feat { border: 1px solid var(--line); background: var(--panel); border-radius: 7px; padding: 26px 26px 28px;
+  backdrop-filter: blur(8px); position: relative; overflow: hidden; transition: border-color .25s, transform .25s; }
+.feat::after { content: ""; position: absolute; left: 0; top: 0; height: 2px; width: 0; background: var(--green);
+  box-shadow: 0 0 12px var(--green); transition: width .35s cubic-bezier(.2,.8,.2,1); }
+.feat:hover { border-color: var(--line-2); transform: translateY(-3px); }
+.feat:hover::after { width: 100%; }
+.feat .icn { width: 42px; height: 42px; border-radius: 6px; border: 1px solid var(--line-2);
+  display: grid; place-items: center; color: var(--green); background: rgba(54,236,208,0.05); margin-bottom: 18px; }
+.feat .icn svg { width: 21px; height: 21px; }
+.feat h3 { font-family: var(--display); font-weight: 600; font-size: 16px; letter-spacing: 0.04em;
+  margin: 0 0 10px; text-transform: uppercase; }
+.feat h3 .g { color: var(--green); }
+.feat p { font-size: 13px; line-height: 1.65; color: var(--muted); margin: 0; }
+
+/* ============================================================
+   FINAL CTA
+   ============================================================ */
+.final { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; backdrop-filter: blur(8px);
+  padding: 56px 48px; text-align: center; position: relative; overflow: hidden; }
+.final::before { content: ""; position: absolute; inset: 0;
+  background: radial-gradient(70% 120% at 50% 0%, rgba(54,236,208,0.12), transparent 60%); pointer-events: none; }
+.final h2 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 3.6vw, 42px);
+  letter-spacing: 0.01em; margin: 0; position: relative; }
+.final h2 .g { color: var(--green); }
+.final p { color: var(--muted); margin: 16px auto 0; max-width: 50ch; line-height: 1.6; position: relative; }
+.final .wait { margin: 30px auto 0; position: relative; }
+.final .wait-row { justify-content: center; }
+
+/* ---- footer ---- */
+footer { border-top: 1px solid var(--line); margin-top: 80px; }
+.foot-inner { width: min(1180px, calc(100vw - 32px)); margin: 0 auto; padding: 28px 0 40px;
+  display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.foot-inner .c { font-size: 11px; color: var(--muted-d); letter-spacing: 0.06em; }
+.foot-inner .c .g { color: var(--green); }
+.foot-links { display: flex; gap: 22px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.foot-links a:hover { color: var(--green); }
+
+/* ---- responsive ---- */
+@media (max-width: 920px) {
+  .hero { grid-template-columns: 1fr; gap: 40px; padding: 56px 0 50px; }
+  .scope-card { max-width: 420px; }
+  .strip { grid-template-columns: 1fr 1fr; }
+  .feat-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .wait-row { flex-direction: column; }
+  .wait-btn { height: 50px; justify-content: center; }
+  .strip { grid-template-columns: 1fr; }
+  .final { padding: 40px 22px; }
+}
+</style>
+</head>
+<body>
+  <!-- abyssal backdrop -->
+  <div class="scene" aria-hidden>
+    <div class="scene-gradient"></div>
+    <div class="scene-mesh"></div>
+    <div class="scene-grain"></div>
+  </div>
+  <div class="plankton" id="plankton" aria-hidden></div>
+
+  <div class="shell">
+    <!-- nav -->
+    <header class="topnav">
+      <div class="topnav-inner">
+        <a class="brand-mark" href="#" aria-label="WhaleWatcher home">
+          <svg viewBox="0 0 48 48" fill="none" aria-hidden>
+            <circle cx="24" cy="24" r="21" stroke="#36ecd0" stroke-width="1" opacity="0.35" />
+            <circle cx="24" cy="24" r="14" stroke="#36ecd0" stroke-width="1" opacity="0.5" />
+            <circle cx="24" cy="24" r="7" stroke="#36ecd0" stroke-width="1" opacity="0.7" />
+            <path d="M11 27c5 2 9 2 13-1 3-2 6-3 10-1-1 3-4 5-8 5-3 0-5-1-6-2-3 2-6 2-9-1z" fill="#36ecd0" />
+            <circle cx="30" cy="24" r="1.4" fill="#03141d" />
+          </svg>
+          <div>
+            <div class="wm"><b>WHALE</b><span class="light">WATCHER</span></div>
+            <div class="tag">Hydrophone Console</div>
+          </div>
+        </a>
+        <button class="nav-cta" onclick="document.getElementById('email').focus()">Request access</button>
+      </div>
+    </header>
+
+    <!-- hero -->
+    <section class="wrap hero">
+      <div>
+        <span class="hero-status reveal" style="animation-delay:.05s"><span class="dot"></span> Private beta · Boarding now</span>
+        <h1 class="reveal" style="animation-delay:.12s">
+          Surface the traders<br>who <span class="g">actually</span> <span class="o">see ahead.</span>
+        </h1>
+        <p class="hero-sub reveal" style="animation-delay:.2s">
+          WhaleWatcher ranks Polymarket traders by a single <b>0–10 Skill Score</b> — pure forecasting
+          edge, not loud PnL. We measure how reliably a wallet's entry prices beat the market's eventual
+          resolution, then Bayesian-shrink it for sample size. <b>Early access opens in waves.</b>
+        </p>
+
+        <!-- waitlist -->
+        <form class="wait reveal" id="waitForm" style="animation-delay:.28s" novalidate>
+          <div class="wait-lbl">Join the waitlist · Get a boarding pass</div>
+          <div class="wait-row" id="waitRow">
+            <input class="wait-input" id="email" type="email" inputmode="email" autocomplete="email"
+                   placeholder="you@deepwater.io" aria-label="Email address" required />
+            <button class="wait-btn" type="submit">
+              Request access
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+          <div class="wait-foot" id="waitFoot">
+            <span class="cnt">2,847</span> traders already on the manifest · No spam, one launch email.
+          </div>
+          <div class="wait-ok" id="waitOk" role="status">
+            <div class="ping">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </div>
+            <div>
+              <div class="t">You're on the manifest.</div>
+              <div class="s">We'll transmit your boarding pass when the next wave opens.</div>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- sonar scope -->
+      <div class="scope-card reveal" style="animation-delay:.34s">
+        <div class="scope-head">
+          <span class="t">Contact Scope</span>
+          <span class="d">SECTOR 7 · LIVE</span>
+        </div>
+        <div class="scope">
+          <svg viewBox="0 0 200 200" aria-hidden>
+            <defs></defs>
+            <circle cx="100" cy="100" r="96" fill="none" stroke="rgba(54,236,208,0.16)" />
+            <circle cx="100" cy="100" r="68" fill="none" stroke="rgba(54,236,208,0.12)" />
+            <circle cx="100" cy="100" r="40" fill="none" stroke="rgba(54,236,208,0.1)" />
+            <circle cx="100" cy="100" r="12" fill="none" stroke="rgba(54,236,208,0.18)" />
+            <line x1="100" y1="4" x2="100" y2="196" stroke="rgba(54,236,208,0.08)" />
+            <line x1="4" y1="100" x2="196" y2="100" stroke="rgba(54,236,208,0.08)" />
+            <line x1="29" y1="29" x2="171" y2="171" stroke="rgba(54,236,208,0.06)" />
+            <line x1="171" y1="29" x2="29" y2="171" stroke="rgba(54,236,208,0.06)" />
+          </svg>
+          <div class="sweep"></div>
+          <div class="blip apex" style="left:62%;top:34%"><span class="tag">@whale.eth · 9.4</span></div>
+          <div class="blip" style="left:38%;top:58%"><span class="tag">8.1</span></div>
+          <div class="blip" style="left:70%;top:66%"><span class="tag">7.6</span></div>
+          <div class="blip" style="left:48%;top:30%"><span class="tag">7.2</span></div>
+          <div class="blip" style="left:30%;top:42%"></div>
+        </div>
+        <div class="scope-foot">
+          <span>Tracking 2.4k wallets</span>
+          <span>Edge &gt; market</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- stat strip -->
+    <section class="wrap reveal" style="animation-delay:.4s">
+      <div class="strip">
+        <div class="cell"><div class="k">Skill range</div><div class="v">0–10</div><div class="s">Bayesian-shrunk edge</div></div>
+        <div class="cell"><div class="k">Wallets scanned</div><div class="v">2,412</div><div class="s">Refreshed daily</div></div>
+        <div class="cell"><div class="k">Bot wallets filtered</div><div class="v alt">38%</div><div class="s">Heuristic-screened</div></div>
+        <div class="cell"><div class="k">Edge horizon</div><div class="v alt">30 / 90d</div><div class="s">Resolved positions</div></div>
+      </div>
+    </section>
+
+    <!-- features -->
+    <div class="wrap">
+      <div class="rule"><span class="orn">◇</span> What the console gives you <span class="line"></span></div>
+      <section class="feat-grid">
+        <article class="feat">
+          <div class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <h3>Edge, not <span class="g">noise</span></h3>
+          <p>A wallet can be up millions on one lucky longshot. The Skill Score ignores PnL theater and
+             measures forecasting edge per share — how far entry prices beat eventual resolution.</p>
+        </article>
+        <article class="feat">
+          <div class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 7-8"/><path d="M16 7h4v4"/></svg></div>
+          <h3>Shrunk for <span class="g">sample</span></h3>
+          <p>Three good calls aren't a track record. Every score is Bayesian-shrunk toward zero until a
+             wallet earns its confidence — so a hot streak can't out-rank a proven forecaster.</p>
+        </article>
+        <article class="feat">
+          <div class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <h3>Bots <span class="g">screened</span></h3>
+          <p>Market-makers and arbitrage bots are flagged by trade cadence, simultaneous markets and
+             tiny average size — then excluded from the board, so you watch humans with conviction.</p>
+        </article>
+      </section>
+    </div>
+
+    <!-- final CTA -->
+    <section class="wrap" style="margin-top:78px">
+      <div class="final">
+        <h2>Get your <span class="g">boarding pass.</span></h2>
+        <p>Waves open in batches. Reserve your spot and we'll transmit access the moment your sector clears.</p>
+        <form class="wait" id="waitForm2" novalidate>
+          <div class="wait-row">
+            <input class="wait-input" id="email2" type="email" inputmode="email" autocomplete="email"
+                   placeholder="you@deepwater.io" aria-label="Email address" required />
+            <button class="wait-btn" type="submit">
+              Join waitlist
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+          <div class="wait-foot" id="waitFoot2" style="justify-content:center">
+            <span class="cnt">2,847</span> already aboard · Built on Polymarket's public data.
+          </div>
+          <div class="wait-ok" id="waitOk2" role="status" style="justify-content:center; text-align:left">
+            <div class="ping">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </div>
+            <div>
+              <div class="t">You're on the manifest.</div>
+              <div class="s">Watch your inbox for the next wave.</div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <footer>
+      <div class="foot-inner">
+        <div class="c"><span class="g">WHALE</span>WATCHER · Hydrophone Console · © 2026</div>
+        <nav class="foot-links">
+          <a href="#">Methodology</a>
+          <a href="#">Polymarket</a>
+          <a href="#">Contact</a>
+        </nav>
+      </div>
+    </footer>
+  </div>
+
+<script>
+  // drifting plankton particles (client-generated, like OceanScene.tsx)
+  (function () {
+    const host = document.getElementById('plankton');
+    for (let i = 0; i < 22; i++) {
+      const d = 14 + Math.random() * 16, size = 1.5 + Math.random() * 3;
+      const s = document.createElement('span');
+      s.style.left = (Math.random() * 100) + 'vw';
+      s.style.width = s.style.height = size + 'px';
+      s.style.opacity = (0.3 + Math.random() * 0.4).toFixed(2);
+      s.style.animationDuration = d + 's';
+      s.style.animationDelay = (-Math.random() * d) + 's';
+      host.appendChild(s);
+    }
+  })();
+
+  // waitlist submit → optimistic success state (mockup: no backend)
+  function wireForm(formId, rowId, footId, okId) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const input = form.querySelector('input[type=email]');
+      if (!input.value || !input.checkValidity()) { input.focus(); input.reportValidity(); return; }
+      const row = document.getElementById(rowId);
+      const foot = document.getElementById(footId);
+      const ok = document.getElementById(okId);
+      if (row) row.style.display = 'none';
+      if (foot) foot.style.display = 'none';
+      ok.classList.add('show');
+    });
+  }
+  wireForm('waitForm', 'waitRow', 'waitFoot', 'waitOk');
+  // second form has no row id wrapper; hide its row by selector
+  (function () {
+    const form = document.getElementById('waitForm2');
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const input = document.getElementById('email2');
+      if (!input.value || !input.checkValidity()) { input.focus(); input.reportValidity(); return; }
+      form.querySelector('.wait-row').style.display = 'none';
+      document.getElementById('waitFoot2').style.display = 'none';
+      document.getElementById('waitOk2').classList.add('show');
+    });
+  })();
+</script>
+</body>
+</html>

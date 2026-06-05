@@ -1,0 +1,9 @@
+
+> edgeboard-web@1.0.0 start C:\Users\Jimmy\dev\edgeboard\web
+> next start "-p" "3737"
+
+  ▲ Next.js 14.2.18
+  - Local:        http://localhost:3737
+
+ ✓ Starting...
+ ✓ Ready in 694ms
