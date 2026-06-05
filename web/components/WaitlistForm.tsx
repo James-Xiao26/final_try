@@ -21,6 +21,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function WaitlistForm({ cta, foot, centered = false }: WaitlistFormProps) {
   const [email, setEmail] = useState("");
+  // Honeypot: bots tend to fill every field; humans never see this one. A non-empty value on submit
+  // marks the request as spam (the server silently drops it).
+  const [company, setCompany] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const inputId = useId();
@@ -42,7 +45,7 @@ export default function WaitlistForm({ cta, foot, centered = false }: WaitlistFo
       const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmed })
+        body: JSON.stringify({ email: trimmed, company })
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -75,6 +78,19 @@ export default function WaitlistForm({ cta, foot, centered = false }: WaitlistFo
 
   return (
     <form className={`ea-wait${centered ? " ea-wait-center" : ""}`} onSubmit={onSubmit} noValidate>
+      {/* Honeypot — off-screen and out of the tab/a11y order, so only bots ever fill it. */}
+      <div aria-hidden style={{ position: "absolute", left: "-9999px", width: 1, height: 1, overflow: "hidden" }}>
+        <label htmlFor={`${inputId}-company`}>Company (leave blank)</label>
+        <input
+          id={`${inputId}-company`}
+          type="text"
+          name="company"
+          tabIndex={-1}
+          autoComplete="off"
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+        />
+      </div>
       <div className="ea-wait-row">
         <input
           id={inputId}
