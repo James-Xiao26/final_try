@@ -144,12 +144,12 @@ export default function RecentTradesFeed({ initialTrades, initialTraderCount }: 
           <table>
             <thead>
               <tr>
-                <th>Contact</th>
-                <th>Transmission</th>
-                <th>Bearing</th>
-                <th className="r">Depth</th>
-                <th className="r">Tonnage</th>
-                <th className="r">Elapsed</th>
+                <th>Trader</th>
+                <th>Market</th>
+                <th>Side</th>
+                <th className="r">Price</th>
+                <th className="r">Size</th>
+                <th className="r">Time</th>
               </tr>
             </thead>
             <tbody>
@@ -165,7 +165,7 @@ export default function RecentTradesFeed({ initialTrades, initialTraderCount }: 
                         <Link href={`/wallet/${trade.address}`} className="name" title={trade.handle ? `@${trade.handle}` : trade.address}>
                           {trade.handle ? <><span className="at">@</span>{traderLabel(trade.handle, trade.address).replace(/^@/, "")}</> : shortenAddress(trade.address)}
                         </Link>
-                        <div className="skl"><span className="sigchip">SIG {trade.skillScore === null ? "—" : trade.skillScore.toFixed(1)}</span></div>
+                        <div className="skl"><span className="sigchip">{trade.rank === null ? "Unranked" : `Rank #${trade.rank}`}</span></div>
                       </td>
                       <td className="act-market"><span title={trade.market ?? ""}>{trade.market || "—"}</span></td>
                       <td>
@@ -174,7 +174,7 @@ export default function RecentTradesFeed({ initialTrades, initialTraderCount }: 
                         ) : (
                           <span className={`act-bearing ${buy ? "buy" : sell ? "sell" : ""}`}>
                             <span className="ar">{buy ? "▲" : sell ? "▼" : "•"}</span>
-                            {buy ? "INBOUND" : sell ? "SOUNDING" : trade.side}
+                            {buy ? "BUY" : sell ? "SELL" : trade.side}
                           </span>
                         )}
                       </td>

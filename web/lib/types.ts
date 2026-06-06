@@ -70,6 +70,8 @@ export interface RecentTrade {
   address: string;
   handle: string | null;
   skillScore: number | null;
+  // Best (lowest-number = highest) leaderboard rank for this wallet across horizons.
+  rank: number | null;
   conditionId: string | null;
   market: string | null;
   outcomeIndex: number | null;

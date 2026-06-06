@@ -243,14 +243,15 @@ input:focus { border-color: var(--green) !important; }
 .lb-log-head h2 .g { color: var(--green); }
 .lb-log-head .meta { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
 .lb-log-panel { padding: 4px 8px 8px; overflow-x: auto; }
-.lb-log-panel table { width: 100%; border-collapse: collapse; min-width: 820px; }
+.lb-log-panel table { width: 100%; border-collapse: collapse; min-width: 680px; }
 .lb-log-panel thead th { font-family: var(--font-plex-mono); font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-d); font-weight: 500; text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .lb-log-panel thead th.r { text-align: right; }
 .lb-log-panel tbody td { padding: 16px; vertical-align: middle; border-top: 1px solid rgba(54,236,208,0.07); }
 
 .lb-cid .hex { font-family: var(--font-display); font-weight: 700; font-size: 26px; line-height: 1; color: var(--text); letter-spacing: 0.04em; }
 .lb-cid.apex .hex { color: var(--yellow); text-shadow: 0 0 14px rgba(255,210,122,0.4); }
-.lb-desig .name { font-family: var(--font-display); font-weight: 600; font-size: 19px; color: var(--text); letter-spacing: 0.01em; transition: color .15s; }
+.lb-desig { width: 160px; }
+.lb-desig .name { font-family: var(--font-display); font-weight: 600; font-size: 15px; color: var(--text); letter-spacing: 0.01em; transition: color .15s; display: block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb-desig .name:hover { color: var(--green); }
 .lb-desig .name .at { color: var(--green); font-weight: 400; }
 .lb-desig .meta { font-family: var(--font-plex-mono); font-size: 11px; color: var(--muted); margin-top: 4px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px; }
@@ -258,7 +259,8 @@ input:focus { border-color: var(--green) !important; }
 .lb-desig .meta button:hover { color: var(--green); border-color: var(--green); }
 .lb-class .chip { display: inline-block; font-family: var(--font-display); font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 11px; border-radius: 2px; border: 1px solid rgba(54,236,208,0.3); color: var(--green); background: rgba(54,236,208,0.06); }
 .lb-class.apex .chip { color: var(--yellow); border-color: rgba(255,210,122,0.4); background: rgba(255,210,122,0.07); }
-.lb-signal { width: 200px; }
+.lb-signal { width: 230px; }
+.lb-log-panel thead th.lb-signal, .lb-log-panel tbody td.lb-signal { padding-right: 56px; }
 .lb-signal .sig-wrap { display: flex; align-items: center; gap: 12px; }
 .lb-signal .sig-num { font-family: var(--font-display); font-weight: 700; font-size: 22px; min-width: 42px; }
 .lb-signal .bars { display: flex; align-items: flex-end; gap: 3px; height: 26px; }

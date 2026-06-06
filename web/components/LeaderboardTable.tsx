@@ -10,6 +10,7 @@ import { HORIZONS } from "@/lib/types";
 import type { HorizonDays, LeaderboardRow } from "@/lib/types";
 
 const LEADERBOARD_HORIZONS: readonly HorizonDays[] = HORIZONS;
+const POLL_INTERVAL_MS = 60_000;
 
 interface LeaderboardTableProps {
   initialRows: LeaderboardRow[];
@@ -74,6 +75,37 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
       active = false;
     };
   }, [horizon, initialHorizon, initialRows]);
+
+  // Live refresh: re-pull the current horizon on an interval (and when the tab regains focus) so an
+  // open tab tracks the scheduled ingest without a manual reload. Mirrors the Activity feed's poll.
+  useEffect(() => {
+    let active = true;
+    const poll = (): void => {
+      if (document.hidden) {
+        return;
+      }
+      fetch(`/api/leaderboard?horizon=${horizon}`)
+        .then((response) => response.ok ? response.json() as Promise<LeaderboardRow[]> : Promise.reject(new Error("Leaderboard request failed")))
+        .then((nextRows) => {
+          if (active) {
+            setRows(nextRows);
+          }
+        })
+        .catch(() => {
+          /* keep last good data */
+        });
+    };
+    const intervalId = setInterval(poll, POLL_INTERVAL_MS);
+    const onVisibility = (): void => {
+      if (!document.hidden) poll();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [horizon]);
 
   const apex = useMemo(() => rows.find((row) => row.rank === 1) ?? rows[0], [rows]);
 
@@ -210,13 +242,13 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
           <table>
             <thead>
               <tr>
-                <th>Contact</th>
-                <th>Designation</th>
+                <th>Rank</th>
+                <th>Trader</th>
                 <th className="lb-hide-md">Class</th>
-                <th className="lb-hide-md">Signal · Skill</th>
+                <th className="lb-hide-md lb-signal">Skill Score</th>
                 <th>Edge / Share</th>
-                <th className="r">Hit Rate</th>
-                <th className="r">Returns</th>
+                <th className="r">Win Rate</th>
+                <th className="r">Trades</th>
               </tr>
             </thead>
             <tbody>
@@ -237,7 +269,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
                   const edgePct = Math.min(100, (Math.abs(row.avgEdgePerShare) / 0.12) * 100);
                   return (
                     <tr key={row.address}>
-                      <td className={`lb-cid${apexRow ? " apex" : ""}`}><span className="hex">C-{String(row.rank).padStart(2, "0")}</span></td>
+                      <td className={`lb-cid${apexRow ? " apex" : ""}`}><span className="hex">#{row.rank}</span></td>
                       <td className="lb-desig">
                         <Link href={`/wallet/${row.address}?horizon=${horizon}`} className="name">
                           {row.handle ? <><span className="at">@</span>{row.handle}</> : shortenAddress(row.address)}

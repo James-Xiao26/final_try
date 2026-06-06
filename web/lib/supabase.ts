@@ -17,7 +17,7 @@ type RecentTradeSelectRow = Pick<
   RecentTradeRowDb,
   "address" | "condition_id" | "market" | "outcome_index" | "side" | "price" | "size" | "usdc_size" | "traded_at"
 >;
-type SkillSelectRow = Pick<LeaderboardCacheRow, "address" | "skill_score">;
+type SkillSelectRow = Pick<LeaderboardCacheRow, "address" | "skill_score" | "rank">;
 type MarketRowDb = Database["public"]["Tables"]["markets"]["Row"];
 type MarketSelectRow = Pick<
   MarketRowDb,
@@ -164,7 +164,7 @@ export async function getRecentLeaderboardTrades(
   const addresses = [...new Set(tradeRows.map((row) => row.address))];
   const { data: cacheData, error: cacheError } = await supabase
     .from("leaderboard_cache")
-    .select("address, skill_score")
+    .select("address, skill_score, rank")
     .in("address", addresses);
 
   if (cacheError) {
@@ -177,11 +177,17 @@ export async function getRecentLeaderboardTrades(
 
   // Best (highest) skill score per address across horizons; presence in this map == on the leaderboard.
   const skillByAddress = new Map<string, number | null>();
+  // Best (lowest-number = highest) leaderboard rank per address across horizons.
+  const rankByAddress = new Map<string, number>();
   ((cacheData ?? []) as unknown as SkillSelectRow[]).forEach((row) => {
     const next = row.skill_score;
     const prev = skillByAddress.get(row.address);
     if (prev === undefined || (next !== null && (prev === null || next > prev))) {
       skillByAddress.set(row.address, next);
+    }
+    const prevRank = rankByAddress.get(row.address);
+    if (prevRank === undefined || row.rank < prevRank) {
+      rankByAddress.set(row.address, row.rank);
     }
   });
 
@@ -210,6 +216,7 @@ export async function getRecentLeaderboardTrades(
       address: row.address,
       handle: handles.get(row.address) ?? null,
       skillScore: skillByAddress.get(row.address) ?? null,
+      rank: rankByAddress.get(row.address) ?? null,
       conditionId: row.condition_id,
       market: row.market,
       outcomeIndex: row.outcome_index,
