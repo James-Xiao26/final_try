@@ -21,7 +21,8 @@ export default function OceanScene() {
       const duration = 14 + Math.random() * 16;
       const size = 1.5 + Math.random() * 3;
       return {
-        left: `${Math.random() * 100}vw`,
+        // cap at 96vw so a particle's box never seeds past the right edge (no horizontal overflow)
+        left: `${Math.random() * 96}vw`,
         size,
         duration: `${duration}s`,
         delay: `${-Math.random() * duration}s`,

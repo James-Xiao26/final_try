@@ -24,10 +24,17 @@
   --grid: rgba(54, 236, 208, 0.08);
 }
 * { box-sizing: border-box; }
-html { color-scheme: dark; background: var(--bg); }
+/* overflow-x clip + max-width keep a stray `100vw`/safe-area pixel from triggering iOS Safari's
+   horizontal rubber-band scroll. */
+html { color-scheme: dark; background: var(--bg); overflow-x: hidden; }
 body {
   margin: 0;
+  /* 100dvh (dynamic viewport) tracks the iOS toolbar so the page doesn't reflow/jump as the address
+     bar collapses on scroll; 100vh is the fallback for browsers without dvh. */
   min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 100%;
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
@@ -66,10 +73,12 @@ button { cursor: pointer; }
   position: absolute; inset: 0; opacity: 0.06; mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-.plankton { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.plankton { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
 .plankton span {
   position: absolute; bottom: -10px; border-radius: 50%;
   background: var(--green); box-shadow: 0 0 6px var(--green);
+  /* promote to its own compositor layer so the drift doesn't repaint the blurred topnav above it */
+  will-change: transform, opacity;
   animation: rise-bubble linear infinite;
 }
 @keyframes rise-bubble {
@@ -79,7 +88,7 @@ button { cursor: pointer; }
 }
 
 /* ---- shell: console top-bar over full-width content ---- */
-.shell { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+.shell { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
 .topnav {
   position: sticky; top: 0; z-index: 50;
   border-bottom: 1px solid var(--line);
@@ -87,7 +96,7 @@ button { cursor: pointer; }
   backdrop-filter: blur(10px);
 }
 .topnav-inner {
-  width: min(1180px, calc(100vw - 32px));
+  width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
   display: flex; align-items: center; justify-content: space-between; gap: 20px;
   padding: 14px 0; flex-wrap: wrap;
@@ -120,7 +129,7 @@ button { cursor: pointer; }
 
 .content { flex: 1; min-width: 0; }
 .page {
-  width: min(1180px, calc(100vw - 32px));
+  width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
   padding: 34px 0 64px;
 }
@@ -180,9 +189,12 @@ input:focus { border-color: var(--green) !important; }
 @media (max-width: 760px) {
   .topnav-inner { gap: 12px; }
   .nav-links { order: 3; width: 100%; justify-content: center; }
-  .page { width: min(100vw - 20px, 1180px); padding-top: 20px; }
+  .page { width: min(100% - 20px, 1180px); padding-top: 20px; }
   .topbar, .toolbar { align-items: stretch; flex-direction: column; }
   .brand { font-size: 24px; }
+  /* iOS Safari re-rasterizes backdrop-blur every frame while the sticky bar overlaps the animated
+     scene below it, which reads as flicker. A near-opaque solid bar looks the same and removes it. */
+  .topnav { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(4, 18, 27, 0.94); }
 }
 
 /* ============================================================
@@ -202,7 +214,7 @@ input:focus { border-color: var(--green) !important; }
 .lb-sweep { position: absolute; inset: 0; border-radius: 50%;
   background: conic-gradient(from 0deg, rgba(54,236,208,0.42), rgba(54,236,208,0.04) 38deg, transparent 60deg, transparent 360deg);
   -webkit-mask: radial-gradient(circle at center, transparent 0, #000 1%); mask: radial-gradient(circle at center, transparent 0, #000 1%);
-  animation: lb-sweep 4s linear infinite; }
+  will-change: transform; animation: lb-sweep 4s linear infinite; }
 @keyframes lb-sweep { to { transform: rotate(360deg); } }
 .lb-blip { position: absolute; width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%,-50%);
   background: var(--green); box-shadow: 0 0 10px var(--green), 0 0 22px var(--green); }
@@ -452,7 +464,7 @@ input:focus { border-color: var(--green) !important; }
    Renders inside the shared shell; reuses scene/topnav. All
    landing-specific rules are namespaced `ea-`.
    ============================================================ */
-.ea-wrap { width: min(1180px, calc(100vw - 32px)); margin: 0 auto; }
+.ea-wrap { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
 
 /* staggered page-load reveal */
 .ea .reveal { opacity: 0; transform: translateY(18px); animation: ea-reveal .9s cubic-bezier(.2,.8,.2,1) forwards; }
@@ -524,7 +536,7 @@ input:focus { border-color: var(--green) !important; }
 .ea-sweep { position: absolute; inset: 0; border-radius: 50%;
   background: conic-gradient(from 0deg, rgba(54,236,208,0.42), rgba(54,236,208,0.04) 38deg, transparent 60deg, transparent 360deg);
   -webkit-mask: radial-gradient(circle at center, transparent 0, #000 1%); mask: radial-gradient(circle at center, transparent 0, #000 1%);
-  animation: ea-sweep 4s linear infinite; }
+  will-change: transform; animation: ea-sweep 4s linear infinite; }
 @keyframes ea-sweep { to { transform: rotate(360deg); } }
 .ea-blip { position: absolute; width: 11px; height: 11px; border-radius: 50%; transform: translate(-50%,-50%);
   background: var(--green); box-shadow: 0 0 10px var(--green), 0 0 22px var(--green); }
@@ -630,7 +642,7 @@ input:focus { border-color: var(--green) !important; }
 
 /* ---- footer ---- */
 .ea-foot { border-top: 1px solid var(--line); margin-top: 80px; }
-.ea-foot-inner { width: min(1180px, calc(100vw - 32px)); margin: 0 auto; padding: 28px 0 50px;
+.ea-foot-inner { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 50px;
   display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
 .ea-foot-inner .c { font-size: 11px; color: var(--muted-d); letter-spacing: 0.06em; }
 .ea-foot-inner .c .g { color: var(--green); }

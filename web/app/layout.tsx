@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Chakra_Petch, IBM_Plex_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 import BrandMark from "@/components/BrandMark";
@@ -24,6 +24,14 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "WhaleWatcher",
   description: "Polymarket trader leaderboard, ranked by forecasting edge."
+};
+
+// viewport-fit=cover lets the fixed ocean scene extend under the notch/home indicator; the rest is
+// the standard responsive default. Declared explicitly (Next's default omits viewport-fit).
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover"
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
