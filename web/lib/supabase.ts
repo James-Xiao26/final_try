@@ -1,4 +1,5 @@
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { Database, EquityPoint, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, WalletMetrics, WalletProfile } from "./types";
 import { HORIZONS } from "./types";
@@ -71,6 +72,18 @@ export function createSupabaseBrowserClient() {
   return createBrowserClient<Database>(
     env("NEXT_PUBLIC_SUPABASE_URL"),
     env("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+  );
+}
+
+// Plain anon client for stateless server-side writes (the waitlist insert). The @supabase/ssr
+// server client above is for session/cookie-bound reads; an anonymous INSERT needs no session, and
+// that client's generics also mis-resolve write types (collapsing Insert to never). What this key
+// may actually do is still governed by RLS — on `waitlist` that's INSERT-only, no read-back.
+export function createSupabaseWriteClient() {
+  return createClient<Database>(
+    env("NEXT_PUBLIC_SUPABASE_URL"),
+    env("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    { auth: { persistSession: false } }
   );
 }
 

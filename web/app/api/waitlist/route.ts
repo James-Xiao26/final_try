@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
+import { createSupabaseWriteClient } from "@/lib/supabase";
 
-// Server-side proxy to Waitlister's form-action endpoint. Posting from the server (rather than the
-// browser) avoids CORS and lets the client keep our own styled success state instead of being
-// redirected to Waitlister's hosted confirmation page. The waitlist key is public (it ships in
-// Waitlister's own embed snippets), so a sane default is baked in; override with WAITLISTER_KEY.
-const WAITLISTER_KEY = process.env.WAITLISTER_KEY ?? "ztTKuFNeBL_D";
-const ENDPOINT = `https://waitlister.me/s/${WAITLISTER_KEY}`;
+// Captures early-access signups into our own Supabase `waitlist` table (migration 010). Writes go
+// through the anon key, which the table's RLS allows to INSERT but not SELECT — so this route can
+// add an address yet never read the list back out. Collect signups from the Supabase dashboard.
 
-// Pragmatic email shape check — the real validation happens at Waitlister; this just rejects
-// obvious junk before we spend a round-trip.
+// Pragmatic email shape check — Postgres has the final say via the CITEXT UNIQUE column; this just
+// rejects obvious junk before we spend a round-trip.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // --- Per-IP rate limit -------------------------------------------------------------------------
@@ -54,14 +52,15 @@ export async function POST(request: Request) {
 
   let email: unknown;
   let company: unknown;
+  let source: unknown;
   try {
-    ({ email, company } = await request.json());
+    ({ email, company, source } = await request.json());
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
   // Honeypot: a hidden field no human fills. If it has a value, it's a bot — return a fake success
-  // (so the bot can't tell it was caught) and never touch Waitlister.
+  // (so the bot can't tell it was caught) and never touch the database.
   if (typeof company === "string" && company.trim() !== "") {
     return NextResponse.json({ ok: true });
   }
@@ -71,39 +70,25 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Waitlister gates the form endpoint on a domain allow-list, checked against Origin/Referer.
-    // Posting server-side we have neither, so forward the browser's — Waitlister then matches the
-    // site's real host (which must be added under Settings → Whitelisted domains in the dashboard).
-    const headers: Record<string, string> = {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json"
-    };
-    const origin = request.headers.get("origin");
-    const referer = request.headers.get("referer");
-    if (origin) headers.Origin = origin;
-    if (referer) headers.Referer = referer;
-
-    const body = new URLSearchParams({ email: email.trim() });
-    const res = await fetch(ENDPOINT, {
-      method: "POST",
-      headers,
-      body,
-      // Don't follow Waitlister's post-submit redirect to its hosted success page — a 3xx means the
-      // signup landed, which is all we need.
-      redirect: "manual"
+    const supabase = createSupabaseWriteClient();
+    // No .select() chained, so the insert uses Prefer: return=minimal and needs no SELECT grant —
+    // which is exactly what the anon RLS policy allows (INSERT only, no read-back).
+    const { error } = await supabase.from("waitlist").insert({
+      email: email.trim().toLowerCase(),
+      source: typeof source === "string" && source.trim() !== "" ? source.trim() : null
     });
 
-    // 2xx (JSON/no-content) and 3xx (redirect to hosted confirmation) both indicate success.
-    if (res.ok || (res.status >= 300 && res.status < 400)) {
-      return NextResponse.json({ ok: true });
+    // 23505 = unique_violation: the email is already on the list. That's a success from the user's
+    // point of view, so report ok rather than leaking that they'd already signed up.
+    if (error && error.code !== "23505") {
+      console.error(`[waitlist] Supabase insert failed (${error.code ?? "?"}): ${error.message}`);
+      return NextResponse.json(
+        { error: "We couldn't add you right now. Please try again." },
+        { status: 502 }
+      );
     }
 
-    // Surface Waitlister's own message — e.g. "Domain not whitelisted. Please add this domain to
-    // your waitlist settings." — which is far more actionable than a generic failure.
-    const detail = (await res.json().catch(() => null)) as { message?: string } | null;
-    const message = detail?.message ?? "We couldn't add you right now. Please try again.";
-    console.error(`[waitlist] Waitlister ${res.status}: ${message}`);
-    return NextResponse.json({ error: message }, { status: 502 });
+    return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(
       { error: "We couldn't reach the waitlist. Please try again." },

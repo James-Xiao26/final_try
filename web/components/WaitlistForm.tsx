@@ -15,11 +15,13 @@ interface WaitlistFormProps {
   foot?: React.ReactNode;
   /** Center the row + confirmation (used in the final CTA block). */
   centered?: boolean;
+  /** Attribution tag stored with the signup (e.g. "hero", "cta") so we can see which form converted. */
+  source?: string;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function WaitlistForm({ cta, foot, centered = false }: WaitlistFormProps) {
+export default function WaitlistForm({ cta, foot, centered = false, source }: WaitlistFormProps) {
   const [email, setEmail] = useState("");
   // Honeypot: bots tend to fill every field; humans never see this one. A non-empty value on submit
   // marks the request as spam (the server silently drops it).
@@ -45,7 +47,7 @@ export default function WaitlistForm({ cta, foot, centered = false }: WaitlistFo
       const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmed, company })
+        body: JSON.stringify({ email: trimmed, company, source })
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;

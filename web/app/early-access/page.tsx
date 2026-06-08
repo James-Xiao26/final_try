@@ -35,6 +35,7 @@ export default function EarlyAccessPage() {
             <div className="ea-wait-lbl">Join the waitlist · Get a boarding pass</div>
             <WaitlistForm
               cta="Request access"
+              source="hero"
               foot={
                 <>
                   <span className="cnt">2,847</span> traders already on the manifest · No spam, one
@@ -184,6 +185,7 @@ export default function EarlyAccessPage() {
           <WaitlistForm
             cta="Join waitlist"
             centered
+            source="cta"
             foot={
               <>
                 <span className="cnt">2,847</span> already aboard · Built on Polymarket&apos;s public

@@ -324,6 +324,25 @@ export interface Database {
         };
         Relationships: [];
       };
+      waitlist: {
+        Row: {
+          id: number;
+          email: string;
+          source: string | null;
+          created_at: string;
+        };
+        Insert: {
+          email: string;
+          source?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          email?: string;
+          source?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
