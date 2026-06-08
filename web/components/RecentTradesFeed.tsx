@@ -180,7 +180,11 @@ export default function RecentTradesFeed({ initialTrades, initialTraderCount }: 
                       </td>
                       <td className="act-depth"><div className="v">{trade.price === null ? "—" : formatPrice(trade.price)}</div></td>
                       <td className="act-tonnage"><div className="v">{trade.usdcSize === null ? "—" : formatUsd(trade.usdcSize)}</div></td>
-                      <td className="act-elapsed" title={trade.tradedAt} suppressHydrationWarning><div className="v">{elapsedFrom(trade.tradedAt)}</div></td>
+                      {/* Relative time is computed from Date.now(), so SSR ("49m") and first client
+                          paint ("50m") legitimately differ — suppressHydrationWarning must sit on the
+                          element that directly wraps the text (the inner div), not the td, or React
+                          still flags the nested text mismatch. */}
+                      <td className="act-elapsed" title={trade.tradedAt}><div className="v" suppressHydrationWarning>{elapsedFrom(trade.tradedAt)}</div></td>
                     </tr>
                   );
                 })
