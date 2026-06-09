@@ -15,7 +15,8 @@ import type { NextRequest } from "next/server";
 const ACCESS_COOKIE = "eb_access";
 
 // Reachable without the cookie. The waitlist API must stay open so the form works for the public.
-const PUBLIC_PATHS = ["/early-access", "/api/waitlist"];
+// (/api/health is a temporary diagnostic — remove it from here and delete the route once env is fixed.)
+const PUBLIC_PATHS = ["/early-access", "/api/waitlist", "/api/health"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
