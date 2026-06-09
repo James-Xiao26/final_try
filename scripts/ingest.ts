@@ -336,6 +336,42 @@ interface Database {
         };
         Relationships: [];
       };
+      wallet_closed_positions: {
+        Row: {
+          id: number;
+          address: string;
+          condition_id: string | null;
+          outcome_index: number | null;
+          market: string | null;
+          avg_price: number | null;
+          realized_pnl: number | null;
+          size: number | null;
+          close_time: string | null;
+          ingested_at: string;
+        };
+        Insert: {
+          address: string;
+          condition_id?: string | null;
+          outcome_index?: number | null;
+          market?: string | null;
+          avg_price?: number | null;
+          realized_pnl?: number | null;
+          size?: number | null;
+          close_time?: string | null;
+          ingested_at?: string;
+        };
+        Update: {
+          condition_id?: string | null;
+          outcome_index?: number | null;
+          market?: string | null;
+          avg_price?: number | null;
+          realized_pnl?: number | null;
+          size?: number | null;
+          close_time?: string | null;
+          ingested_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -359,6 +395,22 @@ interface ProcessResult {
   // (no extra API calls). Empty under the same gate as recentTrades.
   openPositions: OpenPositionRecord[];
   fills: ProfileFill[];
+  // Closed positions (sold/redeemed) for the feed's basis cache: avg entry + realized PnL keyed by
+  // condition/outcome, from the /closed-positions payload already fetched. Lets the feed show a
+  // sold-out position's P/L when its buys predate the 24h window. Empty under the same gate.
+  closedPositions: ClosedPositionRecord[];
+}
+
+// A closed-position basis record bound to its wallet, ready to persist into wallet_closed_positions.
+interface ClosedPositionRecord {
+  address: string;
+  conditionId: string;
+  outcomeIndex: number;
+  market: string;
+  avgPrice: number;
+  realizedPnl: number;
+  size: number;
+  closeTime: string;
 }
 
 // Supabase throws PostgrestError-shaped plain objects ({ message, code, details, hint }), not
@@ -461,7 +513,7 @@ async function processWallet(
   }
 
   if (bot) {
-    return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})`, recentTrades: [], openPositions: [], fills: [] };
+    return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})`, recentTrades: [], openPositions: [], fills: [], closedPositions: [] };
   }
 
   // Merge actually-closed positions with resolved-but-unredeemed ones. /closed-positions holds only
@@ -489,6 +541,19 @@ async function processWallet(
   // history from activity. Same eligibility gate as recentTrades.
   const openPositions = insufficient ? [] : openPositionRecords(currentPositions, normalized);
   const fills = insufficient ? [] : profileFillsFromActivity(activity, normalized, CONFIG.PROFILE_TRADES_LIMIT);
+  // Closed-position basis for the feed cache, from the /closed-positions payload already in hand.
+  const closedPositionRecords: ClosedPositionRecord[] = insufficient
+    ? []
+    : closedPositions.map((position) => ({
+        address: normalized,
+        conditionId: position.conditionId,
+        outcomeIndex: position.outcomeIndex,
+        market: position.market,
+        avgPrice: position.avgPrice,
+        realizedPnl: position.realizedPnl,
+        size: position.size,
+        closeTime: position.closeTime
+      }));
 
   return {
     address: normalized,
@@ -498,7 +563,8 @@ async function processWallet(
     summary: `${closedPositions.length} closed + ${resolvedPositions.length} resolved positions`,
     recentTrades,
     openPositions,
-    fills
+    fills,
+    closedPositions: closedPositionRecords
   };
 }
 
@@ -765,6 +831,54 @@ async function replaceWalletPositions(supabase: SupabaseClient, positions: OpenP
   return positions.length;
 }
 
+function toClosedPositionRow(record: ClosedPositionRecord): Database["public"]["Tables"]["wallet_closed_positions"]["Insert"] {
+  return {
+    address: record.address,
+    condition_id: record.conditionId,
+    outcome_index: record.outcomeIndex,
+    market: record.market,
+    avg_price: record.avgPrice,
+    realized_pnl: record.realizedPnl,
+    size: record.size,
+    close_time: record.closeTime
+  };
+}
+
+// Distinct addresses currently in leaderboard_cache (across horizons). The feed only shows these
+// wallets, so the closed-position basis cache is scoped to them to keep the table small.
+async function getLeaderboardAddresses(supabase: SupabaseClient): Promise<Set<string>> {
+  const { data, error } = await supabase.from("leaderboard_cache").select("address");
+  if (error) {
+    throw error;
+  }
+  return new Set((data ?? []).map((row) => row.address));
+}
+
+// Full-ingest-only global wipe-and-replace of the closed-position basis cache, scoped to leaderboard
+// wallets. Like wallet_positions it needs the restricted-lane /closed-positions data, so the feed job
+// never refreshes it (the daily ingest is the sole writer) — closed-position P/L can be up to ~24h
+// stale, the accepted trade-off documented in the migration.
+async function replaceWalletClosedPositions(
+  supabase: SupabaseClient,
+  records: ClosedPositionRecord[],
+  boardAddresses: Set<string>
+): Promise<number> {
+  const { error: deleteError } = await supabase.from("wallet_closed_positions").delete().gte("id", 0);
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  const scoped = records.filter((record) => boardAddresses.has(record.address));
+  for (let offset = 0; offset < scoped.length; offset += CONFIG.RECENT_TRADES_INSERT_CHUNK) {
+    const rows = scoped.slice(offset, offset + CONFIG.RECENT_TRADES_INSERT_CHUNK).map(toClosedPositionRow);
+    const { error } = await supabase.from("wallet_closed_positions").insert(rows);
+    if (error) {
+      throw error;
+    }
+  }
+  return scoped.length;
+}
+
 // Lightweight, decoupled refresh of the activity feed for wallets currently on the leaderboard.
 // Unlike a full ingest it touches neither closed-positions nor scoring: it reads the leaderboard
 // address set from leaderboard_cache, re-pulls /activity (general rate lane) for just those wallets,
@@ -883,6 +997,7 @@ async function main(): Promise<void> {
   const collectedTrades: RecentTrade[] = [];
   const collectedFills: ProfileFill[] = [];
   const collectedPositions: OpenPositionRecord[] = [];
+  const collectedClosed: ClosedPositionRecord[] = [];
   let processed = 0;
   let bots = 0;
   let insufficient = 0;
@@ -916,6 +1031,7 @@ async function main(): Promise<void> {
         collectedTrades.push(...result.recentTrades);
         collectedFills.push(...result.fills);
         collectedPositions.push(...result.openPositions);
+        collectedClosed.push(...result.closedPositions);
         summary = result.summary;
       } catch (reason) {
         summary = `FAILED: ${describeError(reason)}`;
@@ -939,12 +1055,16 @@ async function main(): Promise<void> {
   // during processing. Global wipe-and-replace, same as the feed.
   const walletTradeCount = await replaceWalletTrades(supabase, collectedFills);
   const walletPositionCount = await replaceWalletPositions(supabase, collectedPositions);
+  // Closed-position basis cache, scoped to the wallets just written into leaderboard_cache (the only
+  // wallets the feed shows). Sourced from the /closed-positions payload already fetched — no new API.
+  const boardAddresses = await getLeaderboardAddresses(supabase);
+  const closedPositionCount = await replaceWalletClosedPositions(supabase, collectedClosed, boardAddresses);
 
   // Markets are global and independent of wallet processing; refresh them in the same run.
   const marketCount = await ingestMarkets(supabase, polymarket);
 
   const elapsedSeconds = (Date.now() - startedAt) / CONFIG.MS_PER_SECOND;
-  console.log(`Processed ${processed} wallets; excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades, ${walletTradeCount} profile fills, ${walletPositionCount} open positions; elapsed=${elapsedSeconds.toFixed(1)}s`);
+  console.log(`Processed ${processed} wallets; excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades, ${walletTradeCount} profile fills, ${walletPositionCount} open positions, ${closedPositionCount} closed positions; elapsed=${elapsedSeconds.toFixed(1)}s`);
   console.log(`Bot breakdown: trade_rate=${botBreakdown.trade_rate}, dust_trades=${botBreakdown.dust_trades}, simultaneous_markets=${botBreakdown.simultaneous_markets}`);
 
   // Diagnostic: the restricted lane (closed-positions) is the dominant cost. Its theoretical floor

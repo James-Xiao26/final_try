@@ -4,7 +4,7 @@ import { getRecentLeaderboardTrades } from "@/lib/supabase";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const { trades, traderCount } = await getRecentLeaderboardTrades();
+  const { positions, traderCount } = await getRecentLeaderboardTrades();
 
   return (
     <main className="page">
@@ -18,7 +18,7 @@ export default async function HomePage() {
         <span className="act-live"><span className="dot" /> Live · Last 24h</span>
       </div>
 
-      <RecentTradesFeed initialTrades={trades} initialTraderCount={traderCount} />
+      <RecentTradesFeed initialPositions={positions} initialTraderCount={traderCount} />
     </main>
   );
 }

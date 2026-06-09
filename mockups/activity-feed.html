@@ -137,8 +137,8 @@
     .act-log-shell::after { bottom: 1px; background: linear-gradient(0deg, rgba(8,36,52,0.95), transparent); }
     .act-log-shell.at-top::before { opacity: 0; }
     .act-log-shell.at-bottom::after { opacity: 0; }
-    /* sized to show ~7 contact rows under the sticky header before scrolling */
-    .act-log { max-height: 560px; overflow-y: auto; overflow-x: auto; overscroll-behavior: contain;
+    /* sized to show 7 full contact rows under the sticky header, with a sliver of the 8th as a scroll cue */
+    .act-log { max-height: 700px; overflow-y: auto; overflow-x: auto; overscroll-behavior: contain;
       padding: 4px 8px 8px; border-radius: 6px; transition: box-shadow .2s, border-color .2s; }
     .act-log.hovered { box-shadow: inset 0 0 0 1px var(--line-2), 0 0 26px rgba(54,236,208,0.10); }
 
@@ -190,6 +190,10 @@
       padding: 2px 7px; border-radius: 2px; white-space: nowrap; }
     .pl.up { color: var(--green); border: 1px solid rgba(54,236,208,0.3); background: rgba(54,236,208,0.06); }
     .pl.dn { color: var(--red); border: 1px solid rgba(255,122,89,0.32); background: rgba(255,122,89,0.06); }
+    .pl.na { color: var(--muted); border: 1px solid var(--line); background: rgba(108,151,163,0.06); }
+    .srcchip { font-family: var(--font-plex-mono); font-weight: 500; font-size: 8.5px; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--bio-d); border: 1px dashed rgba(31,169,148,0.5); border-radius: 2px;
+      padding: 1px 4px; margin-left: 2px; vertical-align: middle; cursor: help; }
 
     .c-time { text-align: right; white-space: nowrap; }
     .c-time .stack { align-items: flex-end; }
@@ -373,6 +377,19 @@
         fills: [ { side: "BUY", size: 640, price: 0.83, at: mins(9) } ],
       },
       {
+        handle: "riptide_capital", rank: 9, apex: false,
+        market: "Will Ethereum flip $5k before August?", outcome: "YES",
+        mark: 0.60,
+        // CLOSED, opened before the 24h window: the feed sees only the sells. We can't reconstruct the
+        // basis from fills — but `cachedAvgEntry` (this wallet's avg entry, persisted from Polymarket's
+        // position data) lets us still show true realized P/L. Set to null to see the P/L-n/a fallback.
+        cachedAvgEntry: 0.48,
+        fills: [
+          { side: "SELL", size: 2500, price: 0.62, at: mins(7) },
+          { side: "SELL", size: 1500, price: 0.59, at: mins(33) },
+        ],
+      },
+      {
         handle: "abyssal_alpha", rank: 1, apex: true,
         market: "Government shutdown before November 1?", outcome: "YES",
         mark: 0.90,
@@ -455,7 +472,7 @@
     // ---------------- position math: derive aggregates + running avg ----------------
     // Walks fills oldest->newest. BUY raises size at weighted avg; SELL reduces
     // size (avg cost basis unchanged). Returns the live state + a per-fill running avg.
-    function derive(fills, mark) {
+    function derive(fills, mark, cachedAvgEntry) {
       const chron = [...fills].reverse(); // oldest first
       let size = 0, costBasis = 0, bought = 0, buyCost = 0, sold = 0, proceeds = 0;
       const runningAvg = [];
@@ -464,24 +481,35 @@
         else { const avg = size > 0 ? costBasis / size : 0; costBasis -= f.size * avg; size -= f.size; sold += f.size; proceeds += f.size * f.price; }
         runningAvg.push(size > 0 ? costBasis / size : f.price);
       }
-      const open = size > 0;
+      const EPS = 1; // shares; treat |remaining| < 1 share as fully closed
+      const open = size > EPS;
+      // We can compute the basis from fills only when the BUY fills are in the window. When sells
+      // exceed the buys we've seen, the position was opened before the feed window. In that case we
+      // fall back to `cachedAvgEntry` — the wallet's avg entry persisted from Polymarket's position
+      // data (see the schema/ingest spec) — so the basis is still known, just sourced differently.
+      const basisFromFills = bought > 0 && bought >= sold - EPS;
+      const hasCache = typeof cachedAvgEntry === "number" && cachedAvgEntry > 0;
+      const basisFromCache = !open && !basisFromFills && hasCache;
+      const basisKnown = basisFromFills || basisFromCache;
       const avgEntry = open ? costBasis / size : 0;          // blended basis of shares still held
-      const avgBuy = bought > 0 ? buyCost / bought : 0;       // basis across every buy
+      const avgBuy = bought > 0 ? buyCost / bought : 0;       // basis across the buys we saw in-window
       const avgExit = sold > 0 ? proceeds / sold : null;      // blended exit on the sold shares
+      // the basis we settle realized P/L against: in-window buys if we have them, else the cache
+      const effBasis = open ? avgEntry : (basisFromFills ? avgBuy : (basisFromCache ? cachedAvgEntry : null));
       // unrealized P/L on the still-held shares, marked at the current price
       const curValue = open ? size * mark : 0;
       const unrealPct = open && avgEntry > 0 ? (mark - avgEntry) / avgEntry : 0;
-      // realized P/L for a fully-closed position: avg exit vs avg buy basis
-      const realizedPct = !open && avgExit !== null && avgBuy > 0 ? (avgExit - avgBuy) / avgBuy : 0;
+      // realized P/L for a fully-closed position: avg exit vs the basis (from fills or cache)
+      const realizedPct = !open && effBasis && avgExit !== null ? (avgExit - effBasis) / effBasis : 0;
       const runNewestFirst = [...runningAvg].reverse(); // align with newest-first `fills`
-      return { size, open, avgEntry, avgExit, bought, sold, mark, curValue, unrealPct, realizedPct, runNewestFirst };
+      return { size, open, basisKnown, basisFromCache, avgEntry, avgBuy, avgExit, effBasis, bought, sold, mark, curValue, unrealPct, realizedPct, runNewestFirst };
     }
 
     // ---------------- render ----------------
     const rowsEl = document.getElementById("rows");
     let frag = "";
     POSITIONS.forEach((p, i) => {
-      const d = derive(p.fills, p.mark);
+      const d = derive(p.fills, p.mark, p.cachedAvgEntry);
       const last = p.fills[0];
       const grouped = p.fills.length > 1;
       const name = p.handle ? `<span class="at">@</span>${p.handle}` : shortAddr(p.address);
@@ -500,16 +528,32 @@
       const buy = last.side === "BUY";
       const fillLead = `<span class="bearing ${buy ? "buy" : "sell"}"><span class="ar">${buy ? "▲" : "▼"}</span>${buy ? "BUY" : "SELL"} ${num.format(last.size)}</span>`;
 
-      // P/L vs current price: unrealized on the open stake, realized once fully sold
-      const plVal = d.open ? d.unrealPct : d.realizedPct;
-      const plDir = plVal >= 0 ? "up" : "dn";
-      const plPill = `<span class="pl ${plDir}">${pct(plVal)}</span>`;
-      const posLead = d.open
-        ? `${usd0.format(d.curValue)} ${plPill}`
-        : `closed ${plPill}`;
-      const posSub = d.open
-        ? `${num.format(d.size)} sh · mark ${cents(d.mark)}`
-        : `fully sold · exit ${cents(d.avgExit)}`;
+      // Three states drive the Avg Entry + Position cells:
+      //   open            → blended basis, current value @ mark, unrealized P/L %
+      //   closed (known)  → cost basis, "closed", realized P/L %
+      //   closed (unknown)→ basis opened before window, exit only, P/L n/a
+      let avgLead, avgSub, posLead, posSub;
+      if (d.open) {
+        const plDir = d.unrealPct >= 0 ? "up" : "dn";
+        avgLead = `${cents(d.avgEntry)} ${deltaHtml}`;
+        avgSub = grouped ? "blended basis" : "single fill";
+        posLead = `${usd0.format(d.curValue)} <span class="pl ${plDir}">${pct(d.unrealPct)}</span>`;
+        posSub = `${num.format(d.size)} sh · mark ${cents(d.mark)}`;
+      } else if (d.basisKnown) {
+        const plDir = d.realizedPct >= 0 ? "up" : "dn";
+        const cacheTag = d.basisFromCache
+          ? ` <span class="srcchip" title="Avg entry from the Polymarket position cache — this position's buys predate the 24h feed window">cache</span>`
+          : "";
+        avgLead = `${cents(d.effBasis)}${cacheTag}`;
+        avgSub = d.basisFromCache ? "cached basis" : "cost basis";
+        posLead = `closed <span class="pl ${plDir}">${pct(d.realizedPct)}</span>`;
+        posSub = `sold ${num.format(d.sold)} sh · exit ${cents(d.avgExit)}`;
+      } else {
+        avgLead = "—";
+        avgSub = "opened earlier";
+        posLead = `closed <span class="pl na">P/L n/a</span>`;
+        posSub = `sold ${num.format(d.sold)} sh · exit ${cents(d.avgExit)}`;
+      }
       const chev = grouped
         ? `<span class="chev">FILLS <svg viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`
         : `<span class="chev empty"></span>`;
@@ -529,8 +573,8 @@
           <span class="sub">@ ${cents(last.price)}</span>
         </div></td>
         <td class="c-avg"><div class="stack">
-          <span class="lead">${d.size > 0 ? cents(d.avgEntry) : "—"} ${deltaHtml}</span>
-          <span class="sub">${grouped ? "blended basis" : "single fill"}</span>
+          <span class="lead">${avgLead}</span>
+          <span class="sub">${avgSub}</span>
         </div></td>
         <td class="c-pos"><div class="stack">
           <span class="lead">${posLead}</span>

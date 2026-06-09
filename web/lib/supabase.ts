@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import type { Database, EquityPoint, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, WalletMetrics, WalletPosition, WalletProfile } from "./types";
 import { HORIZONS } from "./types";
 import { groupWalletTrades } from "./walletTrades";
+import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis } from "./recentTrades";
 
 type WalletRow = Database["public"]["Tables"]["wallets"]["Row"];
 type WalletStatsRow = Database["public"]["Tables"]["wallet_stats"]["Row"];
@@ -29,6 +30,16 @@ type WalletTradeRowDb = Database["public"]["Tables"]["wallet_trades"]["Row"];
 type WalletTradeSelectRow = Pick<
   WalletTradeRowDb,
   "condition_id" | "market" | "outcome_index" | "side" | "price" | "size" | "usdc_size" | "traded_at" | "transaction_hash"
+>;
+type WalletClosedPositionRowDb = Database["public"]["Tables"]["wallet_closed_positions"]["Row"];
+// The feed's basis lookups: open state from wallet_positions, closed basis from wallet_closed_positions.
+type FeedOpenPositionRow = Pick<
+  WalletPositionRowDb,
+  "address" | "condition_id" | "outcome_index" | "avg_price" | "cur_price" | "current_value" | "cash_pnl" | "size"
+>;
+type FeedClosedPositionRow = Pick<
+  WalletClosedPositionRowDb,
+  "address" | "condition_id" | "outcome_index" | "avg_price" | "realized_pnl" | "size"
 >;
 type MarketRowDb = Database["public"]["Tables"]["markets"]["Row"];
 type MarketSelectRow = Pick<
@@ -174,7 +185,7 @@ export async function getRecentLeaderboardTrades(
 
   if (error) {
     if (isMissingSchemaError(error)) {
-      return { trades: [], traderCount: 0 };
+      return { positions: [], traderCount: 0 };
     }
 
     throw error;
@@ -182,7 +193,7 @@ export async function getRecentLeaderboardTrades(
 
   const tradeRows = (data ?? []) as unknown as RecentTradeSelectRow[];
   if (tradeRows.length === 0) {
-    return { trades: [], traderCount: 0 };
+    return { positions: [], traderCount: 0 };
   }
 
   const addresses = [...new Set(tradeRows.map((row) => row.address))];
@@ -193,7 +204,7 @@ export async function getRecentLeaderboardTrades(
 
   if (cacheError) {
     if (isMissingSchemaError(cacheError)) {
-      return { trades: [], traderCount: 0 };
+      return { positions: [], traderCount: 0 };
     }
 
     throw cacheError;
@@ -225,7 +236,7 @@ export async function getRecentLeaderboardTrades(
 
     if (walletError) {
       if (isMissingSchemaError(walletError)) {
-        return { trades: [], traderCount: 0 };
+        return { positions: [], traderCount: 0 };
       }
 
       throw walletError;
@@ -252,7 +263,52 @@ export async function getRecentLeaderboardTrades(
     }));
 
   const traderCount = new Set(trades.map((trade) => trade.address)).size;
-  return { trades, traderCount };
+
+  // Basis lookups for the grouped feed: open state (wallet_positions) and closed basis
+  // (wallet_closed_positions) for the wallets that traded. Both are best-effort — a missing table
+  // (migration not yet applied) just degrades to fills-only grouping, never an empty feed.
+  const feedAddresses = [...new Set(trades.map((trade) => trade.address))];
+  const openByKey = new Map<string, OpenBasis>();
+  const closedByKey = new Map<string, ClosedBasis>();
+  if (feedAddresses.length > 0) {
+    const [openRes, closedRes] = await Promise.all([
+      supabase
+        .from("wallet_positions")
+        .select("address, condition_id, outcome_index, avg_price, cur_price, current_value, cash_pnl, size")
+        .in("address", feedAddresses),
+      supabase
+        .from("wallet_closed_positions")
+        .select("address, condition_id, outcome_index, avg_price, realized_pnl, size")
+        .in("address", feedAddresses)
+    ]);
+
+    if (openRes.error && !isMissingSchemaError(openRes.error)) {
+      throw openRes.error;
+    }
+    if (closedRes.error && !isMissingSchemaError(closedRes.error)) {
+      throw closedRes.error;
+    }
+
+    ((openRes.data ?? []) as unknown as FeedOpenPositionRow[]).forEach((row) => {
+      openByKey.set(positionKey(row.address, row.condition_id, row.outcome_index), {
+        avgEntry: row.avg_price,
+        curPrice: row.cur_price,
+        currentValue: row.current_value,
+        cashPnl: row.cash_pnl,
+        size: row.size
+      });
+    });
+    ((closedRes.data ?? []) as unknown as FeedClosedPositionRow[]).forEach((row) => {
+      closedByKey.set(positionKey(row.address, row.condition_id, row.outcome_index), {
+        avgEntry: row.avg_price,
+        realizedPnl: row.realized_pnl,
+        size: row.size
+      });
+    });
+  }
+
+  const positions = groupRecentTrades(trades, openByKey, closedByKey);
+  return { positions, traderCount };
 }
 
 const MARKET_SORT_COLUMNS: Record<MarketSort, keyof MarketSelectRow> = {

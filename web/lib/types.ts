@@ -128,8 +128,51 @@ export interface RecentTrade {
   tradedAt: string;
 }
 
+// One raw fill inside a grouped position's expandable history in the activity feed.
+export interface RecentFill {
+  side: string | null;
+  price: number | null;
+  size: number | null;
+  usdcSize: number | null;
+  tradedAt: string;
+}
+
+// A leaderboard wallet's recent activity in ONE market position (conditionId + outcomeIndex),
+// collapsed from the fills in the feed window: adds and partial sells fold into a single row instead
+// of one row per fill. The headline (lastSide/lastSize/lastPrice) is the most recent fill; the
+// aggregate (avgEntry, mark, value, P/L) prefers the authoritative position cache (wallet_positions
+// for open, wallet_closed_positions for closed) and falls back to the in-window fills. `basisSource`
+// records where avgEntry came from: "cache" (Polymarket position data), "fills" (reconstructed from
+// in-window buys), or "none" (opened before the window with no cache row → P/L unknown).
+export interface RecentTradePosition {
+  address: string;
+  handle: string | null;
+  skillScore: number | null;
+  rank: number | null;
+  conditionId: string | null;
+  market: string | null;
+  outcomeIndex: number | null;
+  // headline: the most recent fill in the window
+  lastSide: string | null;
+  lastPrice: number | null;
+  lastSize: number | null;
+  // aggregate position state
+  state: "open" | "closed";
+  basisSource: "cache" | "fills" | "none";
+  avgEntry: number | null;        // cost basis; null when unknown
+  mark: number | null;            // current outcome price (open positions); null otherwise
+  remainingSize: number;          // shares still held (open); 0 when closed
+  boughtSize: number;             // shares bought within the window
+  soldSize: number;               // shares sold within the window
+  positionValue: number | null;   // open: current value at mark; null when unknown
+  unrealizedPct: number | null;   // open positions, vs current price
+  realizedPct: number | null;     // closed positions with known basis
+  latestTradedAt: string;
+  fills: RecentFill[];            // newest-first, for the expandable ledger
+}
+
 export interface RecentTradesFeed {
-  trades: RecentTrade[];
+  positions: RecentTradePosition[];
   // Distinct leaderboard wallets that traded within the window.
   traderCount: number;
 }
@@ -456,6 +499,42 @@ export interface Database {
           usdc_size?: number | null;
           traded_at?: string;
           transaction_hash?: string | null;
+          ingested_at?: string;
+        };
+        Relationships: [];
+      };
+      wallet_closed_positions: {
+        Row: {
+          id: number;
+          address: string;
+          condition_id: string | null;
+          outcome_index: number | null;
+          market: string | null;
+          avg_price: number | null;
+          realized_pnl: number | null;
+          size: number | null;
+          close_time: string | null;
+          ingested_at: string;
+        };
+        Insert: {
+          address: string;
+          condition_id?: string | null;
+          outcome_index?: number | null;
+          market?: string | null;
+          avg_price?: number | null;
+          realized_pnl?: number | null;
+          size?: number | null;
+          close_time?: string | null;
+          ingested_at?: string;
+        };
+        Update: {
+          condition_id?: string | null;
+          outcome_index?: number | null;
+          market?: string | null;
+          avg_price?: number | null;
+          realized_pnl?: number | null;
+          size?: number | null;
+          close_time?: string | null;
           ingested_at?: string;
         };
         Relationships: [];
