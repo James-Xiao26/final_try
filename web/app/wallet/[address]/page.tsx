@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import WalletActivity from "@/components/WalletActivity";
 import WalletDossier from "@/components/WalletDossier";
 import WalletTelemetry from "@/components/WalletTelemetry";
 import { getWalletProfile } from "@/lib/supabase";
@@ -65,6 +66,8 @@ export default async function WalletPage({ params, searchParams }: WalletPagePro
         equityCurves={profile.equityCurves}
         initialHorizon={initialHorizon}
       />
+
+      <WalletActivity positions={profile.positions} tradeGroups={profile.tradeGroups} />
     </main>
   );
 }

@@ -69,8 +69,13 @@ export const CONFIG = {
   // shown on the home page. Reuses the /activity payload already fetched for bot detection, so it
   // adds no Polymarket API calls. Read-side freshness is bounded by ingest cadence.
   RECENT_TRADE_WINDOW_HOURS: 24,
-  // Chunk size for the recent_trades bulk insert (keeps each insert payload modest).
+  // Chunk size for the recent_trades bulk insert (keeps each insert payload modest). Reused by the
+  // wallet_trades / wallet_positions bulk inserts.
   RECENT_TRADES_INSERT_CHUNK: 500,
+  // Per-wallet raw fills kept for the wallet-profile trade history (wallet_trades). Sliced from the
+  // most recent /activity fills already fetched for bot detection, so it adds no API calls; the read
+  // layer collapses these into per-position groups (avg entry/exit) with the raw fills as a dropdown.
+  PROFILE_TRADES_LIMIT: 200,
   SEED_WALLET_COUNT: 5000,
   API_RETRIES: 5,
   RETRY_BASE_DELAY_MS: 1000,

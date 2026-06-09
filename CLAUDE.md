@@ -21,15 +21,18 @@ pnpm build        # next build (web)
 pnpm typecheck    # tsc --noEmit across BOTH workspaces (recursive)
 pnpm ingest       # run the ingestion pipeline (scripts/ingest.ts via tsx)
 
-pnpm --filter edgeboard-scripts test   # run the unit tests (from repo root)
+pnpm --filter edgeboard-scripts test   # run the scripts unit tests (from repo root)
+pnpm --filter edgeboard-web test       # run the web unit tests (pure lib/ logic)
 ```
 
-**Unit tests** live in the `scripts/` workspace and run on Node's built-in test runner via tsx (`node --import tsx --test "**/*.test.ts"`, wired up as the `test` script in `scripts/package.json` — there is no root-level `test` script, so run it with `pnpm --filter edgeboard-scripts test` or `pnpm test` from inside `scripts/`). No jest/vitest. Current coverage:
+**Unit tests** run on Node's built-in test runner via tsx (`node --import tsx --test`); no jest/vitest, and there is no root-level `test` script — run each workspace's with `pnpm --filter <workspace> test`. Most tests live in `scripts/` (glob `**/*.test.ts`). The `web/` workspace also has a `test` script (glob `lib/**/*.test.ts`) for pure, framework-free `lib/` logic (e.g. the read-time trade collapse); component/page tests are not set up. Current coverage:
 
 - `scripts/metrics.test.ts` — pure-function tests for scoring:
   - `computeMetrics` derives `pctReturn`, `winRate`, `avgEdgePerShare` (per-position mean forecasting edge), `pctEdge`, `nResolved`, `nTrades`, and volume; excludes positions older than the horizon; and handles an empty position set without dividing by zero.
   - `computeSkillScore` returns `null` for ineligible wallets (below `MIN_TRADES`, below `MIN_VOLUME_USD`, sub-cent longshot trader, or `outlierFlag` set), then scores the Bayesian-shrunk per-share edge: `shrunk = avgEdgePerShare·nResolved/(nResolved+EDGE_SHRINKAGE_K)`; zero/negative edge → 0, and any positive shrunk edge maps into `[SCORE_FLOOR, SCORE_MAX]` via `score = clamp(SCORE_FLOOR, SCORE_MAX, SCORE_FLOOR + (SCORE_MAX−SCORE_FLOOR)·shrunk/EDGE_FOR_TEN)` (a hard floor at `SCORE_FLOOR` for any proven edge). Expected scores are asserted as exact constants, so changing `EDGE_SHRINKAGE_K`/`EDGE_FOR_TEN`/`SCORE_FLOOR` in `config.ts` requires updating these.
 - `scripts/botDetection.test.ts` — tests for the bot heuristics.
+- `scripts/walletDetail.test.ts` — `profileFillsFromActivity` (last-N raw fills, newest-first) and `openPositionRecords` (open-only holdings, endDate normalization) for the wallet-profile detail.
+- `web/lib/walletTrades.test.ts` — `groupWalletTrades`, the read-time collapse of raw fills into per-position groups (volume-weighted avg entry/exit, null exit when still held).
 
 "Verifying a change" now means `pnpm typecheck`, `pnpm build`, and the unit tests all pass — and for the full pipeline, running `pnpm ingest` against a real Supabase + the live Polymarket API.
 

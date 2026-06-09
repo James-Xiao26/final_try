@@ -1,8 +1,9 @@
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import type { Database, EquityPoint, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, WalletMetrics, WalletProfile } from "./types";
+import type { Database, EquityPoint, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, WalletMetrics, WalletPosition, WalletProfile } from "./types";
 import { HORIZONS } from "./types";
+import { groupWalletTrades } from "./walletTrades";
 
 type WalletRow = Database["public"]["Tables"]["wallets"]["Row"];
 type WalletStatsRow = Database["public"]["Tables"]["wallet_stats"]["Row"];
@@ -19,6 +20,16 @@ type RecentTradeSelectRow = Pick<
   "address" | "condition_id" | "market" | "outcome_index" | "side" | "price" | "size" | "usdc_size" | "traded_at"
 >;
 type SkillSelectRow = Pick<LeaderboardCacheRow, "address" | "skill_score" | "rank">;
+type WalletPositionRowDb = Database["public"]["Tables"]["wallet_positions"]["Row"];
+type WalletPositionSelectRow = Pick<
+  WalletPositionRowDb,
+  "condition_id" | "asset" | "market" | "outcome_index" | "size" | "avg_price" | "cur_price" | "initial_value" | "current_value" | "cash_pnl" | "end_date"
+>;
+type WalletTradeRowDb = Database["public"]["Tables"]["wallet_trades"]["Row"];
+type WalletTradeSelectRow = Pick<
+  WalletTradeRowDb,
+  "condition_id" | "market" | "outcome_index" | "side" | "price" | "size" | "usdc_size" | "traded_at" | "transaction_hash"
+>;
 type MarketRowDb = Database["public"]["Tables"]["markets"]["Row"];
 type MarketSelectRow = Pick<
   MarketRowDb,
@@ -321,6 +332,23 @@ function emptyCurveMap(): Record<HorizonDays, EquityPoint[]> {
   };
 }
 
+function mapWalletPosition(row: WalletPositionSelectRow): WalletPosition {
+  return {
+    conditionId: row.condition_id,
+    asset: row.asset,
+    market: row.market,
+    outcomeIndex: row.outcome_index,
+    size: toNumber(row.size),
+    avgPrice: toNumber(row.avg_price),
+    curPrice: toNumber(row.cur_price),
+    initialValue: toNumber(row.initial_value),
+    currentValue: toNumber(row.current_value),
+    cashPnl: toNumber(row.cash_pnl),
+    endDate: row.end_date
+  };
+}
+
+
 export async function getWalletProfile(address: string): Promise<WalletProfile | null> {
   const supabase = createSupabaseServerClient();
   const normalized = address.toLowerCase();
@@ -343,10 +371,18 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
   }
 
   const wallet = walletData as unknown as WalletProfileRow;
-  const [{ data: stats, error: statsError }, { data: curves, error: curvesError }, { data: ranks, error: ranksError }] = await Promise.all([
+  const [
+    { data: stats, error: statsError },
+    { data: curves, error: curvesError },
+    { data: ranks, error: ranksError },
+    { data: positionsData, error: positionsError },
+    { data: tradesData, error: tradesError }
+  ] = await Promise.all([
     supabase.from("wallet_stats").select("*").eq("address", normalized).in("horizon_days", [...HORIZONS]).order("horizon_days"),
     supabase.from("equity_curve").select("horizon_days, ts, cumulative_pnl").eq("address", normalized).in("horizon_days", [...HORIZONS]).order("ts"),
-    supabase.from("leaderboard_cache").select("rank, horizon_days").eq("address", normalized).order("horizon_days")
+    supabase.from("leaderboard_cache").select("rank, horizon_days").eq("address", normalized).order("horizon_days"),
+    supabase.from("wallet_positions").select("condition_id, asset, market, outcome_index, size, avg_price, cur_price, initial_value, current_value, cash_pnl, end_date").eq("address", normalized),
+    supabase.from("wallet_trades").select("condition_id, market, outcome_index, side, price, size, usdc_size, traded_at, transaction_hash").eq("address", normalized).order("traded_at", { ascending: false })
   ]);
 
   if (statsError) {
@@ -369,6 +405,14 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
     }
 
     throw ranksError;
+  }
+  // The detail tables (migration 002) are optional: if not yet applied, degrade to empty lists rather
+  // than blanking the whole profile. Other errors still throw.
+  if (positionsError && !isMissingSchemaError(positionsError)) {
+    throw positionsError;
+  }
+  if (tradesError && !isMissingSchemaError(tradesError)) {
+    throw tradesError;
   }
 
   const equityCurves = emptyCurveMap();
@@ -394,6 +438,8 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
     badges: ((ranks ?? []) as unknown as RankSelectRow[]).map((rank) => ({
       label: `Top ${rank.rank} - ${rank.horizon_days}D`,
       horizonDays: rank.horizon_days
-    }))
+    })),
+    positions: ((positionsData ?? []) as unknown as WalletPositionSelectRow[]).map(mapWalletPosition),
+    tradeGroups: groupWalletTrades((tradesData ?? []) as unknown as WalletTradeSelectRow[])
   };
 }

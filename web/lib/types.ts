@@ -29,6 +29,50 @@ export interface EquityPoint {
   cumulativePnl: number;
 }
 
+// One current open holding on a wallet profile (genuinely-open positions, redeemable === false).
+// avgPrice is the entry cost basis; curPrice is the current mark; unrealized P/L = currentValue −
+// initialValue.
+export interface WalletPosition {
+  conditionId: string | null;
+  asset: string;
+  market: string | null;
+  outcomeIndex: number | null;
+  size: number;
+  avgPrice: number;
+  curPrice: number;
+  initialValue: number;
+  currentValue: number;
+  cashPnl: number;
+  endDate: string | null;
+}
+
+// One raw fill within a trade group's dropdown.
+export interface WalletFill {
+  side: string | null;
+  price: number | null;
+  size: number | null;
+  usdcSize: number | null;
+  tradedAt: string;
+  transactionHash: string | null;
+}
+
+// Raw fills collapsed per market position (conditionId + outcomeIndex) for the wallet-profile trade
+// history. avgEntryPrice is the volume-weighted price of BUY fills; avgExitPrice that of SELL fills
+// (null when the position has no sells — still held / held to resolution). `fills` are the raw fills
+// (newest first) for the expandable dropdown.
+export interface WalletTradeGroup {
+  conditionId: string | null;
+  market: string | null;
+  outcomeIndex: number | null;
+  avgEntryPrice: number | null;
+  avgExitPrice: number | null;
+  totalBoughtSize: number;
+  totalSoldSize: number;
+  totalUsdc: number;
+  latestTradedAt: string;
+  fills: WalletFill[];
+}
+
 export interface WalletProfile {
   address: string;
   handle: string | null;
@@ -39,6 +83,8 @@ export interface WalletProfile {
   equityCurve: EquityPoint[];
   equityCurves: Record<HorizonDays, EquityPoint[]>;
   badges: { label: string; horizonDays: number }[];
+  positions: WalletPosition[];
+  tradeGroups: WalletTradeGroup[];
 }
 
 // Sortable columns on the Markets page. "change" maps to the leading outcome's 24h price change.
@@ -320,6 +366,96 @@ export interface Database {
           size?: number | null;
           usdc_size?: number | null;
           traded_at?: string;
+          ingested_at?: string;
+        };
+        Relationships: [];
+      };
+      wallet_positions: {
+        Row: {
+          id: number;
+          address: string;
+          condition_id: string | null;
+          asset: string;
+          market: string | null;
+          outcome_index: number | null;
+          size: number | null;
+          avg_price: number | null;
+          cur_price: number | null;
+          initial_value: number | null;
+          current_value: number | null;
+          cash_pnl: number | null;
+          end_date: string | null;
+          ingested_at: string;
+        };
+        Insert: {
+          address: string;
+          condition_id?: string | null;
+          asset: string;
+          market?: string | null;
+          outcome_index?: number | null;
+          size?: number | null;
+          avg_price?: number | null;
+          cur_price?: number | null;
+          initial_value?: number | null;
+          current_value?: number | null;
+          cash_pnl?: number | null;
+          end_date?: string | null;
+          ingested_at?: string;
+        };
+        Update: {
+          condition_id?: string | null;
+          asset?: string;
+          market?: string | null;
+          outcome_index?: number | null;
+          size?: number | null;
+          avg_price?: number | null;
+          cur_price?: number | null;
+          initial_value?: number | null;
+          current_value?: number | null;
+          cash_pnl?: number | null;
+          end_date?: string | null;
+          ingested_at?: string;
+        };
+        Relationships: [];
+      };
+      wallet_trades: {
+        Row: {
+          id: number;
+          address: string;
+          condition_id: string | null;
+          market: string | null;
+          outcome_index: number | null;
+          side: string | null;
+          price: number | null;
+          size: number | null;
+          usdc_size: number | null;
+          traded_at: string;
+          transaction_hash: string | null;
+          ingested_at: string;
+        };
+        Insert: {
+          address: string;
+          condition_id?: string | null;
+          market?: string | null;
+          outcome_index?: number | null;
+          side?: string | null;
+          price?: number | null;
+          size?: number | null;
+          usdc_size?: number | null;
+          traded_at: string;
+          transaction_hash?: string | null;
+          ingested_at?: string;
+        };
+        Update: {
+          condition_id?: string | null;
+          market?: string | null;
+          outcome_index?: number | null;
+          side?: string | null;
+          price?: number | null;
+          size?: number | null;
+          usdc_size?: number | null;
+          traded_at?: string;
+          transaction_hash?: string | null;
           ingested_at?: string;
         };
         Relationships: [];

@@ -5,6 +5,7 @@ import { CONFIG } from "./config.js";
 import { computeMetrics, type WalletMetrics } from "./metrics.js";
 import { apiStats, discoverTopWallets, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet } from "./polymarket.js";
 import { recentTradesFromActivity, type RecentTrade } from "./recentTrades.js";
+import { openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -245,6 +246,96 @@ interface Database {
         };
         Relationships: [];
       };
+      wallet_positions: {
+        Row: {
+          id: number;
+          address: string;
+          condition_id: string | null;
+          asset: string;
+          market: string | null;
+          outcome_index: number | null;
+          size: number | null;
+          avg_price: number | null;
+          cur_price: number | null;
+          initial_value: number | null;
+          current_value: number | null;
+          cash_pnl: number | null;
+          end_date: string | null;
+          ingested_at: string;
+        };
+        Insert: {
+          address: string;
+          condition_id?: string | null;
+          asset: string;
+          market?: string | null;
+          outcome_index?: number | null;
+          size?: number | null;
+          avg_price?: number | null;
+          cur_price?: number | null;
+          initial_value?: number | null;
+          current_value?: number | null;
+          cash_pnl?: number | null;
+          end_date?: string | null;
+          ingested_at?: string;
+        };
+        Update: {
+          condition_id?: string | null;
+          asset?: string;
+          market?: string | null;
+          outcome_index?: number | null;
+          size?: number | null;
+          avg_price?: number | null;
+          cur_price?: number | null;
+          initial_value?: number | null;
+          current_value?: number | null;
+          cash_pnl?: number | null;
+          end_date?: string | null;
+          ingested_at?: string;
+        };
+        Relationships: [];
+      };
+      wallet_trades: {
+        Row: {
+          id: number;
+          address: string;
+          condition_id: string | null;
+          market: string | null;
+          outcome_index: number | null;
+          side: string | null;
+          price: number | null;
+          size: number | null;
+          usdc_size: number | null;
+          traded_at: string;
+          transaction_hash: string | null;
+          ingested_at: string;
+        };
+        Insert: {
+          address: string;
+          condition_id?: string | null;
+          market?: string | null;
+          outcome_index?: number | null;
+          side?: string | null;
+          price?: number | null;
+          size?: number | null;
+          usdc_size?: number | null;
+          traded_at: string;
+          transaction_hash?: string | null;
+          ingested_at?: string;
+        };
+        Update: {
+          condition_id?: string | null;
+          market?: string | null;
+          outcome_index?: number | null;
+          side?: string | null;
+          price?: number | null;
+          size?: number | null;
+          usdc_size?: number | null;
+          traded_at?: string;
+          transaction_hash?: string | null;
+          ingested_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -264,6 +355,10 @@ interface ProcessResult {
   // Recent fills for the landing-page feed, mapped from the activity already fetched for bot
   // detection. Empty for bots and for wallets that can never reach the leaderboard (no skill score).
   recentTrades: RecentTrade[];
+  // Wallet-profile detail, mapped from the same already-fetched /positions and /activity payloads
+  // (no extra API calls). Empty under the same gate as recentTrades.
+  openPositions: OpenPositionRecord[];
+  fills: ProfileFill[];
 }
 
 // Supabase throws PostgrestError-shaped plain objects ({ message, code, details, hint }), not
@@ -366,7 +461,7 @@ async function processWallet(
   }
 
   if (bot) {
-    return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})`, recentTrades: [] };
+    return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})`, recentTrades: [], openPositions: [], fills: [] };
   }
 
   // Merge actually-closed positions with resolved-but-unredeemed ones. /closed-positions holds only
@@ -390,6 +485,10 @@ async function processWallet(
   // skill score). The feed's read path further restricts to wallets currently in leaderboard_cache.
   const insufficient = metrics.every((metric) => metric.skillScore === null);
   const recentTrades = insufficient ? [] : recentTradesFromActivity(activity, normalized, recentTradeCutoffMs);
+  // Profile detail rides the payloads already in hand: open holdings from currentPositions, raw fill
+  // history from activity. Same eligibility gate as recentTrades.
+  const openPositions = insufficient ? [] : openPositionRecords(currentPositions, normalized);
+  const fills = insufficient ? [] : profileFillsFromActivity(activity, normalized, CONFIG.PROFILE_TRADES_LIMIT);
 
   return {
     address: normalized,
@@ -397,7 +496,9 @@ async function processWallet(
     botReason,
     insufficient,
     summary: `${closedPositions.length} closed + ${resolvedPositions.length} resolved positions`,
-    recentTrades
+    recentTrades,
+    openPositions,
+    fills
   };
 }
 
@@ -496,6 +597,14 @@ async function resetComputedTables(supabase: SupabaseClient): Promise<void> {
   if (tradesError) {
     throw tradesError;
   }
+  const { error: walletTradesError } = await supabase.from("wallet_trades").delete().gte("id", 0);
+  if (walletTradesError) {
+    throw walletTradesError;
+  }
+  const { error: walletPositionsError } = await supabase.from("wallet_positions").delete().gte("id", 0);
+  if (walletPositionsError) {
+    throw walletPositionsError;
+  }
 }
 
 // Global (not per-wallet) pass: pull the top events from the Gamma API for the Markets page, each
@@ -582,6 +691,80 @@ async function replaceRecentTrades(supabase: SupabaseClient, trades: RecentTrade
   return trades.length;
 }
 
+function toWalletTradeRow(fill: ProfileFill): Database["public"]["Tables"]["wallet_trades"]["Insert"] {
+  return {
+    address: fill.address,
+    condition_id: fill.conditionId,
+    market: fill.market,
+    outcome_index: fill.outcomeIndex,
+    side: fill.side,
+    price: fill.price,
+    size: fill.size,
+    usdc_size: fill.usdcSize,
+    traded_at: fill.tradedAt,
+    transaction_hash: fill.transactionHash
+  };
+}
+
+function toWalletPositionRow(position: OpenPositionRecord): Database["public"]["Tables"]["wallet_positions"]["Insert"] {
+  return {
+    address: position.address,
+    condition_id: position.conditionId,
+    asset: position.asset,
+    market: position.market,
+    outcome_index: position.outcomeIndex,
+    size: position.size,
+    avg_price: position.avgPrice,
+    cur_price: position.curPrice,
+    initial_value: position.initialValue,
+    current_value: position.currentValue,
+    cash_pnl: position.cashPnl,
+    end_date: position.endDate
+  };
+}
+
+async function insertWalletTrades(supabase: SupabaseClient, fills: ProfileFill[]): Promise<void> {
+  for (let offset = 0; offset < fills.length; offset += CONFIG.RECENT_TRADES_INSERT_CHUNK) {
+    const rows = fills.slice(offset, offset + CONFIG.RECENT_TRADES_INSERT_CHUNK).map(toWalletTradeRow);
+    const { error } = await supabase.from("wallet_trades").insert(rows);
+    if (error) {
+      throw error;
+    }
+  }
+}
+
+// Global wipe-and-replace of the wallet-profile trade history, mirroring replaceRecentTrades. The
+// full ingest writes fills for every eligible wallet; the feed job later scoped-replaces just the
+// leaderboard subset (see refreshLeaderboardFeed). `id >= 0` matches every row.
+async function replaceWalletTrades(supabase: SupabaseClient, fills: ProfileFill[]): Promise<number> {
+  const { error: deleteError } = await supabase.from("wallet_trades").delete().gte("id", 0);
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  await insertWalletTrades(supabase, fills);
+  return fills.length;
+}
+
+// Full-ingest-only global wipe-and-replace of current open positions. Unlike wallet_trades these are
+// not refreshed by the feed job (they need the restricted-lane /positions call), so the daily ingest
+// is the sole writer.
+async function replaceWalletPositions(supabase: SupabaseClient, positions: OpenPositionRecord[]): Promise<number> {
+  const { error: deleteError } = await supabase.from("wallet_positions").delete().gte("id", 0);
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  for (let offset = 0; offset < positions.length; offset += CONFIG.RECENT_TRADES_INSERT_CHUNK) {
+    const rows = positions.slice(offset, offset + CONFIG.RECENT_TRADES_INSERT_CHUNK).map(toWalletPositionRow);
+    const { error } = await supabase.from("wallet_positions").insert(rows);
+    if (error) {
+      throw error;
+    }
+  }
+  return positions.length;
+}
+
 // Lightweight, decoupled refresh of the activity feed for wallets currently on the leaderboard.
 // Unlike a full ingest it touches neither closed-positions nor scoring: it reads the leaderboard
 // address set from leaderboard_cache, re-pulls /activity (general rate lane) for just those wallets,
@@ -590,7 +773,7 @@ async function replaceRecentTrades(supabase: SupabaseClient, trades: RecentTrade
 async function refreshLeaderboardFeed(
   supabase: SupabaseClient,
   client: PolymarketClient
-): Promise<{ wallets: number; trades: number }> {
+): Promise<{ wallets: number; trades: number; walletTrades: number }> {
   const cutoffMs = Date.now() - CONFIG.RECENT_TRADE_WINDOW_HOURS * 60 * 60 * CONFIG.MS_PER_SECOND;
 
   const { data, error } = await supabase.from("leaderboard_cache").select("address");
@@ -599,12 +782,15 @@ async function refreshLeaderboardFeed(
   }
   const addresses = [...new Set((data ?? []).map((row) => row.address))];
   if (addresses.length === 0) {
-    return { wallets: 0, trades: 0 };
+    return { wallets: 0, trades: 0, walletTrades: 0 };
   }
 
   // Worker pool over the (small) leaderboard set; /activity rides the general lane, so this is a few
-  // seconds of gating even for the full set.
+  // seconds of gating even for the full set. The single /activity pull feeds both the landing feed
+  // (collapsed, 24h-windowed) and the wallet-profile trade history (raw fills, last N) — no extra
+  // API calls for the second.
   const collected: RecentTrade[] = [];
+  const collectedFills: ProfileFill[] = [];
   let cursor = 0;
   const worker = async (): Promise<void> => {
     while (cursor < addresses.length) {
@@ -617,6 +803,7 @@ async function refreshLeaderboardFeed(
         const activity = await client.getActivity(address);
         // pushing between awaits can't interleave mid-operation, so concurrent workers are safe here.
         collected.push(...recentTradesFromActivity(activity, address, cutoffMs));
+        collectedFills.push(...profileFillsFromActivity(activity, address, CONFIG.PROFILE_TRADES_LIMIT));
       } catch (reason) {
         console.warn(`Feed refresh failed for ${address}: ${describeError(reason)}`);
       }
@@ -626,19 +813,25 @@ async function refreshLeaderboardFeed(
     Array.from({ length: Math.min(CONFIG.WALLET_CONCURRENCY, addresses.length) }, () => worker())
   );
 
-  // Scoped replace: delete only these addresses' rows, then insert the fresh fills. Unlike the global
+  // Scoped replace: delete only these addresses' rows, then insert the fresh data. Unlike the global
   // wipe, a concurrent read never sees the whole feed momentarily empty. Chunk the delete filter so
-  // the `.in(...)` address list can't overflow the request URL at scale.
+  // the `.in(...)` address list can't overflow the request URL at scale. Both recent_trades and the
+  // profile trade history are scoped to the same leaderboard address set.
   for (let offset = 0; offset < addresses.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
     const slice = addresses.slice(offset, offset + CONFIG.LEADERBOARD_FILTER_CHUNK);
     const { error: deleteError } = await supabase.from("recent_trades").delete().in("address", slice);
     if (deleteError) {
       throw deleteError;
     }
+    const { error: tradesDeleteError } = await supabase.from("wallet_trades").delete().in("address", slice);
+    if (tradesDeleteError) {
+      throw tradesDeleteError;
+    }
   }
 
   await insertRecentTrades(supabase, collected);
-  return { wallets: addresses.length, trades: collected.length };
+  await insertWalletTrades(supabase, collectedFills);
+  return { wallets: addresses.length, trades: collected.length, walletTrades: collectedFills.length };
 }
 
 async function main(): Promise<void> {
@@ -669,9 +862,9 @@ async function main(): Promise<void> {
   // rewrite their recent_trades rows. Cheap (general lane only) and decoupled from scoring, so it can
   // run every few minutes between full ingests. Requires leaderboard_cache from a prior full ingest.
   if (process.argv.includes("--feed-only")) {
-    const { wallets, trades } = await refreshLeaderboardFeed(supabase, new PolymarketClient());
+    const { wallets, trades, walletTrades } = await refreshLeaderboardFeed(supabase, new PolymarketClient());
     console.log(
-      `Refreshed feed: ${trades} recent trades across ${wallets} leaderboard wallets; ` +
+      `Refreshed feed: ${trades} recent trades + ${walletTrades} profile fills across ${wallets} leaderboard wallets; ` +
         `elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`
     );
     return;
@@ -688,6 +881,8 @@ async function main(): Promise<void> {
   const wallets = await discoverTopWallets();
   const recentTradeCutoffMs = Date.now() - CONFIG.RECENT_TRADE_WINDOW_HOURS * 60 * 60 * CONFIG.MS_PER_SECOND;
   const collectedTrades: RecentTrade[] = [];
+  const collectedFills: ProfileFill[] = [];
+  const collectedPositions: OpenPositionRecord[] = [];
   let processed = 0;
   let bots = 0;
   let insufficient = 0;
@@ -719,6 +914,8 @@ async function main(): Promise<void> {
         // Single-threaded JS: pushing between awaits can't interleave mid-operation, so concurrent
         // workers appending here is safe.
         collectedTrades.push(...result.recentTrades);
+        collectedFills.push(...result.fills);
+        collectedPositions.push(...result.openPositions);
         summary = result.summary;
       } catch (reason) {
         summary = `FAILED: ${describeError(reason)}`;
@@ -738,11 +935,16 @@ async function main(): Promise<void> {
   // rebuild so the read-time membership join has fresh ranks to filter against.
   const recentTradeCount = await replaceRecentTrades(supabase, collectedTrades);
 
+  // Wallet-profile detail: open positions + raw fill history, both from payloads already fetched
+  // during processing. Global wipe-and-replace, same as the feed.
+  const walletTradeCount = await replaceWalletTrades(supabase, collectedFills);
+  const walletPositionCount = await replaceWalletPositions(supabase, collectedPositions);
+
   // Markets are global and independent of wallet processing; refresh them in the same run.
   const marketCount = await ingestMarkets(supabase, polymarket);
 
   const elapsedSeconds = (Date.now() - startedAt) / CONFIG.MS_PER_SECOND;
-  console.log(`Processed ${processed} wallets; excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades; elapsed=${elapsedSeconds.toFixed(1)}s`);
+  console.log(`Processed ${processed} wallets; excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades, ${walletTradeCount} profile fills, ${walletPositionCount} open positions; elapsed=${elapsedSeconds.toFixed(1)}s`);
   console.log(`Bot breakdown: trade_rate=${botBreakdown.trade_rate}, dust_trades=${botBreakdown.dust_trades}, simultaneous_markets=${botBreakdown.simultaneous_markets}`);
 
   // Diagnostic: the restricted lane (closed-positions) is the dominant cost. Its theoretical floor
