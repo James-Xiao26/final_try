@@ -50,7 +50,7 @@ export interface TradeActivity {
   transactionHash: string | null;
 }
 
-interface LeaderboardEntry {
+export interface LeaderboardEntry {
   rank: string;
   proxyWallet: string;
   userName: string | null;
@@ -251,7 +251,7 @@ async function fetchJson(
   throw lastError ?? new Error(`Polymarket request failed for ${url.toString()}`);
 }
 
-function mapClosedPosition(record: JsonRecord): ClosedPosition {
+export function mapClosedPosition(record: JsonRecord): ClosedPosition {
   const timestamp = record.closeTime ?? record.timestamp ?? record.resolutionTime ?? record.endDate ?? 0;
   return {
     proxyWallet: readString(record, ["proxyWallet", "user", "wallet"]).toLowerCase(),
@@ -269,7 +269,7 @@ function mapClosedPosition(record: JsonRecord): ClosedPosition {
   };
 }
 
-function mapPosition(record: JsonRecord): Position {
+export function mapPosition(record: JsonRecord): Position {
   return {
     proxyWallet: readString(record, ["proxyWallet", "user", "wallet"]).toLowerCase(),
     asset: readString(record, ["asset", "tokenId"]),
@@ -330,7 +330,7 @@ export function openUnrealizedPnl(positions: Position[]): number {
     .reduce((sum, position) => sum + (position.currentValue - position.initialValue), 0);
 }
 
-function mapActivity(record: JsonRecord): TradeActivity {
+export function mapActivity(record: JsonRecord): TradeActivity {
   const size = readNumber(record, ["size", "tokens"]);
   const price = readNumber(record, ["price", "avgPrice"]);
   return {
@@ -348,7 +348,7 @@ function mapActivity(record: JsonRecord): TradeActivity {
   };
 }
 
-function mapLeaderboard(record: JsonRecord): LeaderboardEntry {
+export function mapLeaderboard(record: JsonRecord): LeaderboardEntry {
   return {
     rank: readString(record, ["rank"]),
     proxyWallet: readString(record, ["proxyWallet", "user", "wallet"]).toLowerCase(),

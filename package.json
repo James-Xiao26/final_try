@@ -7,6 +7,7 @@
     "dev": "pnpm --filter edgeboard-web dev",
     "build": "pnpm --filter edgeboard-web build",
     "typecheck": "pnpm --recursive run typecheck",
+    "test": "pnpm --recursive run test",
     "ingest": "pnpm --filter edgeboard-scripts ingest",
     "ingest:feed": "pnpm --filter edgeboard-scripts ingest:feed",
     "ingest:markets": "pnpm --filter edgeboard-scripts ingest:markets",

@@ -24,12 +24,16 @@ pnpm ingest       # run the ingestion pipeline (scripts/ingest.ts via tsx)
 pnpm --filter edgeboard-scripts test   # run the unit tests (from repo root)
 ```
 
-**Unit tests** live in the `scripts/` workspace and run on Node's built-in test runner via tsx (`node --import tsx --test "**/*.test.ts"`, wired up as the `test` script in `scripts/package.json` — there is no root-level `test` script, so run it with `pnpm --filter edgeboard-scripts test` or `pnpm test` from inside `scripts/`). No jest/vitest. Current coverage:
+**Unit tests** run on Node's built-in test runner via tsx and live in both workspaces. The `scripts/` suite (`node --import tsx --test "**/*.test.ts"`) and the `web/` suite (`node --import tsx --test "lib/**/*.test.ts"`) are each wired up as the `test` script in their package.json. Run a single workspace with `pnpm --filter edgeboard-scripts test` / `pnpm --filter edgeboard-web test`, or both at once with `pnpm test` from the repo root (recursive). No jest/vitest. Current coverage:
 
 - `scripts/metrics.test.ts` — pure-function tests for scoring:
   - `computeMetrics` derives `pctReturn`, `winRate`, `avgEdgePerShare` (per-position mean forecasting edge), `pctEdge`, `nResolved`, `nTrades`, and volume; excludes positions older than the horizon; and handles an empty position set without dividing by zero.
   - `computeSkillScore` returns `null` for ineligible wallets (below `MIN_TRADES`, below `MIN_VOLUME_USD`, sub-cent longshot trader, or `outlierFlag` set), then scores the Bayesian-shrunk per-share edge: `shrunk = avgEdgePerShare·nResolved/(nResolved+EDGE_SHRINKAGE_K)`; zero/negative edge → 0, and any positive shrunk edge maps into `[SCORE_FLOOR, SCORE_MAX]` via `score = clamp(SCORE_FLOOR, SCORE_MAX, SCORE_FLOOR + (SCORE_MAX−SCORE_FLOOR)·shrunk/EDGE_FOR_TEN)` (a hard floor at `SCORE_FLOOR` for any proven edge). Expected scores are asserted as exact constants, so changing `EDGE_SHRINKAGE_K`/`EDGE_FOR_TEN`/`SCORE_FLOOR` in `config.ts` requires updating these.
 - `scripts/botDetection.test.ts` — tests for the bot heuristics.
+- `scripts/polymarket.test.ts` + `scripts/markets.test.ts` — `resolvedToClosed` and `mapEvent`.
+- `scripts/polymarketMappers.test.ts` — the defensive API mappers (`mapClosedPosition`, `mapPosition`, `mapActivity`, `mapLeaderboard`) and `openUnrealizedPnl`: canonical fields, fallback key lists, `outcomeFromResolvedPrice` epsilon boundaries, and safe defaults. Pins the field-name mapping so a Polymarket schema shift is caught here.
+- `scripts/ingest.test.ts` — `describeError`, `toRecentTradeRow`, and (against a hand-rolled fake Supabase/Polymarket client) `rebuildLeaderboardCache` (ranking, bot/loser filtering, `TOP_N` truncation, `.in()` chunking, empty handling, error propagation) and `processWallet` (bot short-circuit + eligible-wallet upserts). Note: `ingest.ts` only runs `main()` when it's the process entry point, so importing it for tests is safe.
+- `web/lib/waitlist.test.ts` — the waitlist route's extracted pure logic (`web/lib/waitlist.ts`): email validation, honeypot detection, `x-forwarded-for`/`x-real-ip` parsing, and the per-IP sliding-window rate limiter (limit boundary, per-key isolation, window expiry via an injectable clock).
 
 "Verifying a change" now means `pnpm typecheck`, `pnpm build`, and the unit tests all pass — and for the full pipeline, running `pnpm ingest` against a real Supabase + the live Polymarket API.
 
