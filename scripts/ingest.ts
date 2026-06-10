@@ -5,8 +5,9 @@ import { CONFIG } from "./config.js";
 import { computeMetrics, type WalletMetrics } from "./metrics.js";
 import { apiStats, discoverTopWallets, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet } from "./polymarket.js";
 import { recentTradesFromActivity, type RecentTrade } from "./recentTrades.js";
+import { buildMarkToMarketCurve, type CurvePosition } from "./equityCurve.js";
 import { dailyPointsFromHistory, planPriceFetches, type CacheState } from "./priceHistory.js";
-import { openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
+import { earliestEntryDates, openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -440,6 +441,9 @@ interface ProcessResult {
   // union of closed + current positions. Drives the market price-history cache (later scoped to the
   // leaderboard subset). Empty under the same eligibility gate.
   assets: string[];
+  // Earliest fill date ("YYYY-MM-DD") per outcome token, from /activity — each position's entry date
+  // for the mark-to-market equity curve (writeDailyEquityCurves). Empty under the same gate.
+  entryDates: Map<string, string>;
 }
 
 // A closed-position basis record bound to its wallet, ready to persist into wallet_closed_positions.
@@ -452,6 +456,9 @@ interface ClosedPositionRecord {
   realizedPnl: number;
   size: number;
   closeTime: string;
+  // Outcome-token id, for the mark-to-market equity curve (joins to market_price_history). Not
+  // persisted to wallet_closed_positions — used only in-memory by writeDailyEquityCurves.
+  asset: string;
 }
 
 // Supabase throws PostgrestError-shaped plain objects ({ message, code, details, hint }), not
@@ -554,7 +561,7 @@ async function processWallet(
   }
 
   if (bot) {
-    return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})`, recentTrades: [], openPositions: [], fills: [], closedPositions: [], assets: [] };
+    return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})`, recentTrades: [], openPositions: [], fills: [], closedPositions: [], assets: [], entryDates: new Map() };
   }
 
   // Merge actually-closed positions with resolved-but-unredeemed ones. /closed-positions holds only
@@ -593,7 +600,8 @@ async function processWallet(
         avgPrice: position.avgPrice,
         realizedPnl: position.realizedPnl,
         size: position.size,
-        closeTime: position.closeTime
+        closeTime: position.closeTime,
+        asset: position.asset
       }));
 
   // Distinct outcome-token ids held at any point in the window — union of closed (sold/redeemed)
@@ -602,6 +610,8 @@ async function processWallet(
   const assets = insufficient
     ? []
     : [...new Set([...closedPositions, ...currentPositions].map((p) => p.asset).filter((a) => a !== ""))];
+  // Per-token entry dates for the mark-to-market equity curve (writeDailyEquityCurves).
+  const entryDates = insufficient ? new Map<string, string>() : earliestEntryDates(activity);
 
   return {
     address: normalized,
@@ -613,7 +623,8 @@ async function processWallet(
     openPositions,
     fills,
     closedPositions: closedPositionRecords,
-    assets
+    assets,
+    entryDates
   };
 }
 
@@ -1036,6 +1047,108 @@ async function cacheMarketPriceHistory(
   return { fetched, upserted, deferred, pruned };
 }
 
+// Reads the daily price series a board wallet's tokens need from market_price_history, keyed by asset
+// and ascending by ts (forward-fill friendly).
+async function loadPricesForAssets(
+  supabase: SupabaseClient,
+  assets: string[]
+): Promise<Map<string, { ts: string; price: number }[]>> {
+  const byAsset = new Map<string, { ts: string; price: number }[]>();
+  for (let offset = 0; offset < assets.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
+    const slice = assets.slice(offset, offset + CONFIG.LEADERBOARD_FILTER_CHUNK);
+    const { data, error } = await supabase
+      .from("market_price_history")
+      .select("asset, ts, price")
+      .in("asset", slice)
+      .order("ts");
+    if (error) {
+      throw error;
+    }
+    for (const row of data ?? []) {
+      const series = byAsset.get(row.asset) ?? [];
+      series.push({ ts: row.ts, price: row.price });
+      byAsset.set(row.asset, series);
+    }
+  }
+  return byAsset;
+}
+
+// Builds and persists the daily mark-to-market equity curve for each leaderboard wallet, overwriting
+// the sparse realized curve written into equity_curve during processing. Marks each in-window
+// position (open + closed-in-window) at the cached daily price (buildMarkToMarketCurve). Reads the
+// price cache cacheMarketPriceHistory just wrote, so it must run after it. Non-board wallets keep
+// their realized curve.
+async function writeDailyEquityCurves(
+  supabase: SupabaseClient,
+  boardAddresses: Set<string>,
+  openPositions: OpenPositionRecord[],
+  closedPositions: ClosedPositionRecord[],
+  entryDatesByAddress: Map<string, Map<string, string>>
+): Promise<number> {
+  const msPerDay = CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
+  const todayUtc = new Date().toISOString().slice(0, "YYYY-MM-DD".length);
+  const todayMs = Date.parse(todayUtc);
+
+  // Group the collected positions by board address.
+  const openByAddress = new Map<string, OpenPositionRecord[]>();
+  const closedByAddress = new Map<string, ClosedPositionRecord[]>();
+  for (const position of openPositions) {
+    if (!boardAddresses.has(position.address)) continue;
+    const list = openByAddress.get(position.address) ?? [];
+    list.push(position);
+    openByAddress.set(position.address, list);
+  }
+  for (const position of closedPositions) {
+    if (!boardAddresses.has(position.address)) continue;
+    const list = closedByAddress.get(position.address) ?? [];
+    list.push(position);
+    closedByAddress.set(position.address, list);
+  }
+
+  const rows: Database["public"]["Tables"]["equity_curve"]["Insert"][] = [];
+  for (const address of boardAddresses) {
+    const open = openByAddress.get(address) ?? [];
+    const closed = closedByAddress.get(address) ?? [];
+    if (open.length === 0 && closed.length === 0) {
+      continue;
+    }
+    const entryByAsset = entryDatesByAddress.get(address) ?? new Map<string, string>();
+    const assets = [...new Set([...open.map((p) => p.asset), ...closed.map((p) => p.asset)].filter((a) => a !== ""))];
+    const pricesByAsset = await loadPricesForAssets(supabase, assets);
+
+    const curvePositions: CurvePosition[] = [
+      ...open.map((p) => ({ asset: p.asset, size: p.size, avgCost: p.avgPrice, realizedPnl: null, closeTs: null })),
+      ...closed.map((p) => ({ asset: p.asset, size: p.size, avgCost: p.avgPrice, realizedPnl: p.realizedPnl, closeTs: p.closeTime }))
+    ];
+
+    for (const horizon of CONFIG.HORIZONS) {
+      const windowStartUtc = new Date(todayMs - horizon * msPerDay).toISOString().slice(0, "YYYY-MM-DD".length);
+      const curve = buildMarkToMarketCurve({ positions: curvePositions, pricesByAsset, entryByAsset, windowStartUtc, todayUtc });
+      for (const point of curve) {
+        rows.push({ address, horizon_days: horizon, ts: point.ts, cumulative_pnl: point.cumulativePnl });
+      }
+    }
+  }
+
+  // Replace board wallets' equity_curve rows (delete-then-insert), leaving non-board wallets' realized
+  // curves untouched. Chunk the address delete filter so the request URL can't overflow.
+  const addresses = [...boardAddresses];
+  for (let offset = 0; offset < addresses.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
+    const slice = addresses.slice(offset, offset + CONFIG.LEADERBOARD_FILTER_CHUNK);
+    const { error } = await supabase.from("equity_curve").delete().in("address", slice);
+    if (error) {
+      throw error;
+    }
+  }
+  for (let offset = 0; offset < rows.length; offset += CONFIG.RECENT_TRADES_INSERT_CHUNK) {
+    const { error } = await supabase.from("equity_curve").insert(rows.slice(offset, offset + CONFIG.RECENT_TRADES_INSERT_CHUNK));
+    if (error) {
+      throw error;
+    }
+  }
+  return rows.length;
+}
+
 // Lightweight, decoupled refresh of the activity feed for wallets currently on the leaderboard.
 // Unlike a full ingest it touches neither closed-positions nor scoring: it reads the leaderboard
 // address set from leaderboard_cache, re-pulls /activity (general rate lane) for just those wallets,
@@ -1141,6 +1254,17 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Cadence gate for the FULL pass only (the partial modes above already returned). Heroku Scheduler
+  // can't express "every N hours", so we schedule the full ingest hourly and no-op unless the current
+  // UTC hour is a multiple of FULL_INGEST_EVERY_HOURS (e.g. 4 → runs at 00/04/08/12/16/20 UTC). The
+  // skipped hourly invocations exit here in ~seconds, costing negligible dyno time. Unset/0 disables
+  // the gate (every invocation runs the full pass).
+  const everyHours = Number(process.env.FULL_INGEST_EVERY_HOURS ?? 0);
+  if (Number.isFinite(everyHours) && everyHours > 0 && new Date().getUTCHours() % everyHours !== 0) {
+    console.log(`Skipping full ingest: UTC hour ${new Date().getUTCHours()} is not a multiple of ${everyHours}`);
+    return;
+  }
+
   // Opt-in fresh start: wipe computed tables before ingesting so stale rows from a prior run don't
   // linger. Placed after --rebuild-only so the two flags never combine to wipe-then-rebuild-empty.
   if (process.argv.includes("--reset")) {
@@ -1158,6 +1282,8 @@ async function main(): Promise<void> {
   // Per-wallet distinct token ids (CLOB assets), for the price-history cache. Scoped to the
   // leaderboard subset after the rebuild.
   const assetsByAddress = new Map<string, string[]>();
+  // Per-wallet per-token entry dates, for the mark-to-market equity curve (board-scoped later).
+  const entryDatesByAddress = new Map<string, Map<string, string>>();
   let processed = 0;
   let bots = 0;
   let insufficient = 0;
@@ -1195,6 +1321,9 @@ async function main(): Promise<void> {
         if (result.assets.length > 0) {
           assetsByAddress.set(result.address, result.assets);
         }
+        if (result.entryDates.size > 0) {
+          entryDatesByAddress.set(result.address, result.entryDates);
+        }
         summary = result.summary;
       } catch (reason) {
         summary = `FAILED: ${describeError(reason)}`;
@@ -1228,11 +1357,16 @@ async function main(): Promise<void> {
   // the wipe-and-replace tables above and the only step that hits the CLOB API.
   const priceHistory = await cacheMarketPriceHistory(supabase, polymarket, boardAddresses, assetsByAddress);
 
+  // Daily mark-to-market equity curve for board wallets: marks each in-window position at the cached
+  // daily price. Reads the price cache just written above, so it must run after it. Overwrites the
+  // sparse realized curve in equity_curve for board wallets.
+  const equityCurveCount = await writeDailyEquityCurves(supabase, boardAddresses, collectedPositions, collectedClosed, entryDatesByAddress);
+
   // Markets are global and independent of wallet processing; refresh them in the same run.
   const marketCount = await ingestMarkets(supabase, polymarket);
 
   const elapsedSeconds = (Date.now() - startedAt) / CONFIG.MS_PER_SECOND;
-  console.log(`Processed ${processed} wallets; excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades, ${walletTradeCount} profile fills, ${walletPositionCount} open positions, ${closedPositionCount} closed positions; price-history ${priceHistory.upserted} rows across ${priceHistory.fetched} markets (deferred=${priceHistory.deferred}, pruned=${priceHistory.pruned}); elapsed=${elapsedSeconds.toFixed(1)}s`);
+  console.log(`Processed ${processed} wallets; excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades, ${walletTradeCount} profile fills, ${walletPositionCount} open positions, ${closedPositionCount} closed positions; price-history ${priceHistory.upserted} rows across ${priceHistory.fetched} markets (deferred=${priceHistory.deferred}, pruned=${priceHistory.pruned}); equity-curve ${equityCurveCount} daily rows; elapsed=${elapsedSeconds.toFixed(1)}s`);
   console.log(`Bot breakdown: trade_rate=${botBreakdown.trade_rate}, dust_trades=${botBreakdown.dust_trades}, simultaneous_markets=${botBreakdown.simultaneous_markets}`);
 
   // Diagnostic: the restricted lane (closed-positions) is the dominant cost. Its theoretical floor

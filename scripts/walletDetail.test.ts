@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { openPositionRecords, profileFillsFromActivity } from "./walletDetail.js";
+import { earliestEntryDates, openPositionRecords, profileFillsFromActivity } from "./walletDetail.js";
 import type { Position, TradeActivity } from "./polymarket.js";
 
 function activity(partial: Partial<TradeActivity>): TradeActivity {
@@ -127,4 +127,20 @@ test("openPositionRecords normalizes endDate to ISO or null", () => {
   assert.equal(withDate.endDate, new Date(Date.parse("2026-05-10")).toISOString());
   assert.ok(withBad);
   assert.equal(withBad.endDate, null);
+});
+
+test("earliestEntryDates keeps the oldest fill date per asset (UTC)", () => {
+  const day = (iso: string): number => Math.floor(Date.parse(iso) / 1000);
+  const dates = earliestEntryDates([
+    activity({ asset: "A", timestamp: day("2026-06-09T10:00:00Z") }),
+    activity({ asset: "A", timestamp: day("2026-06-07T03:00:00Z") }), // older → wins for A
+    activity({ asset: "B", timestamp: day("2026-05-20T00:00:00Z") })
+  ]);
+  assert.equal(dates.get("A"), "2026-06-07");
+  assert.equal(dates.get("B"), "2026-05-20");
+});
+
+test("earliestEntryDates skips fills with no asset and handles empty input", () => {
+  assert.equal(earliestEntryDates([activity({ asset: "" })]).size, 0);
+  assert.equal(earliestEntryDates([]).size, 0);
 });

@@ -175,7 +175,7 @@ export default function WalletTelemetry({ metrics, equityCurves, initialHorizon 
           </div>
         </div>
         <DiveProfile points={points} horizon={horizon} />
-        <div className="dive-foot"><span>Depth = cumulative realized P/L</span><span>{horizon}-day trace</span></div>
+        <div className="dive-foot"><span>Depth = mark-to-market P/L</span><span>{horizon}-day trace</span></div>
       </section>
     </>
   );

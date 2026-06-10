@@ -72,6 +72,29 @@ export function profileFillsFromActivity(
     }));
 }
 
+// Earliest fill date (UTC "YYYY-MM-DD") per outcome token, from a wallet's already-fetched
+// /activity. Used as each position's entry date for the mark-to-market equity curve — a position is
+// only marked from the day it was first opened. /activity timestamps are unix seconds; it's capped at
+// ACTIVITY_LIMIT, so a token whose opening fill predates that window is simply absent (the curve
+// builder then clamps its entry to the window start).
+export function earliestEntryDates(activity: TradeActivity[]): Map<string, string> {
+  const earliest = new Map<string, number>();
+  for (const trade of activity) {
+    if (!trade.asset) {
+      continue;
+    }
+    const prior = earliest.get(trade.asset);
+    if (prior === undefined || trade.timestamp < prior) {
+      earliest.set(trade.asset, trade.timestamp);
+    }
+  }
+  const dates = new Map<string, string>();
+  for (const [asset, ts] of earliest) {
+    dates.set(asset, new Date(ts * CONFIG.MS_PER_SECOND).toISOString().slice(0, "YYYY-MM-DD".length));
+  }
+  return dates;
+}
+
 // The genuinely-open holdings (redeemable === false) from a wallet's /positions, shaped for storage.
 export function openPositionRecords(positions: Position[], address: string): OpenPositionRecord[] {
   const normalized = address.toLowerCase();
