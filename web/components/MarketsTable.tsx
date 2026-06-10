@@ -1,7 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCompactUsd, formatPercent } from "@/lib/format";
 import type { MarketRow, MarketSort } from "@/lib/types";
 
@@ -11,15 +11,15 @@ interface MarketsTableProps {
 }
 
 const SORT_COLUMNS: { label: string; column: MarketSort; title: string }[] = [
-  { label: "Depth", column: "liquidity", title: "Sort by liquidity" },
-  { label: "24h Current", column: "volume_24hr", title: "Sort by 24-hour volume" },
+  { label: "Liquidity", column: "liquidity", title: "Sort by liquidity" },
+  { label: "24h Volume", column: "volume_24hr", title: "Sort by 24-hour volume" },
   { label: "Volume", column: "volume", title: "Sort by total volume" },
   { label: "24h Drift", column: "change", title: "Leading outcome's price change over 24h. Click to sort." }
 ];
 
 const SORT_META: Record<MarketSort, string> = {
-  liquidity: "depth",
-  volume_24hr: "24h current",
+  liquidity: "liquidity",
+  volume_24hr: "24h volume",
   volume: "total volume",
   change: "24h drift"
 };
@@ -31,6 +31,9 @@ export default function MarketsTable({ initialRows, initialSort }: MarketsTableP
   const [rows, setRows] = useState(initialRows);
   const [loading, setLoading] = useState(false);
   const [fill, setFill] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const logRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setFill(true);
@@ -95,6 +98,20 @@ export default function MarketsTable({ initialRows, initialSort }: MarketsTableP
     return { liq, v24, top };
   }, [rows]);
 
+  // Edge fades: hide the top/bottom gradient at the scroll extremes (mirrors the Activity log).
+  useEffect(() => {
+    const log = logRef.current;
+    const shell = shellRef.current;
+    if (!log || !shell) return;
+    const update = (): void => {
+      shell.classList.toggle("at-top", log.scrollTop <= 2);
+      shell.classList.toggle("at-bottom", log.scrollTop + log.clientHeight >= log.scrollHeight - 2);
+    };
+    update();
+    log.addEventListener("scroll", update);
+    return () => log.removeEventListener("scroll", update);
+  }, [rows, loading]);
+
   return (
     <>
       <div className="mkt-readouts">
@@ -116,10 +133,22 @@ export default function MarketsTable({ initialRows, initialSort }: MarketsTableP
       <section className="mkt-grid">
         <div className="mkt-grid-head">
           <h2>Sounding <span className="g">Chart</span></h2>
-          <span className="meta">sorted by {SORT_META[sort]}</span>
+          <span className="log-head-right">
+            <span className="meta">sorted by {SORT_META[sort]}</span>
+            <span className={`af-scroll-state ${locked ? "locked" : ""}`}>
+              <span className="pip" />
+              {locked ? "Chart scroll · locked" : "Page scroll · hover chart to lock"}
+            </span>
+          </span>
         </div>
-        <div className="panel mkt-panel">
-          <table>
+        <div className="panel log-shell at-top" ref={shellRef}>
+          <div
+            className={`mkt-panel log-scroll ${locked ? "hovered" : ""}`}
+            ref={logRef}
+            onMouseEnter={() => setLocked(true)}
+            onMouseLeave={() => setLocked(false)}
+          >
+            <table>
             <thead>
               <tr>
                 <th><span className="lbl">Market</span></th>
@@ -184,6 +213,7 @@ export default function MarketsTable({ initialRows, initialSort }: MarketsTableP
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
     </>

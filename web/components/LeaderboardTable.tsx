@@ -2,7 +2,7 @@
 
 import { Copy } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import HorizonToggle from "@/components/HorizonToggle";
 import WalletSearch from "@/components/WalletSearch";
 import { formatEdge, formatNumber, formatPercent, shortenAddress } from "@/lib/format";
@@ -40,6 +40,9 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const logRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -120,6 +123,20 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rows, apex, normalized]
   );
+
+  // Edge fades: hide the top/bottom gradient at the scroll extremes (mirrors the Activity log).
+  useEffect(() => {
+    const log = logRef.current;
+    const shell = shellRef.current;
+    if (!log || !shell) return;
+    const update = (): void => {
+      shell.classList.toggle("at-top", log.scrollTop <= 2);
+      shell.classList.toggle("at-bottom", log.scrollTop + log.clientHeight >= log.scrollHeight - 2);
+    };
+    update();
+    log.addEventListener("scroll", update);
+    return () => log.removeEventListener("scroll", update);
+  }, [contactRows, loading]);
 
   // Top-3 sonar blips, positioned by signal (stronger = nearer the core), like the console scope.
   const blips = rows.slice(0, 3).map((row, i) => {
@@ -234,12 +251,24 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
       <section className="lb-log">
         <div className="lb-log-head">
           <h2>Contact <span className="g">Log</span></h2>
-          <span className="meta">
-            {normalized ? `${contactRows.length} return${contactRows.length === 1 ? "" : "s"} on scan` : `Returns 02–${String(rows.length).padStart(2, "0")} · sorted by signal strength`}
+          <span className="log-head-right">
+            <span className="meta">
+              {normalized ? `${contactRows.length} return${contactRows.length === 1 ? "" : "s"} on scan` : `Returns 02–${String(rows.length).padStart(2, "0")} · sorted by signal strength`}
+            </span>
+            <span className={`af-scroll-state ${locked ? "locked" : ""}`}>
+              <span className="pip" />
+              {locked ? "Log scroll · locked" : "Page scroll · hover log to lock"}
+            </span>
           </span>
         </div>
-        <div className="panel lb-log-panel">
-          <table>
+        <div className="panel log-shell at-top" ref={shellRef}>
+          <div
+            className={`lb-log-panel log-scroll ${locked ? "hovered" : ""}`}
+            ref={logRef}
+            onMouseEnter={() => setLocked(true)}
+            onMouseLeave={() => setLocked(false)}
+          >
+            <table>
             <thead>
               <tr>
                 <th>Rank</th>
@@ -306,6 +335,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
     </>

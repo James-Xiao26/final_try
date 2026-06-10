@@ -254,7 +254,7 @@ input:focus { border-color: var(--green) !important; }
 .lb-log-head h2 { font-family: var(--font-display); font-weight: 600; font-size: 17px; letter-spacing: 0.14em; text-transform: uppercase; margin: 0; }
 .lb-log-head h2 .g { color: var(--green); }
 .lb-log-head .meta { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
-.lb-log-panel { padding: 4px 8px 8px; overflow-x: auto; }
+.lb-log-panel { padding: 4px 8px 8px; }
 .lb-log-panel table { width: 100%; border-collapse: collapse; min-width: 680px; }
 .lb-log-panel thead th { font-family: var(--font-plex-mono); font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-d); font-weight: 500; text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .lb-log-panel thead th.r { text-align: right; }
@@ -373,6 +373,20 @@ input:focus { border-color: var(--green) !important; }
   font-weight: 500; text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .af-log thead th.r { text-align: right; }
 
+/* Shared in-panel scroll log: edge fades + hover-lock glow + sticky header.
+   Reused by the Leaderboard Contact Log and Markets Sounding Chart (mirrors the Activity feed above). */
+.log-shell { position: relative; }
+.log-shell::before, .log-shell::after { content: ""; position: absolute; left: 1px; right: 11px; height: 26px; pointer-events: none; z-index: 3; transition: opacity .2s; }
+.log-shell::before { top: 1px; background: linear-gradient(180deg, rgba(8,36,52,0.95), transparent); }
+.log-shell::after { bottom: 1px; background: linear-gradient(0deg, rgba(8,36,52,0.95), transparent); }
+.log-shell.at-top::before { opacity: 0; }
+.log-shell.at-bottom::after { opacity: 0; }
+/* fixed height shows ~7 rows; overscroll-behavior keeps the wheel from chaining into the page */
+.log-scroll { max-height: 632px; overflow: auto; overscroll-behavior: contain; transition: box-shadow .2s; }
+.log-scroll.hovered { box-shadow: inset 0 0 0 1px var(--line-2), 0 0 26px rgba(54,236,208,0.10); }
+.log-scroll thead th { position: sticky; top: 0; z-index: 2; background: rgba(6,28,40,0.96); backdrop-filter: blur(6px); }
+.log-head-right { display: inline-flex; align-items: center; gap: 14px; }
+
 .af-row { position: relative; }
 .af-row > td { padding: 14px 16px; vertical-align: middle; border-top: 1px solid rgba(54,236,208,0.07); }
 .af-row.group { cursor: pointer; }
@@ -460,7 +474,7 @@ input:focus { border-color: var(--green) !important; }
 .mkt-grid-head h2 { font-family: var(--font-display); font-weight: 600; font-size: 16px; letter-spacing: 0.14em; text-transform: uppercase; margin: 0; }
 .mkt-grid-head h2 .g { color: var(--green); }
 .mkt-grid-head .meta { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
-.mkt-panel { padding: 4px 8px 8px; overflow-x: auto; }
+.mkt-panel { padding: 4px 8px 8px; }
 .mkt-panel table { width: 100%; border-collapse: collapse; min-width: 820px; }
 .mkt-panel thead th { font-family: var(--font-plex-mono); font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-d); font-weight: 500; text-align: left; padding: 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .mkt-panel thead th .lbl { padding: 13px 16px; display: block; }

@@ -38,7 +38,7 @@ The ingest CLI flags (`--feed-only`, `--markets-only`) let the scheduler run che
 - `scripts/botDetection.test.ts` — the bot heuristics.
 - `scripts/walletDetail.test.ts` — `profileFillsFromActivity` (last-N raw fills, newest-first) and `openPositionRecords` (open-only holdings, endDate normalization) for the wallet-profile detail.
 - `scripts/recentTrades.test.ts` — `recentTradesFromActivity` (the activity feed's buy/sell extraction).
-- `scripts/markets.test.ts` — `mapEvent` (rolls a Gamma `/events` row up into one Markets record: leading-by-volume outcome, 24h change, category/tags, status flags).
+- `scripts/markets.test.ts` — `mapEvent` (rolls a Gamma `/events` row up into one Markets record: most-favored outcome by implied probability, 24h change, category/tags, status flags).
 - `scripts/polymarket.test.ts` — the defensive `readString`/`readNumber` field mapping.
 - `scripts/priceHistory.test.ts` — `dailyPointsFromHistory` (collapse raw CLOB points to one per UTC day, horizon-windowed) and `planPriceFetches` (skip resolved/fresh assets, honor the per-run cap).
 - `web/lib/walletTrades.test.ts` — `groupWalletTrades`, the read-time collapse of raw fills into per-position groups (volume-weighted avg entry/exit, null exit when still held).

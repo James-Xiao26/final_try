@@ -388,33 +388,46 @@ interface LeadingOutcome {
 }
 
 // An event has many outcome markets (e.g. one per team). There's no single event price, so we
-// surface the *most-traded* outcome: the market with the highest volume within the event, and show
-// that market's price. Its label is the market's groupItemTitle ("Spain"), or the first outcome name
-// for a plain binary market ("Yes").
+// surface the *favored* outcome — the one the market judges most likely, not the most-traded. For a
+// multi-candidate event that's the candidate market with the highest implied (Yes) probability and
+// its groupItemTitle ("France"). For a plain binary market it's whichever leg is priced higher, so a
+// market trading "No" at 70% shows "No 70%", not "Yes 30%".
 function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
   let leading: LeadingOutcome = { price: null, label: null, spread: null, oneDayPriceChange: null };
-  let bestVolume = -Infinity;
+  let bestYes = -Infinity;
 
   for (const market of markets) {
-    const volume = readNumber(market, ["volume", "volumeNum"]);
-    if (volume <= bestVolume) {
-      continue;
-    }
-    bestVolume = volume;
-
     const prices = parseJsonArray(market.outcomePrices)
       .map((entry) => Number(entry))
       .filter((value) => Number.isFinite(value));
     // Implied Yes probability from outcomePrices[0]; fall back to the last trade price.
     const yesPrice = prices.length > 0 ? prices[0] ?? null : readOptionalNumber(market, ["lastTradePrice"]);
+    // Rank candidates by implied probability — the favored outcome leads, regardless of volume.
+    if (yesPrice === null || yesPrice <= bestYes) {
+      continue;
+    }
+    bestYes = yesPrice;
+
     const outcomes = parseJsonArray(market.outcomes).map((entry) => String(entry));
     const groupTitle = readString(market, ["groupItemTitle"]);
-    leading = {
-      price: yesPrice,
-      label: groupTitle || outcomes[0] || "Yes",
-      spread: readOptionalNumber(market, ["spread"]),
-      oneDayPriceChange: readOptionalNumber(market, ["oneDayPriceChange"])
-    };
+    const change = readOptionalNumber(market, ["oneDayPriceChange"]);
+    const spread = readOptionalNumber(market, ["spread"]);
+
+    if (groupTitle) {
+      // Candidate within a multi-outcome event: the candidate *is* the Yes side.
+      leading = { price: yesPrice, label: groupTitle, spread, oneDayPriceChange: change };
+    } else {
+      // Plain binary market: surface whichever leg (Yes/No) is priced higher.
+      const noPrice = prices.length > 1 ? prices[1] ?? null : 1 - yesPrice;
+      const noLeads = noPrice !== null && noPrice > yesPrice;
+      leading = {
+        price: noLeads ? noPrice : yesPrice,
+        label: noLeads ? outcomes[1] || "No" : outcomes[0] || "Yes",
+        spread,
+        // oneDayPriceChange tracks the Yes leg; the No leg moves the opposite way.
+        oneDayPriceChange: change === null ? null : noLeads ? -change : change
+      };
+    }
   }
 
   return leading;
