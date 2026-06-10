@@ -1,4 +1,5 @@
 import { CONFIG } from "./config.js";
+import type { RawHistory } from "./priceHistory.js";
 
 export interface ClosedPosition {
   proxyWallet: string;
@@ -96,7 +97,8 @@ type RateLane = keyof typeof CONFIG.REQUEST_INTERVAL_MS;
 // still start at least REQUEST_INTERVAL_MS apart so concurrent wallets can't burst past the cap.
 const requestGates: Record<RateLane, Promise<void>> = {
   restricted: Promise.resolve(),
-  general: Promise.resolve()
+  general: Promise.resolve(),
+  clob: Promise.resolve()
 };
 
 function throttle(lane: RateLane): Promise<void> {
@@ -108,7 +110,7 @@ function throttle(lane: RateLane): Promise<void> {
 // Lightweight ingest profiling: lets main() compare actual processing time against the gate's
 // theoretical floor (requests * interval) to tell whether we're rate-gate-bound or starving it.
 export const apiStats = {
-  requests: { restricted: 0, general: 0 } as Record<RateLane, number>,
+  requests: { restricted: 0, general: 0, clob: 0 } as Record<RateLane, number>,
   retries: 0
 };
 
@@ -497,6 +499,21 @@ export class PolymarketClient {
   // Resolved-but-unredeemed positions, shaped as ClosedPosition so they merge with getClosedPositions.
   async getResolvedPositions(address: string): Promise<ClosedPosition[]> {
     return resolvedToClosed(await this.getCurrentPositions(address));
+  }
+
+  // Full daily price series for one outcome token, from the CLOB prices-history endpoint. `asset`
+  // is the CLOB token id (Position.asset). interval=max returns the token's whole life at the given
+  // fidelity (1440min = daily); the caller windows/dedupes to the horizon (dailyPointsFromHistory).
+  // Runs on the dedicated "clob" lane against CLOB_API_BASE.
+  async getPriceHistory(asset: string): Promise<RawHistory[]> {
+    const params = new URLSearchParams({
+      market: asset,
+      interval: "max",
+      fidelity: String(CONFIG.PRICE_HISTORY_FIDELITY_MIN)
+    });
+    const response = await fetchJson("/prices-history", params, "clob", CONFIG.CLOB_API_BASE);
+    const history = isRecord(response) ? response.history : null;
+    return Array.isArray(history) ? history.filter(isRecord).map((point) => ({ t: readNumber(point, ["t"]), p: readNumber(point, ["p"]) })) : [];
   }
 
   async getActivity(address: string, limit = CONFIG.ACTIVITY_LIMIT): Promise<TradeActivity[]> {

@@ -5,6 +5,7 @@ import { CONFIG } from "./config.js";
 import { computeMetrics, type WalletMetrics } from "./metrics.js";
 import { apiStats, discoverTopWallets, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet } from "./polymarket.js";
 import { recentTradesFromActivity, type RecentTrade } from "./recentTrades.js";
+import { dailyPointsFromHistory, planPriceFetches, type CacheState } from "./priceHistory.js";
 import { openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
 
 loadEnv({ path: "../.env.local" });
@@ -372,6 +373,42 @@ interface Database {
         };
         Relationships: [];
       };
+      market_price_history: {
+        Row: {
+          asset: string;
+          condition_id: string | null;
+          ts: string;
+          price: number;
+        };
+        Insert: {
+          asset: string;
+          condition_id?: string | null;
+          ts: string;
+          price: number;
+        };
+        Update: {
+          condition_id?: string | null;
+          price?: number;
+        };
+        Relationships: [];
+      };
+      market_price_meta: {
+        Row: {
+          asset: string;
+          max_ts: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          asset: string;
+          max_ts?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          max_ts?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -399,6 +436,10 @@ interface ProcessResult {
   // condition/outcome, from the /closed-positions payload already fetched. Lets the feed show a
   // sold-out position's P/L when its buys predate the 24h window. Empty under the same gate.
   closedPositions: ClosedPositionRecord[];
+  // Distinct outcome-token ids (CLOB asset ids) this wallet held at any point in the window —
+  // union of closed + current positions. Drives the market price-history cache (later scoped to the
+  // leaderboard subset). Empty under the same eligibility gate.
+  assets: string[];
 }
 
 // A closed-position basis record bound to its wallet, ready to persist into wallet_closed_positions.
@@ -513,7 +554,7 @@ async function processWallet(
   }
 
   if (bot) {
-    return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})`, recentTrades: [], openPositions: [], fills: [], closedPositions: [] };
+    return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})`, recentTrades: [], openPositions: [], fills: [], closedPositions: [], assets: [] };
   }
 
   // Merge actually-closed positions with resolved-but-unredeemed ones. /closed-positions holds only
@@ -555,6 +596,13 @@ async function processWallet(
         closeTime: position.closeTime
       }));
 
+  // Distinct outcome-token ids held at any point in the window — union of closed (sold/redeemed)
+  // and current (open + resolved-unredeemed) positions. Seeds the price-history cache, later scoped
+  // to the leaderboard subset. Same eligibility gate so we don't cache for never-ranked wallets.
+  const assets = insufficient
+    ? []
+    : [...new Set([...closedPositions, ...currentPositions].map((p) => p.asset).filter((a) => a !== ""))];
+
   return {
     address: normalized,
     bot,
@@ -564,7 +612,8 @@ async function processWallet(
     recentTrades,
     openPositions,
     fills,
-    closedPositions: closedPositionRecords
+    closedPositions: closedPositionRecords,
+    assets
   };
 }
 
@@ -879,6 +928,114 @@ async function replaceWalletClosedPositions(
   return scoped.length;
 }
 
+interface PriceHistoryResult {
+  fetched: number; // markets whose series we (re)pulled this run
+  upserted: number; // total daily price rows written
+  deferred: number; // eligible markets skipped past the per-run cap (next run picks them up)
+  pruned: number; // history rows removed beyond the max horizon
+}
+
+// Caches a daily price series for every outcome token held (at any point in the window) by a
+// leaderboard wallet, from the CLOB prices-history endpoint. Append-only and immutable: a token
+// whose newest cached day has gone stale (no new daily point for PRICE_HISTORY_STALE_DAYS) is
+// treated as resolved/final and never re-fetched — so the heavy first run amortizes to near-zero.
+// The only step that hits the CLOB API; runs on its own "clob" rate lane.
+async function cacheMarketPriceHistory(
+  supabase: SupabaseClient,
+  client: PolymarketClient,
+  boardAddresses: Set<string>,
+  assetsByAddress: Map<string, string[]>
+): Promise<PriceHistoryResult> {
+  const maxHorizon = Math.max(...CONFIG.HORIZONS);
+  const msPerDay = CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
+  const nowMs = Date.now();
+  const todayUtc = new Date(nowMs).toISOString().slice(0, "YYYY-MM-DD".length);
+  const staleBeforeMs = Date.parse(todayUtc) - CONFIG.PRICE_HISTORY_STALE_DAYS * msPerDay;
+
+  // Tokens needed = union of in-window assets across leaderboard wallets only.
+  const needed = new Set<string>();
+  for (const address of boardAddresses) {
+    for (const asset of assetsByAddress.get(address) ?? []) {
+      needed.add(asset);
+    }
+  }
+  if (needed.size === 0) {
+    return { fetched: 0, upserted: 0, deferred: 0, pruned: 0 };
+  }
+
+  // Planning state: newest cached day per asset (one tiny row each in market_price_meta). An asset
+  // whose max_ts is stale is flagged resolved so planPriceFetches skips it.
+  const { data: metaRows, error: metaError } = await supabase.from("market_price_meta").select("asset, max_ts");
+  if (metaError) {
+    throw metaError;
+  }
+  const state = new Map<string, CacheState>();
+  for (const row of metaRows ?? []) {
+    const maxTs = row.max_ts;
+    const resolved = maxTs !== null && Date.parse(maxTs) < staleBeforeMs;
+    state.set(row.asset, { maxTs, resolved });
+  }
+
+  const { fetch, deferred } = planPriceFetches([...needed], state, todayUtc, CONFIG.PRICE_HISTORY_MAX_FETCHES_PER_RUN);
+
+  // Worker pool over the fetch list — the clob rate gate is the real limiter, so a handful of
+  // workers keeps it saturated without bursting past the cap.
+  let cursor = 0;
+  let fetched = 0;
+  let upserted = 0;
+  const worker = async (): Promise<void> => {
+    while (cursor < fetch.length) {
+      const asset = fetch[cursor];
+      cursor += 1;
+      if (!asset) {
+        continue;
+      }
+      try {
+        const history = await client.getPriceHistory(asset);
+        const points = dailyPointsFromHistory(history, maxHorizon, nowMs);
+        if (points.length === 0) {
+          continue;
+        }
+        const rows = points.map((point) => ({ asset, ts: point.ts, price: point.price }));
+        const { error } = await supabase.from("market_price_history").upsert(rows, { onConflict: "asset,ts" });
+        if (error) {
+          throw error;
+        }
+        const newestTs = points[points.length - 1]?.ts ?? null;
+        const { error: metaUpsertError } = await supabase
+          .from("market_price_meta")
+          .upsert({ asset, max_ts: newestTs, updated_at: new Date().toISOString() }, { onConflict: "asset" });
+        if (metaUpsertError) {
+          throw metaUpsertError;
+        }
+        fetched += 1;
+        upserted += rows.length;
+      } catch (reason) {
+        console.warn(`price-history ${asset}: ${describeError(reason)}`);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONFIG.WALLET_CONCURRENCY, fetch.length) }, () => worker()));
+
+  // Bound growth: drop daily rows (and stale meta) older than the max horizon.
+  const pruneBefore = new Date(Date.parse(todayUtc) - maxHorizon * msPerDay).toISOString().slice(0, "YYYY-MM-DD".length);
+  let pruned = 0;
+  const { error: pruneError, count } = await supabase
+    .from("market_price_history")
+    .delete({ count: "exact" })
+    .lt("ts", pruneBefore);
+  if (pruneError) {
+    throw pruneError;
+  }
+  pruned = count ?? 0;
+  const { error: pruneMetaError } = await supabase.from("market_price_meta").delete().lt("max_ts", pruneBefore);
+  if (pruneMetaError) {
+    throw pruneMetaError;
+  }
+
+  return { fetched, upserted, deferred, pruned };
+}
+
 // Lightweight, decoupled refresh of the activity feed for wallets currently on the leaderboard.
 // Unlike a full ingest it touches neither closed-positions nor scoring: it reads the leaderboard
 // address set from leaderboard_cache, re-pulls /activity (general rate lane) for just those wallets,
@@ -998,6 +1155,9 @@ async function main(): Promise<void> {
   const collectedFills: ProfileFill[] = [];
   const collectedPositions: OpenPositionRecord[] = [];
   const collectedClosed: ClosedPositionRecord[] = [];
+  // Per-wallet distinct token ids (CLOB assets), for the price-history cache. Scoped to the
+  // leaderboard subset after the rebuild.
+  const assetsByAddress = new Map<string, string[]>();
   let processed = 0;
   let bots = 0;
   let insufficient = 0;
@@ -1032,6 +1192,9 @@ async function main(): Promise<void> {
         collectedFills.push(...result.fills);
         collectedPositions.push(...result.openPositions);
         collectedClosed.push(...result.closedPositions);
+        if (result.assets.length > 0) {
+          assetsByAddress.set(result.address, result.assets);
+        }
         summary = result.summary;
       } catch (reason) {
         summary = `FAILED: ${describeError(reason)}`;
@@ -1060,11 +1223,16 @@ async function main(): Promise<void> {
   const boardAddresses = await getLeaderboardAddresses(supabase);
   const closedPositionCount = await replaceWalletClosedPositions(supabase, collectedClosed, boardAddresses);
 
+  // Historical daily price series for the markets leaderboard wallets hold, for the mark-to-market
+  // equity curve. Append-only + immutable (resolved markets fetched once), so it's independent of
+  // the wipe-and-replace tables above and the only step that hits the CLOB API.
+  const priceHistory = await cacheMarketPriceHistory(supabase, polymarket, boardAddresses, assetsByAddress);
+
   // Markets are global and independent of wallet processing; refresh them in the same run.
   const marketCount = await ingestMarkets(supabase, polymarket);
 
   const elapsedSeconds = (Date.now() - startedAt) / CONFIG.MS_PER_SECOND;
-  console.log(`Processed ${processed} wallets; excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades, ${walletTradeCount} profile fills, ${walletPositionCount} open positions, ${closedPositionCount} closed positions; elapsed=${elapsedSeconds.toFixed(1)}s`);
+  console.log(`Processed ${processed} wallets; excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades, ${walletTradeCount} profile fills, ${walletPositionCount} open positions, ${closedPositionCount} closed positions; price-history ${priceHistory.upserted} rows across ${priceHistory.fetched} markets (deferred=${priceHistory.deferred}, pruned=${priceHistory.pruned}); elapsed=${elapsedSeconds.toFixed(1)}s`);
   console.log(`Bot breakdown: trade_rate=${botBreakdown.trade_rate}, dust_trades=${botBreakdown.dust_trades}, simultaneous_markets=${botBreakdown.simultaneous_markets}`);
 
   // Diagnostic: the restricted lane (closed-positions) is the dominant cost. Its theoretical floor
@@ -1074,7 +1242,7 @@ async function main(): Promise<void> {
   const restrictedFloorSeconds =
     (apiStats.requests.restricted * CONFIG.REQUEST_INTERVAL_MS.restricted) / CONFIG.MS_PER_SECOND;
   console.log(
-    `API requests: restricted=${apiStats.requests.restricted} general=${apiStats.requests.general} retries=${apiStats.retries}`
+    `API requests: restricted=${apiStats.requests.restricted} general=${apiStats.requests.general} clob=${apiStats.requests.clob} retries=${apiStats.retries}`
   );
   console.log(
     `Processing=${processingSeconds.toFixed(1)}s vs restricted-gate floor=${restrictedFloorSeconds.toFixed(1)}s ` +
