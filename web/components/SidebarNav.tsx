@@ -22,7 +22,7 @@ export default function SidebarNav() {
         // from both views); other links match their own subtree.
         const isActive =
           link.href === "/"
-            ? pathname === "/"
+            ? pathname === "/" || pathname.startsWith("/market/")
             : link.href === "/leaderboard"
               ? pathname.startsWith("/leaderboard") || pathname.startsWith("/wallet")
               : pathname.startsWith(link.href);

@@ -177,6 +177,82 @@ export interface RecentTradesFeed {
   traderCount: number;
 }
 
+// ── Convergence ("Crowded Markets") ─────────────────────────────────────────────
+// A market (one binary condition_id) where multiple leaderboard wallets hold or held a
+// position. Outcome 0 = YES, 1 = NO (Polymarket binary convention, matching outcomeLabel
+// elsewhere). Derived at read time from the leaderboard-scoped wallet_positions /
+// wallet_closed_positions / wallet_trades caches — no precompute.
+export interface CrowdedMarketSummary {
+  conditionId: string;
+  market: string | null;        // question text
+  traderCount: number;          // distinct leaderboard wallets in this market
+  yesTraders: number;           // wallets whose position is YES (outcome 0)
+  noTraders: number;            // wallets whose position is NO (outcome 1)
+  openCount: number;            // wallets still holding
+  closedCount: number;          // wallets fully closed out
+  committedUsd: number;         // gross leaderboard capital committed (YES + NO cost basis)
+  netExposureUsd: number;       // YES cost basis − NO cost basis (signed toward YES)
+  topRank: number | null;       // best (lowest-number) leaderboard rank among participants
+  curPrice: number | null;      // current YES price, when known
+  lastTradedAt: string | null;  // most recent tracked leaderboard fill in this market
+}
+
+// One tracked fill in a participant's per-market ledger.
+export interface CrowdFill {
+  outcomeIndex: number | null;
+  side: string | null;
+  price: number | null;
+  size: number | null;
+  usdcSize: number | null;
+  tradedAt: string;
+}
+
+// One leaderboard wallet's stake in a crowded market's detail view. Position state prefers the
+// authoritative caches (wallet_positions for open, wallet_closed_positions for closed); the
+// first/last dates and fill ledger come from the tracked wallet_trades fills in this market.
+export interface CrowdParticipant {
+  address: string;
+  handle: string | null;
+  rank: number | null;
+  skillScore: number | null;
+  outcomeIndex: number | null;
+  side: "YES" | "NO" | "—";
+  state: "open" | "closed";
+  size: number;                 // shares held (open) or size closed
+  avgEntry: number | null;      // cost basis
+  curPrice: number | null;      // current mark (open positions)
+  value: number | null;         // current value at mark (open positions)
+  pnl: number | null;           // unrealized (open) or realized (closed) USD
+  pnlPct: number | null;
+  firstTradedAt: string | null; // earliest tracked fill date in this market
+  lastTradedAt: string | null;  // latest tracked fill date in this market
+  fills: CrowdFill[];           // this wallet's tracked fills in this market, newest-first
+}
+
+// One UTC day on the convergence timeline: cumulative net leaderboard holdings on each side,
+// reconstructed forward from the tracked fills, plus the day's YES market price when known.
+export interface CrowdTimelinePoint {
+  ts: string;                   // UTC day ("YYYY-MM-DD")
+  yesShares: number;            // cumulative net shares held on YES
+  noShares: number;             // cumulative net shares held on NO
+  yesCostUsd: number;           // cumulative net USDC cost on YES
+  noCostUsd: number;            // cumulative net USDC cost on NO
+  price: number | null;         // YES token price that day (best-effort)
+}
+
+export interface CrowdMarketDetail {
+  conditionId: string;
+  market: string | null;
+  curPrice: number | null;
+  traderCount: number;
+  yesTraders: number;
+  noTraders: number;
+  totalVolumeUsd: number;
+  netExposureUsd: number;
+  participants: CrowdParticipant[];
+  timeline: CrowdTimelinePoint[];
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -536,6 +612,25 @@ export interface Database {
           size?: number | null;
           close_time?: string | null;
           ingested_at?: string;
+        };
+        Relationships: [];
+      };
+      market_price_history: {
+        Row: {
+          asset: string;
+          condition_id: string | null;
+          ts: string;
+          price: number;
+        };
+        Insert: {
+          asset: string;
+          condition_id?: string | null;
+          ts: string;
+          price: number;
+        };
+        Update: {
+          condition_id?: string | null;
+          price?: number;
         };
         Relationships: [];
       };
