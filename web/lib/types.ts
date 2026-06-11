@@ -504,6 +504,8 @@ export interface Database {
           current_value: number | null;
           cash_pnl: number | null;
           end_date: string | null;
+          first_traded_at: string | null;
+          last_traded_at: string | null;
           ingested_at: string;
         };
         Insert: {
@@ -519,6 +521,8 @@ export interface Database {
           current_value?: number | null;
           cash_pnl?: number | null;
           end_date?: string | null;
+          first_traded_at?: string | null;
+          last_traded_at?: string | null;
           ingested_at?: string;
         };
         Update: {
@@ -533,6 +537,8 @@ export interface Database {
           current_value?: number | null;
           cash_pnl?: number | null;
           end_date?: string | null;
+          first_traded_at?: string | null;
+          last_traded_at?: string | null;
           ingested_at?: string;
         };
         Relationships: [];
@@ -590,6 +596,7 @@ export interface Database {
           realized_pnl: number | null;
           size: number | null;
           close_time: string | null;
+          first_traded_at: string | null;
           ingested_at: string;
         };
         Insert: {
@@ -601,6 +608,7 @@ export interface Database {
           realized_pnl?: number | null;
           size?: number | null;
           close_time?: string | null;
+          first_traded_at?: string | null;
           ingested_at?: string;
         };
         Update: {
@@ -611,6 +619,7 @@ export interface Database {
           realized_pnl?: number | null;
           size?: number | null;
           close_time?: string | null;
+          first_traded_at?: string | null;
           ingested_at?: string;
         };
         Relationships: [];

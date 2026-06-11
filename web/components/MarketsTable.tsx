@@ -11,9 +11,9 @@ interface MarketsTableProps {
 }
 
 const SORT_COLUMNS: { label: string; column: MarketSort; title: string }[] = [
-  { label: "Liquidity", column: "liquidity", title: "Sort by liquidity" },
-  { label: "24h Volume", column: "volume_24hr", title: "Sort by 24-hour volume" },
   { label: "Volume", column: "volume", title: "Sort by total volume" },
+  { label: "24h Volume", column: "volume_24hr", title: "Sort by 24-hour volume" },
+  { label: "Liquidity", column: "liquidity", title: "Sort by liquidity" },
   { label: "24h Drift", column: "change", title: "Leading outcome's price change over 24h. Click to sort." }
 ];
 
@@ -201,9 +201,9 @@ export default function MarketsTable({ initialRows, initialSort }: MarketsTableP
                           </>
                         )}
                       </td>
-                      <td className="mkt-num">{formatCompactUsd(m.liquidityUsd)}</td>
-                      <td className="mkt-num">{formatCompactUsd(m.volume24hrUsd)}</td>
                       <td className="mkt-num vol">{formatCompactUsd(m.volumeUsd)}</td>
+                      <td className="mkt-num">{formatCompactUsd(m.volume24hrUsd)}</td>
+                      <td className="mkt-num">{formatCompactUsd(m.liquidityUsd)}</td>
                       <td className="mkt-chg">
                         {chg === null ? <span className="muted">—</span> : <span className={chg >= 0 ? "up" : "dn"}>{formatPercent(chg, true)}</span>}
                       </td>

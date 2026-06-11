@@ -549,6 +549,8 @@ interface OpenPositionRowDb {
   cur_price: number | null;
   current_value: number | null;
   cash_pnl: number | null;
+  first_traded_at: string | null;
+  last_traded_at: string | null;
 }
 interface ClosedPositionRowDb {
   address: string;
@@ -559,6 +561,7 @@ interface ClosedPositionRowDb {
   realized_pnl: number | null;
   size: number | null;
   close_time: string | null;
+  first_traded_at: string | null;
 }
 interface CrowdFillRowDb {
   address: string;
@@ -572,8 +575,8 @@ interface CrowdFillRowDb {
   traded_at: string;
 }
 
-const OPEN_POSITION_COLUMNS = "address, condition_id, asset, market, outcome_index, size, avg_price, cur_price, current_value, cash_pnl";
-const CLOSED_POSITION_COLUMNS = "address, condition_id, outcome_index, market, avg_price, realized_pnl, size, close_time";
+const OPEN_POSITION_COLUMNS = "address, condition_id, asset, market, outcome_index, size, avg_price, cur_price, current_value, cash_pnl, first_traded_at, last_traded_at";
+const CLOSED_POSITION_COLUMNS = "address, condition_id, outcome_index, market, avg_price, realized_pnl, size, close_time, first_traded_at";
 const CROWD_FILL_COLUMNS = "address, condition_id, market, outcome_index, side, price, size, usdc_size, traded_at";
 
 function toOpenPosition(row: OpenPositionRowDb): CrowdOpenPosition {
@@ -587,7 +590,9 @@ function toOpenPosition(row: OpenPositionRowDb): CrowdOpenPosition {
     avgPrice: toNumber(row.avg_price),
     curPrice: toNumber(row.cur_price),
     currentValue: toNumber(row.current_value),
-    cashPnl: toNumber(row.cash_pnl)
+    cashPnl: toNumber(row.cash_pnl),
+    firstTradedAt: row.first_traded_at,
+    lastTradedAt: row.last_traded_at
   };
 }
 function toClosedPosition(row: ClosedPositionRowDb): CrowdClosedPosition {
@@ -599,7 +604,8 @@ function toClosedPosition(row: ClosedPositionRowDb): CrowdClosedPosition {
     avgPrice: toNumber(row.avg_price),
     realizedPnl: toNumber(row.realized_pnl),
     size: toNumber(row.size),
-    closeTime: row.close_time
+    closeTime: row.close_time,
+    firstTradedAt: row.first_traded_at
   };
 }
 function toCrowdFill(row: CrowdFillRowDb): CrowdTradeFill {

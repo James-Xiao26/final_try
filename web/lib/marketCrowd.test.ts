@@ -22,6 +22,8 @@ function open(p: Partial<CrowdOpenPosition>): CrowdOpenPosition {
     curPrice: 0.5,
     currentValue: 50,
     cashPnl: 10,
+    firstTradedAt: null,
+    lastTradedAt: null,
     ...p
   };
 }
@@ -36,6 +38,7 @@ function closed(p: Partial<CrowdClosedPosition>): CrowdClosedPosition {
     realizedPnl: 15,
     size: 100,
     closeTime: "2026-02-01T00:00:00.000Z",
+    firstTradedAt: null,
     ...p
   };
 }
@@ -124,6 +127,35 @@ test("buildCrowdMarketDetail falls back to the closed cache for realized P/L", (
   assert.equal(p.pnl, 15);
   // 15 / (0.3 * 100) = 0.5
   assert.equal(p.pnlPct, 0.5);
+});
+
+test("buildCrowdMarketDetail falls back to position-cache dates when there are no fills for the market", () => {
+  // Open holder with no fills in the tracked window: dates come from the open cache (first/last).
+  const positions = [open({ address: "0xa", firstTradedAt: "2026-01-01", lastTradedAt: "2026-03-10" })];
+  // Closed holder with no fills: first from the cache, last falls back to closeTime.
+  const closedRows = [closed({ address: "0xb", outcomeIndex: 1, firstTradedAt: "2025-12-15", closeTime: "2026-02-01T00:00:00.000Z" })];
+  const detail = buildCrowdMarketDetail("c1", positions, closedRows, [], lookups, new Map());
+  assert.ok(detail);
+  const a = detail.participants.find((p) => p.address === "0xa");
+  const b = detail.participants.find((p) => p.address === "0xb");
+  assert.ok(a);
+  assert.equal(a.firstTradedAt, "2026-01-01");
+  assert.equal(a.lastTradedAt, "2026-03-10");
+  assert.ok(b);
+  assert.equal(b.firstTradedAt, "2025-12-15");
+  assert.equal(b.lastTradedAt, "2026-02-01T00:00:00.000Z"); // closeTime
+});
+
+test("buildCrowdMarketDetail prefers fill timestamps over position-cache dates when fills exist", () => {
+  const positions = [open({ address: "0xa", firstTradedAt: "2020-01-01", lastTradedAt: "2020-01-01" })];
+  const fills = [fill({ address: "0xa", tradedAt: "2026-01-09T00:00:00.000Z" })];
+  const detail = buildCrowdMarketDetail("c1", positions, [], fills, lookups, new Map());
+  assert.ok(detail);
+  const [p] = detail.participants;
+  assert.ok(p);
+  // The actual fill timestamp wins over the (stale) cache fallback.
+  assert.equal(p.firstTradedAt, "2026-01-09T00:00:00.000Z");
+  assert.equal(p.lastTradedAt, "2026-01-09T00:00:00.000Z");
 });
 
 test("buildCrowdMarketDetail returns null when no wallet participates", () => {

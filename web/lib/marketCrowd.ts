@@ -16,6 +16,10 @@ export interface CrowdOpenPosition {
   curPrice: number;
   currentValue: number;
   cashPnl: number;
+  // First/last fill day for this holding, from the ingest-time /activity scan. Fallback for the
+  // participant's first-buy/last-trade when the capped fill cache has no fills for this market.
+  firstTradedAt: string | null;
+  lastTradedAt: string | null;
 }
 
 export interface CrowdClosedPosition {
@@ -27,6 +31,8 @@ export interface CrowdClosedPosition {
   realizedPnl: number;
   size: number;
   closeTime: string | null;
+  // First fill day from /activity; "last trade" falls back to closeTime.
+  firstTradedAt: string | null;
 }
 
 export interface CrowdTradeFill {
@@ -301,11 +307,17 @@ export function buildCrowdMarketDetail(
       .sort((a, b) => Date.parse(b.tradedAt) - Date.parse(a.tradedAt));
     myFills.forEach((f) => (totalVolumeUsd += fillUsdc(f)));
     const fillTimes = myFills.map((f) => Date.parse(f.tradedAt)).filter((ms) => Number.isFinite(ms));
-    const firstTradedAt = fillTimes.length ? new Date(Math.min(...fillTimes)).toISOString() : null;
-    const lastTradedAt = fillTimes.length ? new Date(Math.max(...fillTimes)).toISOString() : null;
+    let firstTradedAt = fillTimes.length ? new Date(Math.min(...fillTimes)).toISOString() : null;
+    let lastTradedAt = fillTimes.length ? new Date(Math.max(...fillTimes)).toISOString() : null;
 
     const myOpen = positions.filter((p) => p.address === address && p.size > 0).sort((a, b) => b.size - a.size);
     const myClosed = closed.filter((p) => p.address === address).sort((a, b) => b.size - a.size);
+
+    // Fall back to the position cache's dates when the (capped) fill window has no fills for this
+    // market — the common case for held positions opened before the tracked window. closeTime is the
+    // closed position's exit, i.e. its last trade.
+    if (firstTradedAt === null) firstTradedAt = myOpen[0]?.firstTradedAt ?? myClosed[0]?.firstTradedAt ?? null;
+    if (lastTradedAt === null) lastTradedAt = myOpen[0]?.lastTradedAt ?? myClosed[0]?.closeTime ?? null;
 
     let outcomeIndex: number | null;
     let state: "open" | "closed";

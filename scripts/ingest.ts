@@ -7,7 +7,7 @@ import { apiStats, discoverTopWallets, openUnrealizedPnl, PolymarketClient, reso
 import { recentTradesFromActivity, type RecentTrade } from "./recentTrades.js";
 import { buildMarkToMarketCurve, type CurvePosition } from "./equityCurve.js";
 import { dailyPointsFromHistory, planPriceFetches, type CacheState } from "./priceHistory.js";
-import { earliestEntryDates, openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
+import { earliestEntryDates, latestFillDates, openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -263,6 +263,8 @@ interface Database {
           current_value: number | null;
           cash_pnl: number | null;
           end_date: string | null;
+          first_traded_at: string | null;
+          last_traded_at: string | null;
           ingested_at: string;
         };
         Insert: {
@@ -278,6 +280,8 @@ interface Database {
           current_value?: number | null;
           cash_pnl?: number | null;
           end_date?: string | null;
+          first_traded_at?: string | null;
+          last_traded_at?: string | null;
           ingested_at?: string;
         };
         Update: {
@@ -292,6 +296,8 @@ interface Database {
           current_value?: number | null;
           cash_pnl?: number | null;
           end_date?: string | null;
+          first_traded_at?: string | null;
+          last_traded_at?: string | null;
           ingested_at?: string;
         };
         Relationships: [];
@@ -349,6 +355,7 @@ interface Database {
           realized_pnl: number | null;
           size: number | null;
           close_time: string | null;
+          first_traded_at: string | null;
           ingested_at: string;
         };
         Insert: {
@@ -360,6 +367,7 @@ interface Database {
           realized_pnl?: number | null;
           size?: number | null;
           close_time?: string | null;
+          first_traded_at?: string | null;
           ingested_at?: string;
         };
         Update: {
@@ -370,6 +378,7 @@ interface Database {
           realized_pnl?: number | null;
           size?: number | null;
           close_time?: string | null;
+          first_traded_at?: string | null;
           ingested_at?: string;
         };
         Relationships: [];
@@ -456,6 +465,10 @@ interface ClosedPositionRecord {
   realizedPnl: number;
   size: number;
   closeTime: string;
+  // First fill day (UTC "YYYY-MM-DD") for this outcome token, from /activity — the Convergence
+  // "first buy" fallback when the capped fill cache lacks this market's fills. "Last trade" reuses
+  // closeTime. Null when the token's fills predate the /activity window.
+  firstTradedAt: string | null;
   // Outcome-token id, for the mark-to-market equity curve (joins to market_price_history). Not
   // persisted to wallet_closed_positions — used only in-memory by writeDailyEquityCurves.
   asset: string;
@@ -585,9 +598,14 @@ async function processWallet(
   // skill score). The feed's read path further restricts to wallets currently in leaderboard_cache.
   const insufficient = metrics.every((metric) => metric.skillScore === null);
   const recentTrades = insufficient ? [] : recentTradesFromActivity(activity, normalized, recentTradeCutoffMs);
+  // Per-outcome-token first/last fill day from /activity. entryDates also feeds the equity curve
+  // below; both stamp the Convergence "first buy"/"last trade" dates onto the position caches so the
+  // read path has them when the capped fill cache (wallet_trades) lacks this market's fills.
+  const entryDates = insufficient ? new Map<string, string>() : earliestEntryDates(activity);
+  const lastFillDates = insufficient ? new Map<string, string>() : latestFillDates(activity);
   // Profile detail rides the payloads already in hand: open holdings from currentPositions, raw fill
   // history from activity. Same eligibility gate as recentTrades.
-  const openPositions = insufficient ? [] : openPositionRecords(currentPositions, normalized);
+  const openPositions = insufficient ? [] : openPositionRecords(currentPositions, normalized, entryDates, lastFillDates);
   const fills = insufficient ? [] : profileFillsFromActivity(activity, normalized, CONFIG.PROFILE_TRADES_LIMIT);
   // Closed-position basis for the feed cache, from the /closed-positions payload already in hand.
   const closedPositionRecords: ClosedPositionRecord[] = insufficient
@@ -601,6 +619,7 @@ async function processWallet(
         realizedPnl: position.realizedPnl,
         size: position.size,
         closeTime: position.closeTime,
+        firstTradedAt: entryDates.get(position.asset) ?? null,
         asset: position.asset
       }));
 
@@ -610,8 +629,6 @@ async function processWallet(
   const assets = insufficient
     ? []
     : [...new Set([...closedPositions, ...currentPositions].map((p) => p.asset).filter((a) => a !== ""))];
-  // Per-token entry dates for the mark-to-market equity curve (writeDailyEquityCurves).
-  const entryDates = insufficient ? new Map<string, string>() : earliestEntryDates(activity);
 
   return {
     address: normalized,
@@ -845,7 +862,9 @@ function toWalletPositionRow(position: OpenPositionRecord): Database["public"]["
     initial_value: position.initialValue,
     current_value: position.currentValue,
     cash_pnl: position.cashPnl,
-    end_date: position.endDate
+    end_date: position.endDate,
+    first_traded_at: position.firstTradedAt,
+    last_traded_at: position.lastTradedAt
   };
 }
 
@@ -900,7 +919,8 @@ function toClosedPositionRow(record: ClosedPositionRecord): Database["public"]["
     avg_price: record.avgPrice,
     realized_pnl: record.realizedPnl,
     size: record.size,
-    close_time: record.closeTime
+    close_time: record.closeTime,
+    first_traded_at: record.firstTradedAt
   };
 }
 

@@ -34,7 +34,7 @@ export const CONFIG = {
   // edge over the market's implied price. Calibrated so a ~5-cent shrunk edge lands near 7 given the
   // SCORE_FLOOR=4 band. Changing this (or EDGE_SHRINKAGE_K / SCORE_FLOOR) requires updating the exact
   // score constants in metrics.test.ts.
-  EDGE_FOR_TEN: 0.096,
+  EDGE_FOR_TEN: 0.13,
   BOT: {
     // Calibrated against a working trades/day denominator (see MIN_RATE_WINDOW_DAYS). The old 50
     // was a dead constant: activity is capped at ACTIVITY_LIMIT and the rate used to be divided by

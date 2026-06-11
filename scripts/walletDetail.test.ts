@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { earliestEntryDates, openPositionRecords, profileFillsFromActivity } from "./walletDetail.js";
+import { earliestEntryDates, latestFillDates, openPositionRecords, profileFillsFromActivity } from "./walletDetail.js";
 import type { Position, TradeActivity } from "./polymarket.js";
 
 function activity(partial: Partial<TradeActivity>): TradeActivity {
@@ -143,4 +143,43 @@ test("earliestEntryDates keeps the oldest fill date per asset (UTC)", () => {
 test("earliestEntryDates skips fills with no asset and handles empty input", () => {
   assert.equal(earliestEntryDates([activity({ asset: "" })]).size, 0);
   assert.equal(earliestEntryDates([]).size, 0);
+});
+
+test("latestFillDates keeps the newest fill date per asset (UTC)", () => {
+  const day = (iso: string): number => Math.floor(Date.parse(iso) / 1000);
+  const dates = latestFillDates([
+    activity({ asset: "A", timestamp: day("2026-06-07T03:00:00Z") }),
+    activity({ asset: "A", timestamp: day("2026-06-09T10:00:00Z") }), // newer → wins for A
+    activity({ asset: "B", timestamp: day("2026-05-20T00:00:00Z") })
+  ]);
+  assert.equal(dates.get("A"), "2026-06-09");
+  assert.equal(dates.get("B"), "2026-05-20");
+});
+
+test("latestFillDates skips fills with no asset and handles empty input", () => {
+  assert.equal(latestFillDates([activity({ asset: "" })]).size, 0);
+  assert.equal(latestFillDates([]).size, 0);
+});
+
+test("openPositionRecords stamps first/last fill dates by asset, null when absent", () => {
+  const [stamped, missing] = openPositionRecords(
+    [position({ asset: "a1", redeemable: false }), position({ asset: "a2", redeemable: false })],
+    "0xabc",
+    new Map([["a1", "2026-05-01"]]),
+    new Map([["a1", "2026-06-01"]])
+  );
+  assert.ok(stamped);
+  assert.equal(stamped.firstTradedAt, "2026-05-01");
+  assert.equal(stamped.lastTradedAt, "2026-06-01");
+  // a2 has no entry in either map → both null.
+  assert.ok(missing);
+  assert.equal(missing.firstTradedAt, null);
+  assert.equal(missing.lastTradedAt, null);
+});
+
+test("openPositionRecords defaults fill dates to null when no maps passed", () => {
+  const [record] = openPositionRecords([position({ asset: "a1", redeemable: false })], "0xabc");
+  assert.ok(record);
+  assert.equal(record.firstTradedAt, null);
+  assert.equal(record.lastTradedAt, null);
 });

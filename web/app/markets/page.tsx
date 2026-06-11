@@ -4,7 +4,7 @@ import { getMarkets } from "@/lib/supabase";
 export const dynamic = "force-dynamic";
 
 export default async function MarketsPage() {
-  const initialRows = await getMarkets({ sort: "liquidity" });
+  const initialRows = await getMarkets({ sort: "volume" });
 
   return (
     <main className="page">
@@ -15,7 +15,7 @@ export default async function MarketsPage() {
         </p>
       </div>
 
-      <MarketsTable initialRows={initialRows} initialSort="liquidity" />
+      <MarketsTable initialRows={initialRows} initialSort="volume" />
     </main>
   );
 }
