@@ -7,4 +7,4 @@
 #
 # The web dyno stays awake because cron-job.org pings it every minute.
 # Protect the endpoints with the CRON_SECRET env var (set via heroku config:set).
-web: pnpm --filter edgeboard-scripts server
+web: pnpm server
