@@ -93,7 +93,7 @@ function Oscilloscope() {
     let raf = 0;
 
     const frame = (): void => {
-      ph += 0.18;
+      ph += 0.06;
       if (Math.random() < 0.03) burst = 1;
       burst *= 0.92;
       const sample =
