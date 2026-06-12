@@ -1,7 +1,7 @@
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import type { CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, WalletMetrics, WalletPosition, WalletProfile } from "./types";
+import type { ClosedTrade, ClosedTradesFeed, CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, WalletMetrics, WalletPosition, WalletProfile } from "./types";
 import { HORIZONS } from "./types";
 import { groupWalletTrades } from "./walletTrades";
 import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis } from "./recentTrades";
@@ -272,25 +272,28 @@ export async function getRecentLeaderboardTrades(
   const openByKey = new Map<string, OpenBasis>();
   const closedByKey = new Map<string, ClosedBasis>();
   if (feedAddresses.length > 0) {
+    // Active leaderboard wallets hold thousands of positions combined (the closed cache especially),
+    // so these MUST page — a single PostgREST response caps at 1000 rows, which would silently drop
+    // most positions and leave the feed unable to find their basis (→ "P/L n/a" on otherwise-known
+    // positions). Page through with the same .range() helper the board-wide scans use.
     const [openRes, closedRes] = await Promise.all([
-      supabase
-        .from("wallet_positions")
-        .select("address, condition_id, outcome_index, avg_price, cur_price, current_value, cash_pnl, size")
-        .in("address", feedAddresses),
-      supabase
-        .from("wallet_closed_positions")
-        .select("address, condition_id, outcome_index, avg_price, realized_pnl, size")
-        .in("address", feedAddresses)
+      fetchAllPaged((from, to) =>
+        supabase
+          .from("wallet_positions")
+          .select("address, condition_id, outcome_index, avg_price, cur_price, current_value, cash_pnl, size")
+          .in("address", feedAddresses)
+          .range(from, to)
+      ),
+      fetchAllPaged((from, to) =>
+        supabase
+          .from("wallet_closed_positions")
+          .select("address, condition_id, outcome_index, avg_price, realized_pnl, size")
+          .in("address", feedAddresses)
+          .range(from, to)
+      )
     ]);
 
-    if (openRes.error && !isMissingSchemaError(openRes.error)) {
-      throw openRes.error;
-    }
-    if (closedRes.error && !isMissingSchemaError(closedRes.error)) {
-      throw closedRes.error;
-    }
-
-    ((openRes.data ?? []) as unknown as FeedOpenPositionRow[]).forEach((row) => {
+    (openRes.rows as unknown as FeedOpenPositionRow[]).forEach((row) => {
       openByKey.set(positionKey(row.address, row.condition_id, row.outcome_index), {
         avgEntry: row.avg_price,
         curPrice: row.cur_price,
@@ -299,7 +302,7 @@ export async function getRecentLeaderboardTrades(
         size: row.size
       });
     });
-    ((closedRes.data ?? []) as unknown as FeedClosedPositionRow[]).forEach((row) => {
+    (closedRes.rows as unknown as FeedClosedPositionRow[]).forEach((row) => {
       closedByKey.set(positionKey(row.address, row.condition_id, row.outcome_index), {
         avgEntry: row.avg_price,
         realizedPnl: row.realized_pnl,
@@ -310,6 +313,124 @@ export async function getRecentLeaderboardTrades(
 
   const positions = groupRecentTrades(trades, openByKey, closedByKey);
   return { positions, traderCount };
+}
+
+interface ClosedTradeSelectRow {
+  address: string;
+  condition_id: string | null;
+  outcome_index: number | null;
+  market: string | null;
+  avg_price: number | null;
+  realized_pnl: number | null;
+  size: number | null;
+  close_time: string | null;
+}
+
+// Fully-closed / resolved positions by leaderboard wallets in the last `windowHours`, newest close
+// first. Reads wallet_closed_positions directly (already board-scoped, and the ingest folds in
+// held-to-resolution positions), so it carries the realized $ P/L without any fill-window join —
+// which is why it covers trades the Acoustic Log's grouping can't. Joins rank/skill/handle for
+// display. Capped at `limit` most-recent closes (the table scrolls).
+export async function getRecentClosedTrades(
+  opts: { windowHours?: number; limit?: number } = {}
+): Promise<ClosedTradesFeed> {
+  const supabase = createSupabaseServerClient();
+  const windowHours = opts.windowHours ?? 24;
+  const limit = opts.limit ?? 300;
+  const cutoff = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from("wallet_closed_positions")
+    .select("address, condition_id, outcome_index, market, avg_price, realized_pnl, size, close_time")
+    .gte("close_time", cutoff)
+    .order("close_time", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    if (isMissingSchemaError(error)) {
+      return { trades: [], traderCount: 0 };
+    }
+    throw error;
+  }
+
+  const rows = (data ?? []) as unknown as ClosedTradeSelectRow[];
+  if (rows.length === 0) {
+    return { trades: [], traderCount: 0 };
+  }
+
+  const addresses = [...new Set(rows.map((row) => row.address))];
+  const { data: cacheData, error: cacheError } = await supabase
+    .from("leaderboard_cache")
+    .select("address, skill_score, rank")
+    .in("address", addresses);
+
+  if (cacheError) {
+    if (isMissingSchemaError(cacheError)) {
+      return { trades: [], traderCount: 0 };
+    }
+    throw cacheError;
+  }
+
+  // Best (highest) skill score / best (lowest-number) rank per address across horizons; presence in
+  // the map == currently on the leaderboard.
+  const skillByAddress = new Map<string, number | null>();
+  const rankByAddress = new Map<string, number>();
+  ((cacheData ?? []) as unknown as SkillSelectRow[]).forEach((row) => {
+    const next = row.skill_score;
+    const prev = skillByAddress.get(row.address);
+    if (prev === undefined || (next !== null && (prev === null || next > prev))) {
+      skillByAddress.set(row.address, next);
+    }
+    const prevRank = rankByAddress.get(row.address);
+    if (prevRank === undefined || row.rank < prevRank) {
+      rankByAddress.set(row.address, row.rank);
+    }
+  });
+
+  const memberAddresses = [...skillByAddress.keys()];
+  const handles = new Map<string, string | null>();
+  if (memberAddresses.length > 0) {
+    const { data: wallets, error: walletError } = await supabase
+      .from("wallets")
+      .select("address, handle")
+      .in("address", memberAddresses);
+
+    if (walletError) {
+      if (isMissingSchemaError(walletError)) {
+        return { trades: [], traderCount: 0 };
+      }
+      throw walletError;
+    }
+
+    ((wallets ?? []) as unknown as WalletHandleRow[]).forEach((wallet) => handles.set(wallet.address, wallet.handle));
+  }
+
+  const trades: ClosedTrade[] = rows
+    .filter((row) => skillByAddress.has(row.address) && row.close_time !== null)
+    .map((row) => {
+      const avgEntry = row.avg_price;
+      const size = row.size;
+      const realizedPnl = row.realized_pnl;
+      const basis = avgEntry !== null && size !== null ? avgEntry * size : null;
+      const realizedPct = realizedPnl !== null && basis !== null && basis > 0 ? realizedPnl / basis : null;
+      return {
+        address: row.address,
+        handle: handles.get(row.address) ?? null,
+        rank: rankByAddress.get(row.address) ?? null,
+        skillScore: skillByAddress.get(row.address) ?? null,
+        conditionId: row.condition_id,
+        market: row.market,
+        outcomeIndex: row.outcome_index,
+        avgEntry,
+        size,
+        realizedPnl,
+        realizedPct,
+        closeTime: row.close_time as string
+      };
+    });
+
+  const traderCount = new Set(trades.map((trade) => trade.address)).size;
+  return { trades, traderCount };
 }
 
 const MARKET_SORT_COLUMNS: Record<MarketSort, keyof MarketSelectRow> = {

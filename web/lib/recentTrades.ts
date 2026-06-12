@@ -101,6 +101,7 @@ function buildPosition(key: string, acc: Acc, open: OpenBasis | undefined, close
     lastSide: t.side,
     lastPrice: t.price,
     lastSize: t.size,
+    lastUsdcSize: t.usdcSize,
     boughtSize: acc.buySize,
     soldSize: acc.sellSize,
     latestTradedAt: new Date(acc.latestMs).toISOString(),
@@ -123,7 +124,8 @@ function buildPosition(key: string, acc: Acc, open: OpenBasis | undefined, close
       remainingSize: open.size ?? Math.max(0, acc.buySize - acc.sellSize),
       positionValue: open.currentValue ?? (avgEntry !== null && open.size !== null ? avgEntry * open.size : null),
       unrealizedPct,
-      realizedPct: null
+      realizedPct: null,
+      realizedPnl: null
     };
   }
 
@@ -144,7 +146,8 @@ function buildPosition(key: string, acc: Acc, open: OpenBasis | undefined, close
       remainingSize: 0,
       positionValue: null,
       unrealizedPct: null,
-      realizedPct
+      realizedPct,
+      realizedPnl: closed.realizedPnl
     };
   }
 
@@ -162,7 +165,8 @@ function buildPosition(key: string, acc: Acc, open: OpenBasis | undefined, close
       remainingSize: netRemaining,
       positionValue: avgEntry !== null ? avgEntry * netRemaining : null,
       unrealizedPct: null,
-      realizedPct: null
+      realizedPct: null,
+      realizedPnl: null
     };
   }
 
@@ -178,6 +182,7 @@ function buildPosition(key: string, acc: Acc, open: OpenBasis | undefined, close
     remainingSize: 0,
     positionValue: null,
     unrealizedPct: null,
-    realizedPct
+    realizedPct,
+    realizedPnl: null
   };
 }

@@ -156,6 +156,7 @@ export interface RecentTradePosition {
   lastSide: string | null;
   lastPrice: number | null;
   lastSize: number | null;
+  lastUsdcSize: number | null; // USDC value of the headline fill (price·size when the API omits it)
   // aggregate position state
   state: "open" | "closed";
   basisSource: "cache" | "fills" | "none";
@@ -167,6 +168,7 @@ export interface RecentTradePosition {
   positionValue: number | null;   // open: current value at mark; null when unknown
   unrealizedPct: number | null;   // open positions, vs current price
   realizedPct: number | null;     // closed positions with known basis
+  realizedPnl: number | null;     // closed positions: realized $ P/L (from the cache), null otherwise
   latestTradedAt: string;
   fills: RecentFill[];            // newest-first, for the expandable ledger
 }
@@ -174,6 +176,30 @@ export interface RecentTradePosition {
 export interface RecentTradesFeed {
   positions: RecentTradePosition[];
   // Distinct leaderboard wallets that traded within the window.
+  traderCount: number;
+}
+
+// One fully-closed (sold-out) or resolved position by a leaderboard wallet, for the Closed Trades
+// table on the Activity page. Read straight from the wallet_closed_positions cache (which already
+// folds in held-to-resolution positions), so it carries the realized $ P/L directly — no fill-window
+// join. realizedPct is realizedPnl / (avgEntry·size) when the basis is known.
+export interface ClosedTrade {
+  address: string;
+  handle: string | null;
+  rank: number | null;
+  skillScore: number | null;
+  conditionId: string | null;
+  market: string | null;
+  outcomeIndex: number | null;
+  avgEntry: number | null;
+  size: number | null;
+  realizedPnl: number | null;
+  realizedPct: number | null;
+  closeTime: string;
+}
+
+export interface ClosedTradesFeed {
+  trades: ClosedTrade[];
   traderCount: number;
 }
 

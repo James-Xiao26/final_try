@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Fragment, useState } from "react";
 import { formatNumber, formatPercent, formatPrice, formatUsd, shortenAddress } from "@/lib/format";
 import type { CrowdFill, CrowdParticipant } from "@/lib/types";
+import { useScrollLog } from "./useScrollLog";
 
 interface CrowdParticipantsProps {
   participants: CrowdParticipant[];
@@ -96,6 +97,8 @@ function ParticipantRow({ p }: { p: CrowdParticipant }) {
 }
 
 export default function CrowdParticipants({ participants }: CrowdParticipantsProps) {
+  const { locked, shellRef, logRef, hoverProps } = useScrollLog(participants);
+
   return (
     <section className="panel cp-section">
       <div className="cp-head">
@@ -105,8 +108,9 @@ export default function CrowdParticipants({ participants }: CrowdParticipantsPro
       {participants.length === 0 ? (
         <p className="muted" style={{ padding: 24, margin: 0 }}>No participants on record.</p>
       ) : (
-        <div className="cp-tablewrap">
-          <table className="cp-table">
+        <div className="log-shell at-top" ref={shellRef}>
+          <div className={`cp-tablewrap log-scroll ${locked ? "hovered" : ""}`} ref={logRef} {...hoverProps}>
+            <table className="cp-table">
             <thead>
               <tr>
                 <th />
@@ -124,7 +128,8 @@ export default function CrowdParticipants({ participants }: CrowdParticipantsPro
             <tbody>
               {participants.map((p) => <ParticipantRow key={p.address} p={p} />)}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       )}
     </section>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatCompactUsd } from "@/lib/format";
 import type { CrowdedMarketSummary } from "@/lib/types";
+import { useScrollLog } from "./useScrollLog";
 
 interface ConvergencePanelProps {
   initialRows: CrowdedMarketSummary[];
@@ -72,6 +73,7 @@ function ConvergenceRow({ row }: { row: CrowdedMarketSummary }) {
 
 export default function ConvergencePanel({ initialRows }: ConvergencePanelProps) {
   const [rows, setRows] = useState(initialRows);
+  const { locked, shellRef, logRef, hoverProps } = useScrollLog(rows);
 
   useEffect(() => {
     let active = true;
@@ -99,14 +101,16 @@ export default function ConvergencePanel({ initialRows }: ConvergencePanelProps)
         <h2>Convergence <span className="g">Zones</span></h2>
         <span className="cv-sub">Where the pod is feeding — markets the most tracked contacts hold</span>
       </div>
-      <div className="panel cv-list">
-        {rows.length === 0 ? (
-          <p className="muted" style={{ padding: 36, textAlign: "center", margin: 0 }}>
-            No converged markets yet — the board&apos;s positions haven&apos;t been ingested.
-          </p>
-        ) : (
-          rows.map((row) => <ConvergenceRow key={row.conditionId} row={row} />)
-        )}
+      <div className="panel cv-list log-shell at-top" ref={shellRef}>
+        <div className={`cv-scroll log-scroll ${locked ? "hovered" : ""}`} ref={logRef} {...hoverProps}>
+          {rows.length === 0 ? (
+            <p className="muted" style={{ padding: 36, textAlign: "center", margin: 0 }}>
+              No converged markets yet — the board&apos;s positions haven&apos;t been ingested.
+            </p>
+          ) : (
+            rows.map((row) => <ConvergenceRow key={row.conditionId} row={row} />)
+          )}
+        </div>
       </div>
     </section>
   );

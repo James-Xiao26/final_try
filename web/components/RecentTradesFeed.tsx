@@ -149,6 +149,14 @@ function PositionRow({ p }: { p: RecentTradePosition }) {
   const sell = (p.lastSide ?? "").toUpperCase() === "SELL";
   const runAvgs = grouped ? runningAverages(p.fills) : [];
 
+  // Headline fill's USDC value: prefer the API's usdcSize, else price·size.
+  const lastUsd =
+    p.lastUsdcSize !== null
+      ? Math.abs(p.lastUsdcSize)
+      : p.lastPrice !== null && p.lastSize !== null
+        ? p.lastPrice * p.lastSize
+        : null;
+
   // Avg-entry cell content varies by where the basis came from.
   let avgLead: JSX.Element;
   let avgSub: string;
@@ -156,15 +164,8 @@ function PositionRow({ p }: { p: RecentTradePosition }) {
     avgLead = <>—</>;
     avgSub = "opened earlier";
   } else if (p.basisSource === "cache") {
-    avgLead = (
-      <>
-        {formatPrice(p.avgEntry)}
-        <span className="af-srcchip" title="From the Polymarket position cache — this position's buys predate the 24h feed window">
-          cache
-        </span>
-      </>
-    );
-    avgSub = p.state === "open" ? "cost basis" : "cached basis";
+    avgLead = <>{formatPrice(p.avgEntry)}</>;
+    avgSub = p.state === "open" ? "cost basis" : "realized basis";
   } else {
     avgLead = <>{formatPrice(p.avgEntry)}</>;
     avgSub = grouped ? "blended basis" : "single fill";
@@ -178,7 +179,14 @@ function PositionRow({ p }: { p: RecentTradePosition }) {
       </>
     ) : (
       <>
-        closed <PlPill pct={p.realizedPct} />
+        closed{" "}
+        {p.realizedPnl !== null ? (
+          <span className={`af-realpnl ${p.realizedPnl >= 0 ? "up" : "dn"}`}>
+            {p.realizedPnl >= 0 ? "+" : ""}
+            {formatUsd(p.realizedPnl)}
+          </span>
+        ) : null}{" "}
+        <PlPill pct={p.realizedPct} />
       </>
     );
   const posSub =
@@ -223,9 +231,11 @@ function PositionRow({ p }: { p: RecentTradePosition }) {
             <div className="af-stack">
               <span className={`af-bearing ${buy ? "buy" : sell ? "sell" : ""}`}>
                 <span className="ar">{buy ? "▲" : sell ? "▼" : "•"}</span>
-                {buy ? "BUY" : sell ? "SELL" : p.lastSide} {p.lastSize === null ? "" : formatNumber(p.lastSize)}
+                {buy ? "BUY" : sell ? "SELL" : p.lastSide} {lastUsd === null ? "" : formatUsd(lastUsd)}
               </span>
-              <span className="sub">@ {p.lastPrice === null ? "—" : formatPrice(p.lastPrice)}</span>
+              <span className="sub">
+                {p.lastSize === null ? "—" : formatNumber(p.lastSize)} sh @ {p.lastPrice === null ? "—" : formatPrice(p.lastPrice)}
+              </span>
             </div>
           )}
         </td>
