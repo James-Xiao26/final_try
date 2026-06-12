@@ -10,7 +10,7 @@
     "ingest": "pnpm --filter edgeboard-scripts ingest",
     "ingest:feed": "pnpm --filter edgeboard-scripts ingest:feed",
     "ingest:markets": "pnpm --filter edgeboard-scripts ingest:markets",
-    "server": "pnpm --filter edgeboard-scripts server",
+    "webhook": "pnpm --filter edgeboard-scripts webhook",
     "heroku-postbuild": "echo \"Scheduler-only deploy: skipping web build\""
   },
   "engines": {
