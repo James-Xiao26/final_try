@@ -777,6 +777,7 @@ input:focus { border-color: var(--green) !important; }
   padding: 16px 18px; border-radius: 4px;
   border: 1px solid transparent;
   transition: background .2s, border-color .2s, box-shadow .2s;
+  cursor: default;
 }
 .cv-row + .cv-row { border-top: 1px solid rgba(54,236,208,0.07); }
 .cv-row::after { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px;
