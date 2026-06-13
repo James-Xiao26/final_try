@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import HorizonToggle from "@/components/HorizonToggle";
+import { windowedCurve } from "@/lib/equityCurve";
 import { formatCompactUsd, formatEdge, formatNumber, formatPercent, formatUsd } from "@/lib/format";
 import { HORIZONS } from "@/lib/types";
 import type { EquityPoint, HorizonDays, WalletMetrics } from "@/lib/types";
@@ -12,7 +13,14 @@ interface WalletTelemetryProps {
   initialHorizon: HorizonDays;
 }
 
-const DRAW_LEN = 3000;
+const DRAW_LEN = 4000;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
+// UTC-based so SSR and client agree (no locale/hydration drift).
+function tickLabel(ms: number): string {
+  const d = new Date(ms);
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
 
 function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: HorizonDays }) {
   const [drawn, setDrawn] = useState(false);
@@ -33,24 +41,48 @@ function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: Hori
   const padR = 8;
   const padT = 18;
   const padB = 24;
-  const values = points.map((p) => p.cumulativePnl);
+
+  // Anchor to a fixed [today - horizon, today] window and prepend a $0 baseline at the window start,
+  // so x reflects real elapsed time and the line begins at $0 on the left edge.
+  const { points: pts, startMs, endMs } = windowedCurve(points, horizon);
+  const values = pts.map((p) => p.cumulativePnl);
   const min = Math.min(...values, 0);
   const max = Math.max(...values, 0);
   const span = max - min || 1;
-  const nx = (i: number): number => padL + (i / (points.length - 1 || 1)) * (W - padL - padR);
+  const tspan = endMs - startMs || 1;
+  const nx = (tsMs: number): number => {
+    const x = padL + ((tsMs - startMs) / tspan) * (W - padL - padR);
+    return Math.min(W - padR, Math.max(padL, x)); // clamp for boundary rounding
+  };
   const ny = (v: number): number => padT + (1 - (v - min) / span) * (H - padT - padB);
   const zeroY = ny(0);
-  const lastV = values[values.length - 1] ?? 0;
+  const xs = pts.map((p) => nx(Date.parse(p.ts)));
+  const lastIdx = pts.length - 1;
 
-  const line = points.map((p, i) => `${i ? "L" : "M"}${nx(i).toFixed(1)} ${ny(p.cumulativePnl).toFixed(1)}`).join(" ");
-  const area = `${line} L ${nx(points.length - 1).toFixed(1)} ${ny(min).toFixed(1)} L ${nx(0).toFixed(1)} ${ny(min).toFixed(1)} Z`;
-  const lastX = nx(points.length - 1);
-  const lastY = ny(lastV);
+  // Stepped interior (realized P/L holds flat between closes, then jumps on a close date) with a
+  // diagonal final leg to the "today" point (which folds in continuously-moving unrealized P/L).
+  let line = `M${xs[0]?.toFixed(1)} ${ny(pts[0]?.cumulativePnl ?? 0).toFixed(1)}`;
+  for (let i = 1; i < pts.length; i++) {
+    const x = (xs[i] ?? 0).toFixed(1);
+    const yPrev = ny(pts[i - 1]?.cumulativePnl ?? 0).toFixed(1);
+    const yCur = ny(pts[i]?.cumulativePnl ?? 0).toFixed(1);
+    line += i === lastIdx ? ` L${x} ${yCur}` : ` L${x} ${yPrev} L${x} ${yCur}`;
+  }
+  const firstX = (xs[0] ?? padL).toFixed(1);
+  const lastX = xs[lastIdx] ?? W - padR;
+  const lastY = ny(pts[lastIdx]?.cumulativePnl ?? 0);
+  const area = `${line} L${lastX.toFixed(1)} ${ny(min).toFixed(1)} L${firstX} ${ny(min).toFixed(1)} Z`;
 
   const gridlines = Array.from({ length: 5 }, (_, g) => {
     const y = padT + (g / 4) * (H - padT - padB);
     const val = max - (g / 4) * span;
     return { y, val };
+  });
+
+  const xticks = Array.from({ length: 4 }, (_, k) => {
+    const ms = startMs + (k / 3) * (endMs - startMs);
+    const anchor: "start" | "middle" | "end" = k === 0 ? "start" : k === 3 ? "end" : "middle";
+    return { x: nx(ms), label: tickLabel(ms), anchor };
   });
 
   return (
@@ -69,6 +101,9 @@ function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: Hori
           </g>
         ))}
         <line x1={padL} y1={zeroY} x2={W - padR} y2={zeroY} stroke="rgba(255,122,89,0.35)" strokeDasharray="4 4" />
+        {xticks.map((t, i) => (
+          <text key={i} className="wl-axis" x={t.x} y={H - 6} textAnchor={t.anchor}>{t.label}</text>
+        ))}
         <path d={area} fill="url(#wlDive)" style={{ opacity: drawn ? 1 : 0, transition: "opacity 1.4s ease .4s" }} />
         <path
           d={line}
@@ -140,7 +175,7 @@ export default function WalletTelemetry({ metrics, equityCurves, initialHorizon 
           </div>
         </div>
         <DiveProfile points={points} horizon={horizon} />
-        <div className="dive-foot"><span>Depth = cumulative realized P/L</span><span>{horizon}-day trace</span></div>
+        <div className="dive-foot"><span>Depth = mark-to-market P/L</span><span>{horizon}-day trace</span></div>
       </section>
     </>
   );

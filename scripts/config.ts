@@ -34,7 +34,7 @@ export const CONFIG = {
   // edge over the market's implied price. Calibrated so a ~5-cent shrunk edge lands near 7 given the
   // SCORE_FLOOR=4 band. Changing this (or EDGE_SHRINKAGE_K / SCORE_FLOOR) requires updating the exact
   // score constants in metrics.test.ts.
-  EDGE_FOR_TEN: 0.096,
+  EDGE_FOR_TEN: 0.13,
   BOT: {
     // Calibrated against a working trades/day denominator (see MIN_RATE_WINDOW_DAYS). The old 50
     // was a dead constant: activity is capped at ACTIVITY_LIMIT and the rate used to be divided by
@@ -58,6 +58,21 @@ export const CONFIG = {
   // lists markets with liquidity/volume/price fields. It powers the Markets page. The markets pass
   // is a single cheap global fetch (not per-wallet), so it reuses the "general" rate lane.
   GAMMA_API_BASE: process.env.GAMMA_API_BASE ?? "https://gamma-api.polymarket.com",
+  // The CLOB API (a third host) is the only Polymarket source for historical price series.
+  // We hit /prices-history?market={tokenId}&interval=max&fidelity=1440 to cache each held
+  // token's daily price for the mark-to-market equity curve. Runs on its own "clob" rate lane.
+  CLOB_API_BASE: process.env.CLOB_API_BASE ?? "https://clob.polymarket.com",
+  // Daily fidelity (minutes/point) for prices-history; we window/dedupe to one point per UTC day.
+  PRICE_HISTORY_FIDELITY_MIN: 1440,
+  // A cached token whose newest daily point is older than this is treated as resolved/final (live
+  // markets get a point every day; a settled one stops), so it's never re-fetched. The trade-off: a
+  // genuinely-open but illiquid market with no trades for this many days won't have its tail extended.
+  PRICE_HISTORY_STALE_DAYS: 3,
+  // Safety cap on price-history fetches per ingest. Above the cold-start universe (~3k tokens),
+  // so a first run backfills in one pass; resolved markets are skipped on later runs, so steady
+  // state is just newly-seen markets + active-tail refreshes. Lower it to spread a huge backfill
+  // across several daily runs.
+  PRICE_HISTORY_MAX_FETCHES_PER_RUN: 4000,
   // How many top markets to persist for the Markets page. One liquidity-sorted superset is stored;
   // the read layer re-orders it by volume/24h/volatility, so no per-sort fetch is needed.
   MARKETS_TOP_N: 300,
@@ -69,8 +84,13 @@ export const CONFIG = {
   // shown on the home page. Reuses the /activity payload already fetched for bot detection, so it
   // adds no Polymarket API calls. Read-side freshness is bounded by ingest cadence.
   RECENT_TRADE_WINDOW_HOURS: 24,
-  // Chunk size for the recent_trades bulk insert (keeps each insert payload modest).
+  // Chunk size for the recent_trades bulk insert (keeps each insert payload modest). Reused by the
+  // wallet_trades / wallet_positions bulk inserts.
   RECENT_TRADES_INSERT_CHUNK: 500,
+  // Per-wallet raw fills kept for the wallet-profile trade history (wallet_trades). Sliced from the
+  // most recent /activity fills already fetched for bot detection, so it adds no API calls; the read
+  // layer collapses these into per-position groups (avg entry/exit) with the raw fills as a dropdown.
+  PROFILE_TRADES_LIMIT: 200,
   SEED_WALLET_COUNT: 5000,
   API_RETRIES: 5,
   RETRY_BASE_DELAY_MS: 1000,
@@ -87,7 +107,14 @@ export const CONFIG = {
   //   general:    /activity, /value, /v1/leaderboard, /trades (>=200 req/10s) -> 30ms ~= 333 req/10s
   REQUEST_INTERVAL_MS: {
     restricted: 90,
-    general: 30
+    general: 30,
+    // CLOB prices-history (/prices-history) falls under the CLOB General limit of 9,000 req/10s —
+    // far above the Data API caps. Separate host/bucket, so this gate doesn't serialize behind the
+    // restricted/general lanes. 10ms ~= 1,000 req/10s is only ~11% of the cap, leaving wide headroom
+    // while the per-token Supabase upsert is what actually paces throughput; drop toward ~1.5ms (75%
+    // of cap) only if the one-time cold-start backfill speed ever matters. fetchJson honors
+    // Retry-After on the rare 429.
+    clob: 10
   },
   ACTIVITY_LIMIT: 500,
   CLOSED_POSITION_PAGE_SIZE: 50,

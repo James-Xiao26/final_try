@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Chakra_Petch, IBM_Plex_Mono } from "next/font/google";
 import type { ReactNode } from "react";
+import { Analytics } from "@vercel/analytics/next";
 import BrandMark from "@/components/BrandMark";
 import OceanScene from "@/components/OceanScene";
 import SidebarNav from "@/components/SidebarNav";
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <OceanScene />
 
+        <Analytics />
         <div className="shell">
           <header className="topnav">
             <div className="topnav-inner">

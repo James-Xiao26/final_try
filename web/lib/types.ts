@@ -29,6 +29,50 @@ export interface EquityPoint {
   cumulativePnl: number;
 }
 
+// One current open holding on a wallet profile (genuinely-open positions, redeemable === false).
+// avgPrice is the entry cost basis; curPrice is the current mark; unrealized P/L = currentValue −
+// initialValue.
+export interface WalletPosition {
+  conditionId: string | null;
+  asset: string;
+  market: string | null;
+  outcomeIndex: number | null;
+  size: number;
+  avgPrice: number;
+  curPrice: number;
+  initialValue: number;
+  currentValue: number;
+  cashPnl: number;
+  endDate: string | null;
+}
+
+// One raw fill within a trade group's dropdown.
+export interface WalletFill {
+  side: string | null;
+  price: number | null;
+  size: number | null;
+  usdcSize: number | null;
+  tradedAt: string;
+  transactionHash: string | null;
+}
+
+// Raw fills collapsed per market position (conditionId + outcomeIndex) for the wallet-profile trade
+// history. avgEntryPrice is the volume-weighted price of BUY fills; avgExitPrice that of SELL fills
+// (null when the position has no sells — still held / held to resolution). `fills` are the raw fills
+// (newest first) for the expandable dropdown.
+export interface WalletTradeGroup {
+  conditionId: string | null;
+  market: string | null;
+  outcomeIndex: number | null;
+  avgEntryPrice: number | null;
+  avgExitPrice: number | null;
+  totalBoughtSize: number;
+  totalSoldSize: number;
+  totalUsdc: number;
+  latestTradedAt: string;
+  fills: WalletFill[];
+}
+
 export interface WalletProfile {
   address: string;
   handle: string | null;
@@ -39,6 +83,8 @@ export interface WalletProfile {
   equityCurve: EquityPoint[];
   equityCurves: Record<HorizonDays, EquityPoint[]>;
   badges: { label: string; horizonDays: number }[];
+  positions: WalletPosition[];
+  tradeGroups: WalletTradeGroup[];
 }
 
 // Sortable columns on the Markets page. "change" maps to the leading outcome's 24h price change.
@@ -82,10 +128,155 @@ export interface RecentTrade {
   tradedAt: string;
 }
 
+// One raw fill inside a grouped position's expandable history in the activity feed.
+export interface RecentFill {
+  side: string | null;
+  price: number | null;
+  size: number | null;
+  usdcSize: number | null;
+  tradedAt: string;
+}
+
+// A leaderboard wallet's recent activity in ONE market position (conditionId + outcomeIndex),
+// collapsed from the fills in the feed window: adds and partial sells fold into a single row instead
+// of one row per fill. The headline (lastSide/lastSize/lastPrice) is the most recent fill; the
+// aggregate (avgEntry, mark, value, P/L) prefers the authoritative position cache (wallet_positions
+// for open, wallet_closed_positions for closed) and falls back to the in-window fills. `basisSource`
+// records where avgEntry came from: "cache" (Polymarket position data), "fills" (reconstructed from
+// in-window buys), or "none" (opened before the window with no cache row → P/L unknown).
+export interface RecentTradePosition {
+  address: string;
+  handle: string | null;
+  skillScore: number | null;
+  rank: number | null;
+  conditionId: string | null;
+  market: string | null;
+  outcomeIndex: number | null;
+  // headline: the most recent fill in the window
+  lastSide: string | null;
+  lastPrice: number | null;
+  lastSize: number | null;
+  lastUsdcSize: number | null; // USDC value of the headline fill (price·size when the API omits it)
+  // aggregate position state
+  state: "open" | "closed";
+  basisSource: "cache" | "fills" | "none";
+  avgEntry: number | null;        // cost basis; null when unknown
+  mark: number | null;            // current outcome price (open positions); null otherwise
+  remainingSize: number;          // shares still held (open); 0 when closed
+  boughtSize: number;             // shares bought within the window
+  soldSize: number;               // shares sold within the window
+  positionValue: number | null;   // open: current value at mark; null when unknown
+  unrealizedPct: number | null;   // open positions, vs current price
+  realizedPct: number | null;     // closed positions with known basis
+  realizedPnl: number | null;     // closed positions: realized $ P/L (from the cache), null otherwise
+  latestTradedAt: string;
+  fills: RecentFill[];            // newest-first, for the expandable ledger
+}
+
 export interface RecentTradesFeed {
-  trades: RecentTrade[];
+  positions: RecentTradePosition[];
   // Distinct leaderboard wallets that traded within the window.
   traderCount: number;
+}
+
+// One fully-closed (sold-out) or resolved position by a leaderboard wallet, for the Closed Trades
+// table on the Activity page. Read straight from the wallet_closed_positions cache (which already
+// folds in held-to-resolution positions), so it carries the realized $ P/L directly — no fill-window
+// join. realizedPct is realizedPnl / (avgEntry·size) when the basis is known.
+export interface ClosedTrade {
+  address: string;
+  handle: string | null;
+  rank: number | null;
+  skillScore: number | null;
+  conditionId: string | null;
+  market: string | null;
+  outcomeIndex: number | null;
+  avgEntry: number | null;
+  size: number | null;
+  realizedPnl: number | null;
+  realizedPct: number | null;
+  closeTime: string;
+}
+
+export interface ClosedTradesFeed {
+  trades: ClosedTrade[];
+  traderCount: number;
+}
+
+// ── Convergence ("Crowded Markets") ─────────────────────────────────────────────
+// A market (one binary condition_id) where multiple leaderboard wallets hold or held a
+// position. Outcome 0 = YES, 1 = NO (Polymarket binary convention, matching outcomeLabel
+// elsewhere). Derived at read time from the leaderboard-scoped wallet_positions /
+// wallet_closed_positions / wallet_trades caches — no precompute.
+export interface CrowdedMarketSummary {
+  conditionId: string;
+  market: string | null;        // question text
+  traderCount: number;          // distinct leaderboard wallets in this market
+  yesTraders: number;           // wallets whose position is YES (outcome 0)
+  noTraders: number;            // wallets whose position is NO (outcome 1)
+  openCount: number;            // wallets still holding
+  closedCount: number;          // wallets fully closed out
+  committedUsd: number;         // gross leaderboard capital committed (YES + NO cost basis)
+  netExposureUsd: number;       // YES cost basis − NO cost basis (signed toward YES)
+  topRank: number | null;       // best (lowest-number) leaderboard rank among participants
+  curPrice: number | null;      // current YES price, when known
+  lastTradedAt: string | null;  // most recent tracked leaderboard fill in this market
+}
+
+// One tracked fill in a participant's per-market ledger.
+export interface CrowdFill {
+  outcomeIndex: number | null;
+  side: string | null;
+  price: number | null;
+  size: number | null;
+  usdcSize: number | null;
+  tradedAt: string;
+}
+
+// One leaderboard wallet's stake in a crowded market's detail view. Position state prefers the
+// authoritative caches (wallet_positions for open, wallet_closed_positions for closed); the
+// first/last dates and fill ledger come from the tracked wallet_trades fills in this market.
+export interface CrowdParticipant {
+  address: string;
+  handle: string | null;
+  rank: number | null;
+  skillScore: number | null;
+  outcomeIndex: number | null;
+  side: "YES" | "NO" | "—";
+  state: "open" | "closed";
+  size: number;                 // shares held (open) or size closed
+  avgEntry: number | null;      // cost basis
+  curPrice: number | null;      // current mark (open positions)
+  value: number | null;         // current value at mark (open positions)
+  pnl: number | null;           // unrealized (open) or realized (closed) USD
+  pnlPct: number | null;
+  firstTradedAt: string | null; // earliest tracked fill date in this market
+  lastTradedAt: string | null;  // latest tracked fill date in this market
+  fills: CrowdFill[];           // this wallet's tracked fills in this market, newest-first
+}
+
+// One UTC day on the convergence timeline: cumulative net leaderboard holdings on each side,
+// reconstructed forward from the tracked fills, plus the day's YES market price when known.
+export interface CrowdTimelinePoint {
+  ts: string;                   // UTC day ("YYYY-MM-DD")
+  yesShares: number;            // cumulative net shares held on YES
+  noShares: number;             // cumulative net shares held on NO
+  yesCostUsd: number;           // cumulative net USDC cost on YES
+  noCostUsd: number;            // cumulative net USDC cost on NO
+  price: number | null;         // YES token price that day (best-effort)
+}
+
+export interface CrowdMarketDetail {
+  conditionId: string;
+  market: string | null;
+  curPrice: number | null;
+  traderCount: number;
+  yesTraders: number;
+  noTraders: number;
+  totalVolumeUsd: number;
+  netExposureUsd: number;
+  participants: CrowdParticipant[];
+  timeline: CrowdTimelinePoint[];
 }
 
 export interface Database {
@@ -321,6 +512,160 @@ export interface Database {
           usdc_size?: number | null;
           traded_at?: string;
           ingested_at?: string;
+        };
+        Relationships: [];
+      };
+      wallet_positions: {
+        Row: {
+          id: number;
+          address: string;
+          condition_id: string | null;
+          asset: string;
+          market: string | null;
+          outcome_index: number | null;
+          size: number | null;
+          avg_price: number | null;
+          cur_price: number | null;
+          initial_value: number | null;
+          current_value: number | null;
+          cash_pnl: number | null;
+          end_date: string | null;
+          first_traded_at: string | null;
+          last_traded_at: string | null;
+          ingested_at: string;
+        };
+        Insert: {
+          address: string;
+          condition_id?: string | null;
+          asset: string;
+          market?: string | null;
+          outcome_index?: number | null;
+          size?: number | null;
+          avg_price?: number | null;
+          cur_price?: number | null;
+          initial_value?: number | null;
+          current_value?: number | null;
+          cash_pnl?: number | null;
+          end_date?: string | null;
+          first_traded_at?: string | null;
+          last_traded_at?: string | null;
+          ingested_at?: string;
+        };
+        Update: {
+          condition_id?: string | null;
+          asset?: string;
+          market?: string | null;
+          outcome_index?: number | null;
+          size?: number | null;
+          avg_price?: number | null;
+          cur_price?: number | null;
+          initial_value?: number | null;
+          current_value?: number | null;
+          cash_pnl?: number | null;
+          end_date?: string | null;
+          first_traded_at?: string | null;
+          last_traded_at?: string | null;
+          ingested_at?: string;
+        };
+        Relationships: [];
+      };
+      wallet_trades: {
+        Row: {
+          id: number;
+          address: string;
+          condition_id: string | null;
+          market: string | null;
+          outcome_index: number | null;
+          side: string | null;
+          price: number | null;
+          size: number | null;
+          usdc_size: number | null;
+          traded_at: string;
+          transaction_hash: string | null;
+          ingested_at: string;
+        };
+        Insert: {
+          address: string;
+          condition_id?: string | null;
+          market?: string | null;
+          outcome_index?: number | null;
+          side?: string | null;
+          price?: number | null;
+          size?: number | null;
+          usdc_size?: number | null;
+          traded_at: string;
+          transaction_hash?: string | null;
+          ingested_at?: string;
+        };
+        Update: {
+          condition_id?: string | null;
+          market?: string | null;
+          outcome_index?: number | null;
+          side?: string | null;
+          price?: number | null;
+          size?: number | null;
+          usdc_size?: number | null;
+          traded_at?: string;
+          transaction_hash?: string | null;
+          ingested_at?: string;
+        };
+        Relationships: [];
+      };
+      wallet_closed_positions: {
+        Row: {
+          id: number;
+          address: string;
+          condition_id: string | null;
+          outcome_index: number | null;
+          market: string | null;
+          avg_price: number | null;
+          realized_pnl: number | null;
+          size: number | null;
+          close_time: string | null;
+          first_traded_at: string | null;
+          ingested_at: string;
+        };
+        Insert: {
+          address: string;
+          condition_id?: string | null;
+          outcome_index?: number | null;
+          market?: string | null;
+          avg_price?: number | null;
+          realized_pnl?: number | null;
+          size?: number | null;
+          close_time?: string | null;
+          first_traded_at?: string | null;
+          ingested_at?: string;
+        };
+        Update: {
+          condition_id?: string | null;
+          outcome_index?: number | null;
+          market?: string | null;
+          avg_price?: number | null;
+          realized_pnl?: number | null;
+          size?: number | null;
+          close_time?: string | null;
+          first_traded_at?: string | null;
+          ingested_at?: string;
+        };
+        Relationships: [];
+      };
+      market_price_history: {
+        Row: {
+          asset: string;
+          condition_id: string | null;
+          ts: string;
+          price: number;
+        };
+        Insert: {
+          asset: string;
+          condition_id?: string | null;
+          ts: string;
+          price: number;
+        };
+        Update: {
+          condition_id?: string | null;
+          price?: number;
         };
         Relationships: [];
       };

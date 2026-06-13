@@ -48,7 +48,7 @@ test("mapEvent rolls up event-level aggregate fields", () => {
   assert.equal(event.volume1wkUsd, 120_000_000);
 });
 
-test("mapEvent surfaces the highest-volume outcome (not the highest price)", () => {
+test("mapEvent surfaces the most-favored outcome (highest probability, not highest volume)", () => {
   const event = mapEvent(
     eventRecord({
       markets: [
@@ -57,13 +57,13 @@ test("mapEvent surfaces the highest-volume outcome (not the highest price)", () 
       ]
     })
   );
-  // Spain has the lower price but the most volume, so it leads.
-  assert.equal(event.topOutcome, "Spain");
-  assert.equal(event.currentPrice, 0.17);
-  assert.equal(event.spread, 0.004);
+  // France has the higher implied probability, so it leads — even though Spain trades more volume.
+  assert.equal(event.topOutcome, "France");
+  assert.equal(event.currentPrice, 0.22);
+  assert.equal(event.spread, 0.003);
 });
 
-test("mapEvent surfaces the leading (highest-volume) outcome's 24h price change", () => {
+test("mapEvent surfaces the favored (highest-probability) outcome's 24h price change", () => {
   const event = mapEvent(
     eventRecord({
       markets: [
@@ -72,8 +72,20 @@ test("mapEvent surfaces the leading (highest-volume) outcome's 24h price change"
       ]
     })
   );
-  // Spain leads by volume, so its change is surfaced (not France's).
-  assert.equal(event.oneDayPriceChange, -0.01);
+  // France leads by probability, so its change is surfaced (not Spain's).
+  assert.equal(event.oneDayPriceChange, 0.05);
+});
+
+test("mapEvent surfaces the favored leg of a plain binary market (No when it leads)", () => {
+  const event = mapEvent(
+    eventRecord({
+      markets: [nestedMarket({ groupItemTitle: "", outcomePrices: "[\"0.30\", \"0.70\"]", oneDayPriceChange: 0.04, spread: 0.01 })]
+    })
+  );
+  // No is priced higher than Yes, so it's the favored outcome; its 24h move is the Yes leg inverted.
+  assert.equal(event.topOutcome, "No");
+  assert.equal(event.currentPrice, 0.7);
+  assert.equal(event.oneDayPriceChange, -0.04);
 });
 
 test("mapEvent yields null 24h change when the field is absent", () => {

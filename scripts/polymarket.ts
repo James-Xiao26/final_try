@@ -1,4 +1,5 @@
 import { CONFIG } from "./config.js";
+import type { RawHistory } from "./priceHistory.js";
 
 export interface ClosedPosition {
   proxyWallet: string;
@@ -96,7 +97,8 @@ type RateLane = keyof typeof CONFIG.REQUEST_INTERVAL_MS;
 // still start at least REQUEST_INTERVAL_MS apart so concurrent wallets can't burst past the cap.
 const requestGates: Record<RateLane, Promise<void>> = {
   restricted: Promise.resolve(),
-  general: Promise.resolve()
+  general: Promise.resolve(),
+  clob: Promise.resolve()
 };
 
 function throttle(lane: RateLane): Promise<void> {
@@ -108,7 +110,7 @@ function throttle(lane: RateLane): Promise<void> {
 // Lightweight ingest profiling: lets main() compare actual processing time against the gate's
 // theoretical floor (requests * interval) to tell whether we're rate-gate-bound or starving it.
 export const apiStats = {
-  requests: { restricted: 0, general: 0 } as Record<RateLane, number>,
+  requests: { restricted: 0, general: 0, clob: 0 } as Record<RateLane, number>,
   retries: 0
 };
 
@@ -386,33 +388,46 @@ interface LeadingOutcome {
 }
 
 // An event has many outcome markets (e.g. one per team). There's no single event price, so we
-// surface the *most-traded* outcome: the market with the highest volume within the event, and show
-// that market's price. Its label is the market's groupItemTitle ("Spain"), or the first outcome name
-// for a plain binary market ("Yes").
+// surface the *favored* outcome — the one the market judges most likely, not the most-traded. For a
+// multi-candidate event that's the candidate market with the highest implied (Yes) probability and
+// its groupItemTitle ("France"). For a plain binary market it's whichever leg is priced higher, so a
+// market trading "No" at 70% shows "No 70%", not "Yes 30%".
 function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
   let leading: LeadingOutcome = { price: null, label: null, spread: null, oneDayPriceChange: null };
-  let bestVolume = -Infinity;
+  let bestYes = -Infinity;
 
   for (const market of markets) {
-    const volume = readNumber(market, ["volume", "volumeNum"]);
-    if (volume <= bestVolume) {
-      continue;
-    }
-    bestVolume = volume;
-
     const prices = parseJsonArray(market.outcomePrices)
       .map((entry) => Number(entry))
       .filter((value) => Number.isFinite(value));
     // Implied Yes probability from outcomePrices[0]; fall back to the last trade price.
     const yesPrice = prices.length > 0 ? prices[0] ?? null : readOptionalNumber(market, ["lastTradePrice"]);
+    // Rank candidates by implied probability — the favored outcome leads, regardless of volume.
+    if (yesPrice === null || yesPrice <= bestYes) {
+      continue;
+    }
+    bestYes = yesPrice;
+
     const outcomes = parseJsonArray(market.outcomes).map((entry) => String(entry));
     const groupTitle = readString(market, ["groupItemTitle"]);
-    leading = {
-      price: yesPrice,
-      label: groupTitle || outcomes[0] || "Yes",
-      spread: readOptionalNumber(market, ["spread"]),
-      oneDayPriceChange: readOptionalNumber(market, ["oneDayPriceChange"])
-    };
+    const change = readOptionalNumber(market, ["oneDayPriceChange"]);
+    const spread = readOptionalNumber(market, ["spread"]);
+
+    if (groupTitle) {
+      // Candidate within a multi-outcome event: the candidate *is* the Yes side.
+      leading = { price: yesPrice, label: groupTitle, spread, oneDayPriceChange: change };
+    } else {
+      // Plain binary market: surface whichever leg (Yes/No) is priced higher.
+      const noPrice = prices.length > 1 ? prices[1] ?? null : 1 - yesPrice;
+      const noLeads = noPrice !== null && noPrice > yesPrice;
+      leading = {
+        price: noLeads ? noPrice : yesPrice,
+        label: noLeads ? outcomes[1] || "No" : outcomes[0] || "Yes",
+        spread,
+        // oneDayPriceChange tracks the Yes leg; the No leg moves the opposite way.
+        oneDayPriceChange: change === null ? null : noLeads ? -change : change
+      };
+    }
   }
 
   return leading;
@@ -497,6 +512,21 @@ export class PolymarketClient {
   // Resolved-but-unredeemed positions, shaped as ClosedPosition so they merge with getClosedPositions.
   async getResolvedPositions(address: string): Promise<ClosedPosition[]> {
     return resolvedToClosed(await this.getCurrentPositions(address));
+  }
+
+  // Full daily price series for one outcome token, from the CLOB prices-history endpoint. `asset`
+  // is the CLOB token id (Position.asset). interval=max returns the token's whole life at the given
+  // fidelity (1440min = daily); the caller windows/dedupes to the horizon (dailyPointsFromHistory).
+  // Runs on the dedicated "clob" lane against CLOB_API_BASE.
+  async getPriceHistory(asset: string): Promise<RawHistory[]> {
+    const params = new URLSearchParams({
+      market: asset,
+      interval: "max",
+      fidelity: String(CONFIG.PRICE_HISTORY_FIDELITY_MIN)
+    });
+    const response = await fetchJson("/prices-history", params, "clob", CONFIG.CLOB_API_BASE);
+    const history = isRecord(response) ? response.history : null;
+    return Array.isArray(history) ? history.filter(isRecord).map((point) => ({ t: readNumber(point, ["t"]), p: readNumber(point, ["p"]) })) : [];
   }
 
   async getActivity(address: string, limit = CONFIG.ACTIVITY_LIMIT): Promise<TradeActivity[]> {
