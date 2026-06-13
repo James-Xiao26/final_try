@@ -757,10 +757,20 @@ async function resetComputedTables(supabase: SupabaseClient): Promise<void> {
 // Rows are fully replaced each run: event ids differ from any prior per-market ids, so a plain
 // upsert would leave stale rows behind — we clear the table first (only when we have fresh data).
 async function ingestMarkets(supabase: SupabaseClient, client: PolymarketClient): Promise<number> {
-  const events = await client.getTopEvents();
-  if (events.length === 0) {
+  const rawEvents = await client.getTopEvents();
+  if (rawEvents.length === 0) {
     return 0;
   }
+
+  // Dedupe by event id (the markets primary key): Gamma pagination can return the same event on more
+  // than one page when ordering shifts mid-scan, which would blow up the batch insert on the pkey.
+  const byId = new Map<string, EventSummary>();
+  for (const event of rawEvents) {
+    if (!byId.has(event.id)) {
+      byId.set(event.id, event);
+    }
+  }
+  const events = [...byId.values()];
 
   const { error: deleteError } = await supabase.from("markets").delete().gte("cached_at", "1970-01-01T00:00:00Z");
   if (deleteError) {
