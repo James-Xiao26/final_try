@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { botSignal, type BotSignal } from "./botDetection.js";
@@ -476,7 +477,7 @@ interface ClosedPositionRecord {
 
 // Supabase throws PostgrestError-shaped plain objects ({ message, code, details, hint }), not
 // Error instances, so String(reason) yields a useless "[object Object]". Surface the real fields.
-function describeError(reason: unknown): string {
+export function describeError(reason: unknown): string {
   if (reason instanceof Error) {
     return reason.message;
   }
@@ -547,7 +548,7 @@ async function upsertMetrics(
   }
 }
 
-async function processWallet(
+export async function processWallet(
   supabase: SupabaseClient,
   client: PolymarketClient,
   wallet: DiscoveredWallet,
@@ -645,7 +646,7 @@ async function processWallet(
   };
 }
 
-async function rebuildLeaderboardCache(supabase: SupabaseClient): Promise<void> {
+export async function rebuildLeaderboardCache(supabase: SupabaseClient): Promise<void> {
   for (const horizon of CONFIG.HORIZONS) {
     const { data, error } = await supabase
       .from("wallet_stats")
@@ -795,7 +796,7 @@ async function ingestMarkets(supabase: SupabaseClient, client: PolymarketClient)
   return events.length;
 }
 
-function toRecentTradeRow(trade: RecentTrade): Database["public"]["Tables"]["recent_trades"]["Insert"] {
+export function toRecentTradeRow(trade: RecentTrade): Database["public"]["Tables"]["recent_trades"]["Insert"] {
   return {
     address: trade.address,
     condition_id: trade.conditionId,
@@ -1404,7 +1405,11 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((error) => {
-  console.error(describeError(error));
-  process.exitCode = 1;
-});
+// Only run the pipeline when this file is the process entry point (e.g. `tsx ingest.ts`), not when
+// it's imported (the unit tests import the exported functions, which must not trigger a live run).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(describeError(error));
+    process.exitCode = 1;
+  });
+}

@@ -30,7 +30,7 @@ pnpm --filter edgeboard-scripts probe  # probeClosedPositions.ts — ad-hoc insp
 
 The ingest CLI flags (`--feed-only`, `--markets-only`) let the scheduler run cheap partial refreshes between full passes. Root `engines.node` is `24.x`; the Heroku `heroku-postbuild` is a no-op ("scheduler-only deploy: skipping web build") — the web app deploys via Vercel, Heroku only runs the scheduled ingest.
 
-**Unit tests** run on Node's built-in test runner via tsx (`node --import tsx --test`); no jest/vitest, and there is no root-level `test` script — run each workspace's with `pnpm --filter <workspace> test`. Most tests live in `scripts/` (glob `**/*.test.ts`). The `web/` workspace also has a `test` script (glob `lib/**/*.test.ts`) for pure, framework-free `lib/` logic; component/page tests are not set up. Current coverage:
+**Unit tests** run on Node's built-in test runner via tsx and live in both workspaces. The `scripts/` suite (`node --import tsx --test "**/*.test.ts"`) and the `web/` suite (`node --import tsx --test "lib/**/*.test.ts"`) are each wired up as the `test` script in their package.json. Run a single workspace with `pnpm --filter edgeboard-scripts test` / `pnpm --filter edgeboard-web test`, or both at once with `pnpm test` from the repo root (recursive). No jest/vitest. Current coverage:
 
 - `scripts/metrics.test.ts` — pure-function tests for scoring:
   - `computeMetrics` derives `pctReturn`, `winRate`, `avgEdgePerShare` (per-position mean forecasting edge), `pctEdge`, `nResolved`, `nTrades`, and volume; excludes positions older than the horizon; and handles an empty position set without dividing by zero.
@@ -40,11 +40,14 @@ The ingest CLI flags (`--feed-only`, `--markets-only`) let the scheduler run che
 - `scripts/recentTrades.test.ts` — `recentTradesFromActivity` (the activity feed's buy/sell extraction).
 - `scripts/markets.test.ts` — `mapEvent` (rolls a Gamma `/events` row up into one Markets record: most-favored outcome by implied probability, 24h change, category/tags, status flags).
 - `scripts/polymarket.test.ts` — the defensive `readString`/`readNumber` field mapping.
+- `scripts/polymarketMappers.test.ts` — the defensive API mappers (`mapClosedPosition`, `mapPosition`, `mapActivity`, `mapLeaderboard`) and `openUnrealizedPnl`: canonical fields, fallback key lists, resolution-price epsilon boundaries, and safe defaults. Pins the field-name mapping so a Polymarket schema shift is caught here.
 - `scripts/priceHistory.test.ts` — `dailyPointsFromHistory` (collapse raw CLOB points to one per UTC day, horizon-windowed) and `planPriceFetches` (skip resolved/fresh assets, honor the per-run cap).
+- `scripts/ingest.test.ts` — `describeError`, `toRecentTradeRow`, and (against a hand-rolled fake Supabase/Polymarket client) `rebuildLeaderboardCache` (ranking, bot/loser filtering, `TOP_N` truncation, `.in()` chunking, empty handling, error propagation) and `processWallet` (bot short-circuit + eligible-wallet upserts). Note: `ingest.ts` only runs `main()` when it's the process entry point, so importing it for tests is safe.
 - `web/lib/walletTrades.test.ts` — `groupWalletTrades`, the read-time collapse of raw fills into per-position groups (volume-weighted avg entry/exit, null exit when still held).
 - `web/lib/recentTrades.test.ts` — read-time shaping of the recent-trades feed.
 - `web/lib/equityCurve.test.ts` — `windowedCurve` (anchors the equity curve to a fixed `[end − horizon, end]` window, prepends a $0 baseline, uses the data's last point as the right edge for SSR-stable rendering).
 - `web/lib/marketCrowd.test.ts` — the Convergence read-time aggregation: `summarizeCrowdedMarkets` (ranks markets by distinct leaderboard wallets, YES/NO split, committed capital from the position caches), `buildCrowdMarketDetail` (per-wallet participants: side, P/L from the open/closed cache, fill dates), `buildCrowdTimeline` (cumulative net leaderboard holdings per UTC day, clamped at zero, with the YES price overlay).
+- `web/lib/waitlist.test.ts` — the waitlist route's extracted pure logic (`web/lib/waitlist.ts`): email validation, honeypot detection, `x-forwarded-for`/`x-real-ip` parsing, and the per-IP sliding-window rate limiter (limit boundary, per-key isolation, window expiry via an injectable clock).
 
 "Verifying a change" now means `pnpm typecheck`, `pnpm build`, and the unit tests all pass — and for the full pipeline, running `pnpm ingest` against a real Supabase + the live Polymarket API.
 
