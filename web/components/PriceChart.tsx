@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PriceSeries, WhaleTrade } from "@/lib/marketAnalytics";
+import type { PricePoint, PriceSeries, RegimeShift, WhaleTrade } from "@/lib/marketAnalytics";
 import { formatCompactUsd, shortenAddress } from "@/lib/format";
 
 interface PriceChartProps {
@@ -27,11 +27,21 @@ const padR = 14;
 const padT = 16;
 const padB = 26;
 
+// null = "All" (since creation). Others window the series to the last N days.
+type Horizon = number | null;
+const HORIZON_OPTIONS: { label: string; value: Horizon }[] = [
+  { label: "7D", value: 7 },
+  { label: "30D", value: 30 },
+  { label: "90D", value: 90 },
+  { label: "All", value: null }
+];
+
 export default function PriceChart({ series, whales }: PriceChartProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(920);
   const [hoverX, setHoverX] = useState<number | null>(null);
   const [drawn, setDrawn] = useState(false);
+  const [horizon, setHorizon] = useState<Horizon>(null); // default: full history since creation
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -43,24 +53,60 @@ export default function PriceChart({ series, whales }: PriceChartProps) {
     return () => ro.disconnect();
   }, []);
 
+  // The series' own span (days between first and last point) decides which windows are meaningful —
+  // no point offering "90D" on a 12-day-old market.
+  const spanDays = useMemo(() => {
+    const pts = series.points;
+    if (pts.length < 2) return 0;
+    const first = dayMs(pts[0]?.ts ?? "");
+    const last = dayMs(pts[pts.length - 1]?.ts ?? "");
+    return Math.round((last - first) / 86_400_000);
+  }, [series.points]);
+
+  const options = useMemo(
+    () => HORIZON_OPTIONS.filter((o) => o.value === null || o.value < spanDays),
+    [spanDays]
+  );
+
+  // Window the points / whales / regime markers to the selected horizon (relative to the last day).
+  const view = useMemo(() => {
+    const pts = series.points;
+    if (pts.length === 0) {
+      return { points: [] as PricePoint[], whales: [] as WhaleTrade[], regimes: [] as RegimeShift[] };
+    }
+    if (horizon === null) {
+      return { points: pts, whales, regimes: series.regimeShifts };
+    }
+    const lastMs = dayMs(pts[pts.length - 1]?.ts ?? "");
+    const cutoff = lastMs - horizon * 86_400_000;
+    return {
+      points: pts.filter((p) => dayMs(p.ts) >= cutoff),
+      whales: whales.filter((w) => w.ts >= cutoff),
+      regimes: series.regimeShifts.filter((r) => dayMs(r.ts) >= cutoff)
+    };
+  }, [series.points, series.regimeShifts, whales, horizon]);
+
   useEffect(() => {
     setDrawn(false);
     const id = requestAnimationFrame(() => requestAnimationFrame(() => setDrawn(true)));
     return () => cancelAnimationFrame(id);
-  }, [series]);
+  }, [view, width]);
 
-  const points = series.points;
+  const points = view.points;
 
   const model = useMemo(() => {
     if (points.length === 0) return null;
     const times = points.map((p) => dayMs(p.ts));
     const startMs = times[0] ?? 0;
-    const endMs = Math.max(times[times.length - 1] ?? startMs + 1, ...whales.map((w) => w.ts).filter(Number.isFinite));
+    const endMs = Math.max(times[times.length - 1] ?? startMs + 1, ...view.whales.map((w) => w.ts).filter(Number.isFinite));
     const tspan = endMs - startMs || 1;
 
-    // Price y-axis is padded a little around the observed range so the line isn't glued to the edges.
-    const lo = Math.max(0, series.min === null ? 0 : series.min - 0.05);
-    const hi = Math.min(1, series.max === null ? 1 : series.max + 0.05);
+    // y-axis padded a little around the *visible* range so the line isn't glued to the edges.
+    const prices = points.map((p) => p.price);
+    const vMin = Math.min(...prices);
+    const vMax = Math.max(...prices);
+    const lo = Math.max(0, vMin - 0.05);
+    const hi = Math.min(1, vMax + 0.05);
     const pspan = hi - lo || 1;
 
     const nx = (ms: number): number => padL + ((ms - startMs) / tspan) * (width - padL - padR);
@@ -79,32 +125,23 @@ export default function PriceChart({ series, whales }: PriceChartProps) {
       return { y: ny(v), label: `${Math.round(v * 100)}¢` };
     });
 
-    // Whale markers sized by USDC on a sqrt scale (area ∝ value), clamped to a readable radius range.
-    const maxUsd = Math.max(1, ...whales.map((w) => w.usdc));
-    const markers = whales
+    const maxUsd = Math.max(1, ...view.whales.map((w) => w.usdc));
+    const markers = view.whales
       .filter((w) => Number.isFinite(w.ts))
       .map((w) => {
         const r = 3 + 7 * Math.sqrt(Math.min(1, w.usdc / maxUsd));
-        const py = w.price === null ? ny((series.latest ?? 0.5)) : ny(w.price);
+        const py = w.price === null ? ny(prices[prices.length - 1] ?? 0.5) : ny(w.price);
         return { w, x: nx(w.ts), y: py, r };
       });
 
-    const regimes = series.regimeShifts.map((s) => ({ x: nx(dayMs(s.ts)), s }));
+    const regimes = view.regimes.map((s) => ({ x: nx(dayMs(s.ts)), s }));
 
-    return { times, startMs, endMs, tspan, nx, ny, line, area, xticks, yticks, markers, regimes, lo };
-  }, [points, whales, width, series]);
-
-  if (!model) {
-    return (
-      <div className="ma-chartbox empty" ref={wrapRef}>
-        <span className="muted">No tracked price history for this market yet.</span>
-      </div>
-    );
-  }
+    return { times, startMs, endMs, nx, ny, line, area, xticks, yticks, markers, regimes };
+  }, [points, view.whales, view.regimes, width]);
 
   // Nearest point to the hovered x (in px), for the crosshair readout.
   let hover: { x: number; y: number; ts: number; price: number } | null = null;
-  if (hoverX !== null) {
+  if (hoverX !== null && model) {
     let best = 0;
     let bestDist = Infinity;
     model.times.forEach((t, i) => {
@@ -124,8 +161,34 @@ export default function PriceChart({ series, whales }: PriceChartProps) {
     setHoverX(((e.clientX - rect.left) / rect.width) * width);
   };
 
+  const toggle =
+    options.length > 1 ? (
+      <div className="ma-hz" role="group" aria-label="Price history range">
+        {options.map((o) => (
+          <button
+            key={o.label}
+            type="button"
+            className={horizon === o.value ? "active" : ""}
+            onClick={() => setHorizon(o.value)}
+            aria-pressed={horizon === o.value}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
+  if (!model) {
+    return (
+      <div className="ma-chartbox empty" ref={wrapRef}>
+        <span className="muted">No tracked price history for this market yet.</span>
+      </div>
+    );
+  }
+
   return (
     <div className="ma-chartbox" ref={wrapRef}>
+      {toggle}
       <svg
         width={width}
         height={H}

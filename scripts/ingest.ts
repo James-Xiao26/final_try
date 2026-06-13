@@ -820,7 +820,9 @@ async function cacheListedMarketPrices(
   client: PolymarketClient,
   events: EventSummary[]
 ): Promise<ListedPriceResult> {
-  const maxHorizon = Math.max(...CONFIG.HORIZONS);
+  // Keep the full market lifetime (capped at PRICE_HISTORY_LISTED_DAYS) so the chart can default to
+  // "since creation"; the page windows it down to 7D/30D/etc. at read time.
+  const historyDays = CONFIG.PRICE_HISTORY_LISTED_DAYS;
   const msPerDay = CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
   const nowMs = Date.now();
   const todayUtc = new Date(nowMs).toISOString().slice(0, "YYYY-MM-DD".length);
@@ -865,7 +867,7 @@ async function cacheListedMarketPrices(
       const conditionId = conditionByToken.get(asset) ?? null;
       try {
         const history = await client.getPriceHistory(asset);
-        const points = dailyPointsFromHistory(history, maxHorizon, nowMs);
+        const points = dailyPointsFromHistory(history, historyDays, nowMs);
         if (points.length === 0) {
           continue;
         }
@@ -1146,18 +1148,34 @@ async function cacheMarketPriceHistory(
   };
   await Promise.all(Array.from({ length: Math.min(CONFIG.WALLET_CONCURRENCY, fetch.length) }, () => worker()));
 
-  // Bound growth: drop daily rows (and stale meta) older than the max horizon.
-  const pruneBefore = new Date(Date.parse(todayUtc) - maxHorizon * msPerDay).toISOString().slice(0, "YYYY-MM-DD".length);
+  // Bound growth with two retention windows: wallet-seeded rows (condition_id null — the equity-curve
+  // cache) at the max scoring horizon; listed-market rows (condition_id set — the Markets-page chart)
+  // at the deeper PRICE_HISTORY_LISTED_DAYS so the chart keeps a market's full lifetime.
+  const dayStr = (daysBack: number): string =>
+    new Date(Date.parse(todayUtc) - daysBack * msPerDay).toISOString().slice(0, "YYYY-MM-DD".length);
+  const walletPruneBefore = dayStr(maxHorizon);
+  const listedPruneBefore = dayStr(CONFIG.PRICE_HISTORY_LISTED_DAYS);
   let pruned = 0;
-  const { error: pruneError, count } = await supabase
+  const { error: walletPruneError, count: walletCount } = await supabase
     .from("market_price_history")
     .delete({ count: "exact" })
-    .lt("ts", pruneBefore);
-  if (pruneError) {
-    throw pruneError;
+    .is("condition_id", null)
+    .lt("ts", walletPruneBefore);
+  if (walletPruneError) {
+    throw walletPruneError;
   }
-  pruned = count ?? 0;
-  const { error: pruneMetaError } = await supabase.from("market_price_meta").delete().lt("max_ts", pruneBefore);
+  const { error: listedPruneError, count: listedCount } = await supabase
+    .from("market_price_history")
+    .delete({ count: "exact" })
+    .not("condition_id", "is", null)
+    .lt("ts", listedPruneBefore);
+  if (listedPruneError) {
+    throw listedPruneError;
+  }
+  pruned = (walletCount ?? 0) + (listedCount ?? 0);
+  // Meta tracks newest-day-per-token for fetch planning; drop only tokens whose tail is older than the
+  // deeper window so listed tokens aren't re-fetched needlessly.
+  const { error: pruneMetaError } = await supabase.from("market_price_meta").delete().lt("max_ts", listedPruneBefore);
   if (pruneMetaError) {
     throw pruneMetaError;
   }

@@ -73,6 +73,11 @@ export const CONFIG = {
   // state is just newly-seen markets + active-tail refreshes. Lower it to spread a huge backfill
   // across several daily runs.
   PRICE_HISTORY_MAX_FETCHES_PER_RUN: 4000,
+  // How many days of daily history to keep for *listed* markets (the Markets-page price chart, keyed
+  // by condition_id). Much deeper than the scoring HORIZONS so the chart can default to a market's
+  // full lifetime; bounds storage / prunes orphaned markets that rotate out of the top set. Wallet-
+  // seeded rows (condition_id null, the equity-curve cache) still prune at the max scoring horizon.
+  PRICE_HISTORY_LISTED_DAYS: 365,
   // How many top markets to persist for the Markets page. One liquidity-sorted superset is stored;
   // the read layer re-orders it by volume/24h/volatility, so no per-sort fetch is needed.
   MARKETS_TOP_N: 300,

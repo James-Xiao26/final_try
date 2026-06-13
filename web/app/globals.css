@@ -1086,6 +1086,12 @@ input:focus { border-color: var(--green) !important; }
 .ma-leg.regime::before { background: var(--yellow); }
 
 .ma-chartbox { position: relative; width: 100%; }
+.ma-hz { position: absolute; top: 0; right: 0; z-index: 2; display: inline-flex; gap: 2px; padding: 3px;
+  background: rgba(3,16,26,0.65); border: 1px solid var(--line); border-radius: 8px; }
+.ma-hz button { font-size: 10px; letter-spacing: 0.06em; color: var(--muted); padding: 3px 9px; border-radius: 5px;
+  border: none; background: transparent; transition: color .15s, background .15s; }
+.ma-hz button:hover { color: var(--text); }
+.ma-hz button.active { color: var(--bg); background: var(--green); font-weight: 700; }
 .ma-chartbox.empty { height: 220px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--line); border-radius: 10px; }
 .ma-chartbox svg { display: block; width: 100%; height: auto; }
 .ma-axis { fill: var(--muted-d); font-size: 9px; font-family: var(--font-plex-mono), monospace; }
