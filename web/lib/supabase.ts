@@ -1,11 +1,13 @@
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import type { ClosedTrade, ClosedTradesFeed, CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, WalletMetrics, WalletPosition, WalletProfile } from "./types";
+import type { CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, ResolvedMarket, WalletMetrics, WalletPosition, WalletProfile } from "./types";
 import { HORIZONS } from "./types";
 import { groupWalletTrades } from "./walletTrades";
 import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis } from "./recentTrades";
 import { buildCrowdMarketDetail, summarizeCrowdedMarkets, type CrowdClosedPosition, type CrowdLookups, type CrowdOpenPosition, type CrowdTradeFill } from "./marketCrowd";
+import type { MarketAnalytics, MarketMeta, PricePoint, WhaleFillInput } from "./marketAnalytics";
+import { summarizeResolvedMarkets } from "./resolvedMarkets";
 
 type WalletRow = Database["public"]["Tables"]["wallets"]["Row"];
 type WalletStatsRow = Database["public"]["Tables"]["wallet_stats"]["Row"];
@@ -46,6 +48,7 @@ type MarketRowDb = Database["public"]["Tables"]["markets"]["Row"];
 type MarketSelectRow = Pick<
   MarketRowDb,
   | "id"
+  | "condition_id"
   | "question"
   | "slug"
   | "category"
@@ -315,123 +318,6 @@ export async function getRecentLeaderboardTrades(
   return { positions, traderCount };
 }
 
-interface ClosedTradeSelectRow {
-  address: string;
-  condition_id: string | null;
-  outcome_index: number | null;
-  market: string | null;
-  avg_price: number | null;
-  realized_pnl: number | null;
-  size: number | null;
-  close_time: string | null;
-}
-
-// Fully-closed / resolved positions by leaderboard wallets in the last `windowHours`, newest close
-// first. Reads wallet_closed_positions directly (already board-scoped, and the ingest folds in
-// held-to-resolution positions), so it carries the realized $ P/L without any fill-window join —
-// which is why it covers trades the Acoustic Log's grouping can't. Joins rank/skill/handle for
-// display. Capped at `limit` most-recent closes (the table scrolls).
-export async function getRecentClosedTrades(
-  opts: { windowHours?: number; limit?: number } = {}
-): Promise<ClosedTradesFeed> {
-  const supabase = createSupabaseServerClient();
-  const windowHours = opts.windowHours ?? 24;
-  const limit = opts.limit ?? 300;
-  const cutoff = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
-
-  const { data, error } = await supabase
-    .from("wallet_closed_positions")
-    .select("address, condition_id, outcome_index, market, avg_price, realized_pnl, size, close_time")
-    .gte("close_time", cutoff)
-    .order("close_time", { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    if (isMissingSchemaError(error)) {
-      return { trades: [], traderCount: 0 };
-    }
-    throw error;
-  }
-
-  const rows = (data ?? []) as unknown as ClosedTradeSelectRow[];
-  if (rows.length === 0) {
-    return { trades: [], traderCount: 0 };
-  }
-
-  const addresses = [...new Set(rows.map((row) => row.address))];
-  const { data: cacheData, error: cacheError } = await supabase
-    .from("leaderboard_cache")
-    .select("address, skill_score, rank")
-    .in("address", addresses);
-
-  if (cacheError) {
-    if (isMissingSchemaError(cacheError)) {
-      return { trades: [], traderCount: 0 };
-    }
-    throw cacheError;
-  }
-
-  // Best (highest) skill score / best (lowest-number) rank per address across horizons; presence in
-  // the map == currently on the leaderboard.
-  const skillByAddress = new Map<string, number | null>();
-  const rankByAddress = new Map<string, number>();
-  ((cacheData ?? []) as unknown as SkillSelectRow[]).forEach((row) => {
-    const next = row.skill_score;
-    const prev = skillByAddress.get(row.address);
-    if (prev === undefined || (next !== null && (prev === null || next > prev))) {
-      skillByAddress.set(row.address, next);
-    }
-    const prevRank = rankByAddress.get(row.address);
-    if (prevRank === undefined || row.rank < prevRank) {
-      rankByAddress.set(row.address, row.rank);
-    }
-  });
-
-  const memberAddresses = [...skillByAddress.keys()];
-  const handles = new Map<string, string | null>();
-  if (memberAddresses.length > 0) {
-    const { data: wallets, error: walletError } = await supabase
-      .from("wallets")
-      .select("address, handle")
-      .in("address", memberAddresses);
-
-    if (walletError) {
-      if (isMissingSchemaError(walletError)) {
-        return { trades: [], traderCount: 0 };
-      }
-      throw walletError;
-    }
-
-    ((wallets ?? []) as unknown as WalletHandleRow[]).forEach((wallet) => handles.set(wallet.address, wallet.handle));
-  }
-
-  const trades: ClosedTrade[] = rows
-    .filter((row) => skillByAddress.has(row.address) && row.close_time !== null)
-    .map((row) => {
-      const avgEntry = row.avg_price;
-      const size = row.size;
-      const realizedPnl = row.realized_pnl;
-      const basis = avgEntry !== null && size !== null ? avgEntry * size : null;
-      const realizedPct = realizedPnl !== null && basis !== null && basis > 0 ? realizedPnl / basis : null;
-      return {
-        address: row.address,
-        handle: handles.get(row.address) ?? null,
-        rank: rankByAddress.get(row.address) ?? null,
-        skillScore: skillByAddress.get(row.address) ?? null,
-        conditionId: row.condition_id,
-        market: row.market,
-        outcomeIndex: row.outcome_index,
-        avgEntry,
-        size,
-        realizedPnl,
-        realizedPct,
-        closeTime: row.close_time as string
-      };
-    });
-
-  const traderCount = new Set(trades.map((trade) => trade.address)).size;
-  return { trades, traderCount };
-}
 
 const MARKET_SORT_COLUMNS: Record<MarketSort, keyof MarketSelectRow> = {
   liquidity: "liquidity_usd",
@@ -450,7 +336,7 @@ export async function getMarkets(
 
   let query = supabase
     .from("markets")
-    .select("id, question, slug, category, liquidity_usd, volume_usd, volume_24hr_usd, volume_1wk_usd, last_trade_price, top_outcome, one_day_price_change, end_date, image")
+    .select("id, condition_id, question, slug, category, liquidity_usd, volume_usd, volume_24hr_usd, volume_1wk_usd, last_trade_price, top_outcome, one_day_price_change, end_date, image")
     .eq("active", true)
     .eq("closed", false)
     .order(column, { ascending: false, nullsFirst: false })
@@ -473,6 +359,7 @@ export async function getMarkets(
   const rows = (data ?? []) as unknown as MarketSelectRow[];
   return rows.map((row) => ({
     id: row.id,
+    conditionId: row.condition_id,
     question: row.question,
     slug: row.slug ?? "",
     category: row.category,
@@ -869,4 +756,250 @@ export async function getCrowdMarketDetail(conditionId: string): Promise<CrowdMa
 
   const lookups: CrowdLookups = { rankByAddress, handleByAddress, skillByAddress };
   return buildCrowdMarketDetail(conditionId, positions, closed, fills, lookups, pricesByDay);
+}
+
+interface MarketMetaSelectRow {
+  question: string;
+  slug: string | null;
+  category: string | null;
+  image: string | null;
+  end_date: string | null;
+  liquidity_usd: number | null;
+  volume_usd: number | null;
+  volume_24hr_usd: number | null;
+  volume_1wk_usd: number | null;
+  spread: number | null;
+  last_trade_price: number | null;
+  top_outcome: string | null;
+  one_day_price_change: number | null;
+  outcomes: string[] | null;
+  outcome_prices: number[] | null;
+  active: boolean;
+  closed: boolean;
+}
+
+// Full Market Analytics payload for one binary condition_id: the markets-table snapshot (`meta`), the
+// leaderboard participation `detail` (participants + convergence timeline, null when untracked), the
+// raw daily YES price series (`priceRows`), and the tracked fills joined with each wallet's
+// leaderboard identity (`whaleFills`). The page derives every chart/metric from these via the pure
+// helpers in marketAnalytics.ts. Either of `meta`/`detail` may be null; only an all-empty result (no
+// market row AND no participation) is treated as "not found" by the page.
+export async function getMarketAnalytics(conditionId: string): Promise<MarketAnalytics> {
+  const supabase = createSupabaseServerClient();
+
+  const [metaRes, openRes, closedRes, fillsRes] = await Promise.all([
+    supabase
+      .from("markets")
+      .select(
+        "question, slug, category, image, end_date, liquidity_usd, volume_usd, volume_24hr_usd, volume_1wk_usd, spread, last_trade_price, top_outcome, one_day_price_change, outcomes, outcome_prices, active, closed"
+      )
+      .eq("condition_id", conditionId)
+      .order("volume_usd", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase.from("wallet_positions").select(OPEN_POSITION_COLUMNS).eq("condition_id", conditionId),
+    supabase.from("wallet_closed_positions").select(CLOSED_POSITION_COLUMNS).eq("condition_id", conditionId),
+    supabase.from("wallet_trades").select(CROWD_FILL_COLUMNS).eq("condition_id", conditionId).order("traded_at", { ascending: false })
+  ]);
+
+  for (const res of [metaRes, openRes, closedRes, fillsRes]) {
+    if (res.error && !isMissingSchemaError(res.error)) {
+      throw res.error;
+    }
+  }
+
+  const metaRow = (metaRes.data ?? null) as unknown as MarketMetaSelectRow | null;
+  const meta: MarketMeta | null = metaRow
+    ? {
+        question: metaRow.question,
+        slug: metaRow.slug,
+        category: metaRow.category,
+        image: metaRow.image,
+        endDate: metaRow.end_date,
+        liquidityUsd: toNumber(metaRow.liquidity_usd),
+        volumeUsd: toNumber(metaRow.volume_usd),
+        volume24hrUsd: toNumber(metaRow.volume_24hr_usd),
+        volume1wkUsd: toNumber(metaRow.volume_1wk_usd),
+        spread: metaRow.spread,
+        lastTradePrice: metaRow.last_trade_price,
+        topOutcome: metaRow.top_outcome,
+        oneDayPriceChange: metaRow.one_day_price_change,
+        outcomes: metaRow.outcomes,
+        outcomePrices: metaRow.outcome_prices,
+        active: metaRow.active,
+        closed: metaRow.closed
+      }
+    : null;
+
+  const positions = ((openRes.data ?? []) as unknown as OpenPositionRowDb[]).map(toOpenPosition);
+  const closed = ((closedRes.data ?? []) as unknown as ClosedPositionRowDb[]).map(toClosedPosition);
+  const fills = ((fillsRes.data ?? []) as unknown as CrowdFillRowDb[]).map(toCrowdFill);
+
+  const addresses = [
+    ...new Set([...positions.map((p) => p.address), ...closed.map((p) => p.address), ...fills.map((f) => f.address)])
+  ];
+
+  // Identity lookups for the participating wallets (handle + best rank/skill across horizons).
+  const handleByAddress = new Map<string, string | null>();
+  const rankByAddress = new Map<string, number>();
+  const skillByAddress = new Map<string, number | null>();
+  if (addresses.length > 0) {
+    const [walletsRes, cacheRes] = await Promise.all([
+      supabase.from("wallets").select("address, handle").in("address", addresses),
+      supabase.from("leaderboard_cache").select("address, rank, skill_score").in("address", addresses)
+    ]);
+    if (walletsRes.error && !isMissingSchemaError(walletsRes.error)) throw walletsRes.error;
+    if (cacheRes.error && !isMissingSchemaError(cacheRes.error)) throw cacheRes.error;
+
+    ((walletsRes.data ?? []) as unknown as { address: string; handle: string | null }[]).forEach((row) =>
+      handleByAddress.set(row.address, row.handle)
+    );
+    ((cacheRes.data ?? []) as unknown as { address: string; rank: number; skill_score: number | null }[]).forEach((row) => {
+      const prevRank = rankByAddress.get(row.address);
+      if (prevRank === undefined || row.rank < prevRank) rankByAddress.set(row.address, row.rank);
+      const prevSkill = skillByAddress.get(row.address);
+      if (prevSkill === undefined || (row.skill_score !== null && (prevSkill === null || row.skill_score > prevSkill))) {
+        skillByAddress.set(row.address, row.skill_score);
+      }
+    });
+  }
+
+  // Daily YES price series (best-effort): market_price_history is keyed by outcome token (asset). Use
+  // the YES token (outcome 0) directly, else the NO token inverted (1 − price). Same approach as the
+  // convergence overlay, but here we keep the full series for the price chart.
+  const yesAsset = positions.find((p) => p.outcomeIndex === 0)?.asset ?? null;
+  const noAsset = yesAsset === null ? positions.find((p) => p.outcomeIndex === 1)?.asset ?? null : null;
+  const priceAsset = yesAsset ?? noAsset;
+  const priceRows: PricePoint[] = [];
+  const pricesByDay = new Map<string, number>();
+  if (priceAsset) {
+    const { data: priceData, error: priceError } = await supabase
+      .from("market_price_history")
+      .select("ts, price")
+      .eq("asset", priceAsset)
+      .order("ts", { ascending: true });
+    if (priceError && !isMissingSchemaError(priceError)) throw priceError;
+    ((priceData ?? []) as unknown as { ts: string; price: number }[]).forEach((row) => {
+      const day = row.ts.slice(0, "YYYY-MM-DD".length);
+      const yesPrice = yesAsset !== null ? row.price : 1 - row.price;
+      priceRows.push({ ts: day, price: yesPrice });
+      pricesByDay.set(day, yesPrice);
+    });
+  }
+
+  const lookups: CrowdLookups = { rankByAddress, handleByAddress, skillByAddress };
+  const detail =
+    addresses.length > 0
+      ? buildCrowdMarketDetail(conditionId, positions, closed, fills, lookups, pricesByDay)
+      : null;
+
+  const whaleFills: WhaleFillInput[] = fills.map((f) => ({
+    address: f.address,
+    handle: handleByAddress.get(f.address) ?? null,
+    rank: rankByAddress.get(f.address) ?? null,
+    skillScore: skillByAddress.get(f.address) ?? null,
+    outcomeIndex: f.outcomeIndex,
+    side: f.side,
+    price: f.price,
+    size: f.size,
+    usdcSize: f.usdcSize,
+    tradedAt: f.tradedAt
+  }));
+
+  return { conditionId, meta, detail, priceRows, whaleFills };
+}
+
+// Resolved Markets panel: closed positions from the last 7 days, grouped by market (conditionId),
+// filtered to confirmed-resolved markets only (≥1 wallet held to resolution at 0 or 1). Returns
+// up to 40 markets, newest-resolved first, each with the winning side and per-wallet P/L.
+interface ResolvedClosedSelectRow {
+  address: string;
+  condition_id: string | null;
+  outcome_index: number | null;
+  market: string | null;
+  avg_price: number | null;
+  realized_pnl: number | null;
+  size: number | null;
+  close_time: string | null;
+  first_traded_at: string | null;
+}
+
+export async function getResolvedMarkets(limit = 40): Promise<ResolvedMarket[]> {
+  const supabase = createSupabaseServerClient();
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { rows, missing } = await fetchAllPaged((from, to) =>
+    supabase
+      .from("wallet_closed_positions")
+      .select("address, condition_id, outcome_index, market, avg_price, realized_pnl, size, close_time, first_traded_at")
+      .gte("close_time", cutoff)
+      .order("close_time", { ascending: false })
+      .range(from, to)
+  );
+
+  if (missing) return [];
+
+  const rawRows = rows as unknown as ResolvedClosedSelectRow[];
+  if (rawRows.length === 0) return [];
+
+  const addresses = [...new Set(rawRows.map((r) => r.address))];
+
+  // Leaderboard membership: rank + skill per address.
+  const { data: cacheData, error: cacheError } = await supabase
+    .from("leaderboard_cache")
+    .select("address, skill_score, rank")
+    .in("address", addresses);
+
+  if (cacheError) {
+    if (isMissingSchemaError(cacheError)) return [];
+    throw cacheError;
+  }
+
+  const skillByAddress = new Map<string, number | null>();
+  const rankByAddress = new Map<string, number>();
+  ((cacheData ?? []) as unknown as SkillSelectRow[]).forEach((row) => {
+    const next = row.skill_score;
+    const prev = skillByAddress.get(row.address);
+    if (prev === undefined || (next !== null && (prev === null || next > prev))) {
+      skillByAddress.set(row.address, next);
+    }
+    const prevRank = rankByAddress.get(row.address);
+    if (prevRank === undefined || row.rank < prevRank) {
+      rankByAddress.set(row.address, row.rank);
+    }
+  });
+
+  const memberAddresses = [...skillByAddress.keys()];
+  const handleByAddress = new Map<string, string | null>();
+  if (memberAddresses.length > 0) {
+    const { data: wallets, error: walletError } = await supabase
+      .from("wallets")
+      .select("address, handle")
+      .in("address", memberAddresses);
+
+    if (walletError) {
+      if (isMissingSchemaError(walletError)) return [];
+      throw walletError;
+    }
+
+    ((wallets ?? []) as unknown as WalletHandleRow[]).forEach((wallet) =>
+      handleByAddress.set(wallet.address, wallet.handle)
+    );
+  }
+
+  const lookups: CrowdLookups = { rankByAddress, handleByAddress, skillByAddress };
+
+  const inputs = rawRows.map((r) => ({
+    address: r.address,
+    conditionId: r.condition_id,
+    market: r.market,
+    outcomeIndex: r.outcome_index,
+    avgPrice: toNumber(r.avg_price),
+    size: toNumber(r.size),
+    realizedPnl: r.realized_pnl,
+    closeTime: r.close_time,
+    firstTradedAt: r.first_traded_at
+  }));
+
+  return summarizeResolvedMarkets(inputs, lookups, limit);
 }

@@ -63,6 +63,24 @@ test("mapEvent surfaces the most-favored outcome (highest probability, not highe
   assert.equal(event.spread, 0.003);
 });
 
+test("mapEvent stores the leading market's conditionId (the analytics-page join key)", () => {
+  const event = mapEvent(
+    eventRecord({
+      markets: [
+        nestedMarket({ groupItemTitle: "France", outcomePrices: "[\"0.22\", \"0.78\"]", conditionId: "0xfrance" }),
+        nestedMarket({ groupItemTitle: "Spain", outcomePrices: "[\"0.17\", \"0.83\"]", conditionId: "0xspain" })
+      ]
+    })
+  );
+  // France leads on probability (0.22 > 0.17), so its conditionId wins.
+  assert.equal(event.conditionId, "0xfrance");
+});
+
+test("mapEvent leaves conditionId null when the leading market has none", () => {
+  const event = mapEvent(eventRecord());
+  assert.equal(event.conditionId, null);
+});
+
 test("mapEvent surfaces the favored (highest-probability) outcome's 24h price change", () => {
   const event = mapEvent(
     eventRecord({

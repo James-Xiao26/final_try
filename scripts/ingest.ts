@@ -770,6 +770,7 @@ async function ingestMarkets(supabase: SupabaseClient, client: PolymarketClient)
   const { error } = await supabase.from("markets").insert(
     events.map((event) => ({
       id: event.id,
+      condition_id: event.conditionId,
       question: event.question,
       slug: event.slug,
       category: event.category,

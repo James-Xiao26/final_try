@@ -67,6 +67,7 @@ export interface LeaderboardEntry {
 // that leading market's bid/ask spread (the volatility proxy). null = not derivable.
 export interface EventSummary {
   id: string;
+  conditionId: string | null;
   question: string;
   slug: string;
   category: string | null;
@@ -385,6 +386,9 @@ interface LeadingOutcome {
   spread: number | null;
   // Change in the leading outcome's price over the last 24h, as a 0–1 fraction (e.g. 0.03 = +3pts).
   oneDayPriceChange: number | null;
+  // The leading market's binary condition id — the key the wallet position/trade caches and the
+  // Market Analytics page join on. Null when the event exposes no usable conditionId.
+  conditionId: string | null;
 }
 
 // An event has many outcome markets (e.g. one per team). There's no single event price, so we
@@ -393,7 +397,7 @@ interface LeadingOutcome {
 // its groupItemTitle ("France"). For a plain binary market it's whichever leg is priced higher, so a
 // market trading "No" at 70% shows "No 70%", not "Yes 30%".
 function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
-  let leading: LeadingOutcome = { price: null, label: null, spread: null, oneDayPriceChange: null };
+  let leading: LeadingOutcome = { price: null, label: null, spread: null, oneDayPriceChange: null, conditionId: null };
   let bestYes = -Infinity;
 
   for (const market of markets) {
@@ -412,10 +416,11 @@ function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
     const groupTitle = readString(market, ["groupItemTitle"]);
     const change = readOptionalNumber(market, ["oneDayPriceChange"]);
     const spread = readOptionalNumber(market, ["spread"]);
+    const conditionId = readString(market, ["conditionId", "condition_id", "id"]) || null;
 
     if (groupTitle) {
       // Candidate within a multi-outcome event: the candidate *is* the Yes side.
-      leading = { price: yesPrice, label: groupTitle, spread, oneDayPriceChange: change };
+      leading = { price: yesPrice, label: groupTitle, spread, oneDayPriceChange: change, conditionId };
     } else {
       // Plain binary market: surface whichever leg (Yes/No) is priced higher.
       const noPrice = prices.length > 1 ? prices[1] ?? null : 1 - yesPrice;
@@ -425,7 +430,8 @@ function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
         label: noLeads ? outcomes[1] || "No" : outcomes[0] || "Yes",
         spread,
         // oneDayPriceChange tracks the Yes leg; the No leg moves the opposite way.
-        oneDayPriceChange: change === null ? null : noLeads ? -change : change
+        oneDayPriceChange: change === null ? null : noLeads ? -change : change,
+        conditionId
       };
     }
   }
@@ -443,6 +449,7 @@ export function mapEvent(record: JsonRecord): EventSummary {
 
   return {
     id: readString(record, ["id", "eventId"]),
+    conditionId: leading.conditionId,
     question: readString(record, ["title", "question"]),
     slug: readString(record, ["slug"]),
     category,

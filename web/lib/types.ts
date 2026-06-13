@@ -96,6 +96,7 @@ export type MarketSort = (typeof MARKET_SORTS)[number];
 // leading (favorite) outcome; oneDayPriceChange is that outcome's price change over the last 24h.
 export interface MarketRow {
   id: string;
+  conditionId: string | null;
   question: string;
   slug: string;
   category: string | null;
@@ -179,30 +180,6 @@ export interface RecentTradesFeed {
   traderCount: number;
 }
 
-// One fully-closed (sold-out) or resolved position by a leaderboard wallet, for the Closed Trades
-// table on the Activity page. Read straight from the wallet_closed_positions cache (which already
-// folds in held-to-resolution positions), so it carries the realized $ P/L directly — no fill-window
-// join. realizedPct is realizedPnl / (avgEntry·size) when the basis is known.
-export interface ClosedTrade {
-  address: string;
-  handle: string | null;
-  rank: number | null;
-  skillScore: number | null;
-  conditionId: string | null;
-  market: string | null;
-  outcomeIndex: number | null;
-  avgEntry: number | null;
-  size: number | null;
-  realizedPnl: number | null;
-  realizedPct: number | null;
-  closeTime: string;
-}
-
-export interface ClosedTradesFeed {
-  trades: ClosedTrade[];
-  traderCount: number;
-}
-
 // ── Convergence ("Crowded Markets") ─────────────────────────────────────────────
 // A market (one binary condition_id) where multiple leaderboard wallets hold or held a
 // position. Outcome 0 = YES, 1 = NO (Polymarket binary convention, matching outcomeLabel
@@ -264,6 +241,38 @@ export interface CrowdTimelinePoint {
   yesCostUsd: number;           // cumulative net USDC cost on YES
   noCostUsd: number;            // cumulative net USDC cost on NO
   price: number | null;         // YES token price that day (best-effort)
+}
+
+// ── Resolved Markets panel ────────────────────────────────────────────────────
+// One leaderboard wallet's closed position in a confirmed-resolved market.
+export interface ResolvedParticipant {
+  address: string;
+  handle: string | null;
+  rank: number | null;
+  skillScore: number | null;
+  outcomeIndex: number | null;
+  side: "YES" | "NO" | "—";
+  won: boolean;
+  avgEntry: number | null;
+  size: number;
+  realizedPnl: number | null;
+  realizedPct: number | null;
+  closeTime: string | null;
+  firstTradedAt: string | null;
+}
+
+// One confirmed-resolved market, aggregated from the leaderboard's closed positions.
+export interface ResolvedMarket {
+  conditionId: string;
+  market: string | null;
+  winningOutcomeIndex: number;
+  winningSide: "YES" | "NO";
+  resolvedAt: string;
+  traderCount: number;
+  winners: number;
+  losers: number;
+  totalRealizedPnl: number;
+  participants: ResolvedParticipant[];
 }
 
 export interface CrowdMarketDetail {

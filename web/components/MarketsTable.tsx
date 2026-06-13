@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCompactUsd, formatPercent } from "@/lib/format";
 import type { MarketRow, MarketSort } from "@/lib/types";
@@ -178,13 +179,24 @@ export default function MarketsTable({ initialRows, initialSort }: MarketsTableP
                     <tr key={m.id}>
                       <td className="mkt-q">
                         <div className="q">
-                          {m.slug ? (
-                            <a href={`https://polymarket.com/event/${m.slug}`} target="_blank" rel="noopener noreferrer">
-                              {m.question}<ExternalLink className="ext" size={12} />
-                            </a>
+                          {m.conditionId ? (
+                            <Link href={`/market/${encodeURIComponent(m.conditionId)}`} title="Open market analytics">
+                              {m.question}
+                            </Link>
                           ) : (
                             <span>{m.question}</span>
                           )}
+                          {m.slug ? (
+                            <a
+                              className="mkt-ext"
+                              href={`https://polymarket.com/event/${m.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="View on Polymarket"
+                            >
+                              <ExternalLink className="ext" size={12} />
+                            </a>
+                          ) : null}
                         </div>
                         {m.category ? <div className="cat">{m.category}</div> : null}
                       </td>

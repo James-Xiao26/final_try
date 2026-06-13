@@ -1,14 +1,14 @@
-import ClosedTradesFeed from "@/components/ClosedTradesFeed";
 import ConvergencePanel from "@/components/ConvergencePanel";
 import RecentTradesFeed from "@/components/RecentTradesFeed";
-import { getCrowdedMarkets, getRecentClosedTrades, getRecentLeaderboardTrades } from "@/lib/supabase";
+import ResolvedMarketsPanel from "@/components/ResolvedMarketsPanel";
+import { getCrowdedMarkets, getRecentLeaderboardTrades, getResolvedMarkets } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [{ positions, traderCount }, closed, crowdedMarkets] = await Promise.all([
+  const [{ positions, traderCount }, resolvedMarkets, crowdedMarkets] = await Promise.all([
     getRecentLeaderboardTrades(),
-    getRecentClosedTrades(),
+    getResolvedMarkets(),
     getCrowdedMarkets()
   ]);
 
@@ -26,7 +26,7 @@ export default async function HomePage() {
 
       <RecentTradesFeed initialPositions={positions} initialTraderCount={traderCount} />
 
-      <ClosedTradesFeed trades={closed.trades} traderCount={closed.traderCount} />
+      <ResolvedMarketsPanel rows={resolvedMarkets} />
 
       <ConvergencePanel initialRows={crowdedMarkets} />
     </main>

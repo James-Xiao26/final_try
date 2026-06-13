@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatCompactUsd } from "@/lib/format";
 import type { CrowdedMarketSummary } from "@/lib/types";
@@ -37,7 +38,7 @@ function ConvergenceRow({ row }: { row: CrowdedMarketSummary }) {
   const l = lean(row);
 
   return (
-    <div className="cv-row">
+    <Link className="cv-row" href={`/market/${encodeURIComponent(row.conditionId)}`} title="Open market analytics">
       <div className="cv-rank-cell">
         <span className="cv-contacts">{row.traderCount}</span>
         <span className="cv-contacts-lbl">contacts</span>
@@ -66,7 +67,7 @@ function ConvergenceRow({ row }: { row: CrowdedMarketSummary }) {
       <div className="cv-lean-cell">
         <span className={`cv-lean ${l.cls}`}>{l.label}</span>
       </div>
-    </div>
+    </Link>
   );
 }
 
