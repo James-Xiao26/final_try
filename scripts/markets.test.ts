@@ -81,6 +81,18 @@ test("mapEvent leaves conditionId null when the leading market has none", () => 
   assert.equal(event.conditionId, null);
 });
 
+test("mapEvent captures the leading market's YES clob token (outcome 0) for the price cache", () => {
+  const event = mapEvent(
+    eventRecord({
+      markets: [
+        nestedMarket({ groupItemTitle: "France", outcomePrices: "[\"0.22\", \"0.78\"]", clobTokenIds: "[\"tokFranceYes\", \"tokFranceNo\"]" }),
+        nestedMarket({ groupItemTitle: "Spain", outcomePrices: "[\"0.17\", \"0.83\"]", clobTokenIds: "[\"tokSpainYes\", \"tokSpainNo\"]" })
+      ]
+    })
+  );
+  assert.equal(event.yesTokenId, "tokFranceYes");
+});
+
 test("mapEvent surfaces the favored (highest-probability) outcome's 24h price change", () => {
   const event = mapEvent(
     eventRecord({

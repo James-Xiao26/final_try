@@ -864,27 +864,44 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
     });
   }
 
-  // Daily YES price series (best-effort): market_price_history is keyed by outcome token (asset). Use
-  // the YES token (outcome 0) directly, else the NO token inverted (1 − price). Same approach as the
-  // convergence overlay, but here we keep the full series for the price chart.
+  // Daily YES price series, two sources (best-effort). Preferred: the listed-market series keyed by
+  // condition_id (ingest caches the leading market's YES token there, so every Markets-page market has
+  // a chart). Fallback: the leaderboard-held token series keyed by outcome token (asset) — for markets
+  // a wallet holds that aren't in the listed-markets set; the cached YES token (outcome 0) is used
+  // directly, else the NO token inverted (1 − price).
   const yesAsset = positions.find((p) => p.outcomeIndex === 0)?.asset ?? null;
   const noAsset = yesAsset === null ? positions.find((p) => p.outcomeIndex === 1)?.asset ?? null : null;
-  const priceAsset = yesAsset ?? noAsset;
   const priceRows: PricePoint[] = [];
   const pricesByDay = new Map<string, number>();
-  if (priceAsset) {
-    const { data: priceData, error: priceError } = await supabase
-      .from("market_price_history")
-      .select("ts, price")
-      .eq("asset", priceAsset)
-      .order("ts", { ascending: true });
-    if (priceError && !isMissingSchemaError(priceError)) throw priceError;
-    ((priceData ?? []) as unknown as { ts: string; price: number }[]).forEach((row) => {
-      const day = row.ts.slice(0, "YYYY-MM-DD".length);
-      const yesPrice = yesAsset !== null ? row.price : 1 - row.price;
-      priceRows.push({ ts: day, price: yesPrice });
-      pricesByDay.set(day, yesPrice);
-    });
+  const pushPrice = (ts: string, yesPrice: number): void => {
+    const day = ts.slice(0, "YYYY-MM-DD".length);
+    priceRows.push({ ts: day, price: yesPrice });
+    pricesByDay.set(day, yesPrice);
+  };
+
+  const { data: byConditionData, error: byConditionError } = await supabase
+    .from("market_price_history")
+    .select("ts, price")
+    .eq("condition_id", conditionId)
+    .order("ts", { ascending: true });
+  if (byConditionError && !isMissingSchemaError(byConditionError)) throw byConditionError;
+  const byConditionRows = (byConditionData ?? []) as unknown as { ts: string; price: number }[];
+
+  if (byConditionRows.length > 0) {
+    byConditionRows.forEach((row) => pushPrice(row.ts, row.price));
+  } else {
+    const priceAsset = yesAsset ?? noAsset;
+    if (priceAsset) {
+      const { data: byAssetData, error: byAssetError } = await supabase
+        .from("market_price_history")
+        .select("ts, price")
+        .eq("asset", priceAsset)
+        .order("ts", { ascending: true });
+      if (byAssetError && !isMissingSchemaError(byAssetError)) throw byAssetError;
+      ((byAssetData ?? []) as unknown as { ts: string; price: number }[]).forEach((row) => {
+        pushPrice(row.ts, yesAsset !== null ? row.price : 1 - row.price);
+      });
+    }
   }
 
   const lookups: CrowdLookups = { rankByAddress, handleByAddress, skillByAddress };

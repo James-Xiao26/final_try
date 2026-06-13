@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { botSignal, type BotSignal } from "./botDetection.js";
 import { CONFIG } from "./config.js";
 import { computeMetrics, type WalletMetrics } from "./metrics.js";
-import { apiStats, discoverTopWallets, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet } from "./polymarket.js";
+import { apiStats, discoverTopWallets, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet, type EventSummary } from "./polymarket.js";
 import { recentTradesFromActivity, type RecentTrade } from "./recentTrades.js";
 import { buildMarkToMarketCurve, type CurvePosition } from "./equityCurve.js";
 import { dailyPointsFromHistory, planPriceFetches, type CacheState } from "./priceHistory.js";
@@ -794,7 +794,103 @@ async function ingestMarkets(supabase: SupabaseClient, client: PolymarketClient)
     throw error;
   }
 
+  const prices = await cacheListedMarketPrices(supabase, client, events);
+  console.log(
+    `Ingested ${events.length} markets; price-history ${prices.upserted} rows across ${prices.fetched} markets (deferred=${prices.deferred})`
+  );
+
   return events.length;
+}
+
+interface ListedPriceResult {
+  fetched: number;
+  upserted: number;
+  deferred: number;
+}
+
+// Cache a daily YES price series for each *listed* market's leading outcome token, keyed by
+// condition_id, so the Market Analytics page has a price chart for every market on the Markets page —
+// not just the ones a leaderboard wallet happens to hold (those are seeded separately by
+// cacheMarketPriceHistory). Incremental and idempotent: planPriceFetches skips any token already
+// fresh-through-today via market_price_meta, so after the first daily fill the hourly markets run is a
+// near no-op. Rows carry condition_id (the page joins on it); pruning is handled by
+// cacheMarketPriceHistory in the full run.
+async function cacheListedMarketPrices(
+  supabase: SupabaseClient,
+  client: PolymarketClient,
+  events: EventSummary[]
+): Promise<ListedPriceResult> {
+  const maxHorizon = Math.max(...CONFIG.HORIZONS);
+  const msPerDay = CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
+  const nowMs = Date.now();
+  const todayUtc = new Date(nowMs).toISOString().slice(0, "YYYY-MM-DD".length);
+  const staleBeforeMs = Date.parse(todayUtc) - CONFIG.PRICE_HISTORY_STALE_DAYS * msPerDay;
+
+  // token → condition_id for events exposing both. A token can map to one market only.
+  const conditionByToken = new Map<string, string>();
+  for (const event of events) {
+    if (event.yesTokenId && event.conditionId) {
+      conditionByToken.set(event.yesTokenId, event.conditionId);
+    }
+  }
+  const needed = [...conditionByToken.keys()];
+  if (needed.length === 0) {
+    return { fetched: 0, upserted: 0, deferred: 0 };
+  }
+
+  // Newest cached day per token (market_price_meta); a stale tail is flagged resolved → skipped.
+  const { data: metaRows, error: metaError } = await supabase.from("market_price_meta").select("asset, max_ts");
+  if (metaError) {
+    throw metaError;
+  }
+  const state = new Map<string, CacheState>();
+  for (const row of metaRows ?? []) {
+    const maxTs = row.max_ts;
+    const resolved = maxTs !== null && Date.parse(maxTs) < staleBeforeMs;
+    state.set(row.asset, { maxTs, resolved });
+  }
+
+  const { fetch, deferred } = planPriceFetches(needed, state, todayUtc, CONFIG.PRICE_HISTORY_MAX_FETCHES_PER_RUN);
+
+  let cursor = 0;
+  let fetched = 0;
+  let upserted = 0;
+  const worker = async (): Promise<void> => {
+    while (cursor < fetch.length) {
+      const asset = fetch[cursor];
+      cursor += 1;
+      if (!asset) {
+        continue;
+      }
+      const conditionId = conditionByToken.get(asset) ?? null;
+      try {
+        const history = await client.getPriceHistory(asset);
+        const points = dailyPointsFromHistory(history, maxHorizon, nowMs);
+        if (points.length === 0) {
+          continue;
+        }
+        const rows = points.map((point) => ({ asset, condition_id: conditionId, ts: point.ts, price: point.price }));
+        const { error } = await supabase.from("market_price_history").upsert(rows, { onConflict: "asset,ts" });
+        if (error) {
+          throw error;
+        }
+        const newestTs = points[points.length - 1]?.ts ?? null;
+        const { error: metaUpsertError } = await supabase
+          .from("market_price_meta")
+          .upsert({ asset, max_ts: newestTs, updated_at: new Date().toISOString() }, { onConflict: "asset" });
+        if (metaUpsertError) {
+          throw metaUpsertError;
+        }
+        fetched += 1;
+        upserted += rows.length;
+      } catch (reason) {
+        console.warn(`listed price-history ${asset}: ${describeError(reason)}`);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONFIG.WALLET_CONCURRENCY, fetch.length) }, () => worker()));
+
+  return { fetched, upserted, deferred };
 }
 
 export function toRecentTradeRow(trade: RecentTrade): Database["public"]["Tables"]["recent_trades"]["Insert"] {

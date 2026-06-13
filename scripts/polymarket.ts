@@ -68,6 +68,7 @@ export interface LeaderboardEntry {
 export interface EventSummary {
   id: string;
   conditionId: string | null;
+  yesTokenId: string | null;
   question: string;
   slug: string;
   category: string | null;
@@ -389,6 +390,9 @@ interface LeadingOutcome {
   // The leading market's binary condition id — the key the wallet position/trade caches and the
   // Market Analytics page join on. Null when the event exposes no usable conditionId.
   conditionId: string | null;
+  // The leading market's YES outcome-token (CLOB asset) id — outcome index 0. Seeds the per-market
+  // price-history cache so the analytics page has a price series even with no leaderboard holders.
+  yesTokenId: string | null;
 }
 
 // An event has many outcome markets (e.g. one per team). There's no single event price, so we
@@ -397,7 +401,7 @@ interface LeadingOutcome {
 // its groupItemTitle ("France"). For a plain binary market it's whichever leg is priced higher, so a
 // market trading "No" at 70% shows "No 70%", not "Yes 30%".
 function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
-  let leading: LeadingOutcome = { price: null, label: null, spread: null, oneDayPriceChange: null, conditionId: null };
+  let leading: LeadingOutcome = { price: null, label: null, spread: null, oneDayPriceChange: null, conditionId: null, yesTokenId: null };
   let bestYes = -Infinity;
 
   for (const market of markets) {
@@ -417,10 +421,12 @@ function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
     const change = readOptionalNumber(market, ["oneDayPriceChange"]);
     const spread = readOptionalNumber(market, ["spread"]);
     const conditionId = readString(market, ["conditionId", "condition_id", "id"]) || null;
+    // clobTokenIds is a JSON-string array [yesToken, noToken]; index 0 is the YES outcome token.
+    const yesTokenId = parseJsonArray(market.clobTokenIds).map((entry) => String(entry))[0] || null;
 
     if (groupTitle) {
       // Candidate within a multi-outcome event: the candidate *is* the Yes side.
-      leading = { price: yesPrice, label: groupTitle, spread, oneDayPriceChange: change, conditionId };
+      leading = { price: yesPrice, label: groupTitle, spread, oneDayPriceChange: change, conditionId, yesTokenId };
     } else {
       // Plain binary market: surface whichever leg (Yes/No) is priced higher.
       const noPrice = prices.length > 1 ? prices[1] ?? null : 1 - yesPrice;
@@ -431,7 +437,8 @@ function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
         spread,
         // oneDayPriceChange tracks the Yes leg; the No leg moves the opposite way.
         oneDayPriceChange: change === null ? null : noLeads ? -change : change,
-        conditionId
+        conditionId,
+        yesTokenId
       };
     }
   }
@@ -450,6 +457,7 @@ export function mapEvent(record: JsonRecord): EventSummary {
   return {
     id: readString(record, ["id", "eventId"]),
     conditionId: leading.conditionId,
+    yesTokenId: leading.yesTokenId,
     question: readString(record, ["title", "question"]),
     slug: readString(record, ["slug"]),
     category,
