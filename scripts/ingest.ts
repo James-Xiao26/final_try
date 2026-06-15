@@ -52,11 +52,12 @@ interface Database {
           address: string;
           horizon_days: number;
           skill_score: number | null;
-          pct_return: number;
-          win_rate: number;          total_pnl_usd: number;
+          pct_return: number | null;
+          win_rate: number | null;
+          total_pnl_usd: number | null;
           unrealized_pnl_usd: number | null;
-          total_volume_usd: number;
-          n_trades: number;
+          total_volume_usd: number | null;
+          n_trades: number | null;
           pct_edge: number | null;
           avg_edge_per_share: number | null;
           n_resolved: number | null;
@@ -66,11 +67,12 @@ interface Database {
           address: string;
           horizon_days: number;
           skill_score: number | null;
-          pct_return: number;
-          win_rate: number;          total_pnl_usd: number;
+          pct_return: number | null;
+          win_rate: number | null;
+          total_pnl_usd: number | null;
           unrealized_pnl_usd?: number | null;
-          total_volume_usd: number;
-          n_trades: number;
+          total_volume_usd: number | null;
+          n_trades: number | null;
           pct_edge?: number | null;
           avg_edge_per_share?: number | null;
           n_resolved?: number | null;
@@ -78,11 +80,12 @@ interface Database {
         };
         Update: {
           skill_score?: number | null;
-          pct_return?: number;
-          win_rate?: number;          total_pnl_usd?: number;
+          pct_return?: number | null;
+          win_rate?: number | null;
+          total_pnl_usd?: number | null;
           unrealized_pnl_usd?: number | null;
-          total_volume_usd?: number;
-          n_trades?: number;
+          total_volume_usd?: number | null;
+          n_trades?: number | null;
           pct_edge?: number | null;
           avg_edge_per_share?: number | null;
           n_resolved?: number | null;
@@ -96,16 +99,16 @@ interface Database {
           address: string;
           horizon_days: number;
           ts: string;
-          cumulative_pnl: number;
+          cumulative_pnl: number | null;
         };
         Insert: {
           address: string;
           horizon_days: number;
           ts: string;
-          cumulative_pnl: number;
+          cumulative_pnl: number | null;
         };
         Update: {
-          cumulative_pnl?: number;
+          cumulative_pnl?: number | null;
         };
         Relationships: [];
       };
@@ -115,9 +118,9 @@ interface Database {
           rank: number;
           address: string;
           skill_score: number | null;
-          pct_return: number;
-          win_rate: number;
-          n_trades: number;
+          pct_return: number | null;
+          win_rate: number | null;
+          n_trades: number | null;
           avg_edge_per_share: number | null;
           cached_at: string;
         };
@@ -126,17 +129,17 @@ interface Database {
           rank: number;
           address: string;
           skill_score: number | null;
-          pct_return: number;
-          win_rate: number;
-          n_trades: number;
+          pct_return: number | null;
+          win_rate: number | null;
+          n_trades: number | null;
           avg_edge_per_share?: number | null;
           cached_at?: string;
         };
         Update: {
           skill_score?: number | null;
-          pct_return?: number;
-          win_rate?: number;
-          n_trades?: number;
+          pct_return?: number | null;
+          win_rate?: number | null;
+          n_trades?: number | null;
           avg_edge_per_share?: number | null;
           cached_at?: string;
         };
