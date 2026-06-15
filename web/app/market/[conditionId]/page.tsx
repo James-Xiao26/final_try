@@ -13,15 +13,23 @@ import {
   buildPriceSeries,
   concentration,
   detectWhaleTrades,
+  marketResolution,
   pnlDistribution,
+  PRICE_LINE_COLORS,
   smartMoneyLean,
   summarizeWhaleMoves
 } from "@/lib/marketAnalytics";
+import type { CSSProperties } from "react";
 
 export const dynamic = "force-dynamic";
 
 interface MarketPageProps {
   params: { conditionId: string };
+}
+
+// Sets the legend swatch color via a CSS variable the `.ma-leg::before` reads.
+function legColor(color: string): CSSProperties {
+  return { ["--leg-color" as string]: color } as CSSProperties;
 }
 
 function cents(v: number | null): string {
@@ -91,6 +99,16 @@ export default async function MarketPage({ params }: MarketPageProps) {
   const traderCount = detail?.traderCount ?? 0;
   const hasSmartMoney = traderCount > 0;
 
+  // If the market has resolved, decode the winning side and judge whether the skill-weighted smart
+  // money called it — the on-brand "did the sharp money have edge here?" readout.
+  const resolution = marketResolution(meta, currentPrice);
+  // Only judge the sharp money when the winner maps to a YES/NO side (binary market) and the lean
+  // isn't a tie — a 3+ outcome market resolves to a non-YES/NO leg, so there's no YES/NO verdict.
+  const smartCalledIt =
+    resolution && hasSmartMoney && lean.label !== "SPLIT" && resolution.winnerSide !== "—"
+      ? lean.label === resolution.winnerSide
+      : null;
+
   return (
     <main className="page ma-page">
       <Link href="/markets" className="wl-back">← Back to Markets</Link>
@@ -106,7 +124,7 @@ export default async function MarketPage({ params }: MarketPageProps) {
             <div className="ma-head-tags">
               {meta?.category ? <span className="ma-tag">{meta.category}</span> : null}
               <span className={`ma-tag ${meta?.closed ? "closed" : "live"}`}>{meta?.closed ? "Resolved" : "Live"}</span>
-              <span className="ma-tag muted">Resolves {resolutionLabel(meta?.endDate ?? null)}</span>
+              {!meta?.closed ? <span className="ma-tag muted">Resolves {resolutionLabel(meta?.endDate ?? null)}</span> : null}
             </div>
             <h1 className="ma-title">{title}</h1>
             {meta?.slug ? (
@@ -116,6 +134,17 @@ export default async function MarketPage({ params }: MarketPageProps) {
             ) : null}
           </div>
         </div>
+        {resolution ? (
+          <div className={`ma-resolution ${resolution.winnerSide === "YES" ? "yes" : resolution.winnerSide === "NO" ? "no" : ""}`}>
+            <span className="ma-res-badge">Resolved</span>
+            <span className="ma-res-outcome">{resolution.winnerLabel} won</span>
+            {smartCalledIt !== null ? (
+              <span className={`ma-res-verdict ${smartCalledIt ? "right" : "wrong"}`}>
+                {smartCalledIt ? "Sharp money called it ✓" : "Sharp money missed ✗"}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       {/* ── Headline metrics ──────────────────────────────────── */}
@@ -156,15 +185,27 @@ export default async function MarketPage({ params }: MarketPageProps) {
         <div className="ma-section-head">
           <h2>Price <span className="g">History</span></h2>
           <div className="ma-legend">
-            <span className="ma-leg price">YES price</span>
+            {analytics.extraLines.length > 0 ? (
+              <>
+                <span className="ma-leg" style={legColor(PRICE_LINE_COLORS[0] ?? "#36ecd0")}>{analytics.primaryLabel ?? "YES"}</span>
+                {analytics.extraLines.map((l, i) => (
+                  <span key={l.label} className="ma-leg" style={legColor(PRICE_LINE_COLORS[(i + 1) % PRICE_LINE_COLORS.length] ?? "#36ecd0")}>
+                    {l.label}
+                  </span>
+                ))}
+              </>
+            ) : (
+              <span className="ma-leg price">YES price</span>
+            )}
             <span className="ma-leg buy">Whale buy</span>
             <span className="ma-leg sell">Whale sell</span>
             {series.regimeShifts.length > 0 ? <span className="ma-leg regime">Regime shift</span> : null}
           </div>
         </div>
-        <PriceChart series={series} whales={whales.trades} />
+        <PriceChart series={series} whales={whales.trades} extraLines={analytics.extraLines} />
         <p className="ma-caption">
-          YES implied probability over time, with tracked whale trades overlaid (marker size ∝ trade value).
+          YES implied probability over time (intraday resolution), with tracked whale trades overlaid at
+          their YES-equivalent price so buys/sells sit on the line (marker size ∝ trade value).
           {series.regimeShifts.length > 0
             ? ` ${series.regimeShifts.length} regime shift${series.regimeShifts.length === 1 ? "" : "s"} flagged — days where the consensus moved more than 2.5σ (likely news shocks).`
             : ""}

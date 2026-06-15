@@ -158,6 +158,46 @@ test("buildCrowdMarketDetail prefers fill timestamps over position-cache dates w
   assert.equal(p.lastTradedAt, "2026-01-09T00:00:00.000Z");
 });
 
+test("buildCrowdMarketDetail marks a fill-only OPEN holder to the current YES price for value/P-L", () => {
+  // No position-cache row: weflyhigh appears only via fills (a net-long YES buy). With a YES price of
+  // 0.55 the remaining holding is marked, so value/P-L are filled rather than blank.
+  const fills = [fill({ address: "0xb", outcomeIndex: 0, side: "BUY", size: 100, usdcSize: 50, tradedAt: "2026-01-02T00:00:00.000Z" })];
+  const detail = buildCrowdMarketDetail("c1", [], [], fills, lookups, new Map([["2026-01-02", 0.55]]));
+  const p = detail?.participants.find((x) => x.address === "0xb");
+  assert.ok(p);
+  assert.equal(p.state, "open");
+  assert.equal(p.side, "YES");
+  assert.equal(Number(p.value?.toFixed(4)), 55); // 100 shares · 0.55
+  assert.equal(Number(p.pnl?.toFixed(4)), 5); // 55 marked − 50 paid
+  assert.equal(Number(p.pnlPct?.toFixed(4)), 0.1);
+});
+
+test("buildCrowdMarketDetail marks a fill-only NO holder with the complement price", () => {
+  const fills = [fill({ address: "0xb", outcomeIndex: 1, side: "BUY", size: 100, usdcSize: 40, tradedAt: "2026-01-02T00:00:00.000Z" })];
+  const detail = buildCrowdMarketDetail("c1", [], [], fills, lookups, new Map([["2026-01-02", 0.7]]));
+  const p = detail?.participants.find((x) => x.address === "0xb");
+  assert.ok(p);
+  assert.equal(p.side, "NO");
+  assert.equal(Number(p.value?.toFixed(4)), 30); // 100 · (1 − 0.7)
+  assert.equal(Number(p.pnl?.toFixed(4)), -10); // 30 marked − 40 paid
+});
+
+test("buildCrowdMarketDetail leaves P/L blank for a sells-only (buys-out-of-window) participant", () => {
+  // Only sell fills are in the tracked window — the cost basis predates it, so reporting proceeds as
+  // profit would massively overstate. P/L and avg entry stay null instead of fabricated.
+  const fills = [
+    fill({ address: "0xb", outcomeIndex: 0, side: "SELL", size: 60, usdcSize: 33, tradedAt: "2026-01-03T00:00:00.000Z" }),
+    fill({ address: "0xb", outcomeIndex: 0, side: "SELL", size: 40, usdcSize: 22, tradedAt: "2026-01-04T00:00:00.000Z" })
+  ];
+  const detail = buildCrowdMarketDetail("c1", [], [], fills, lookups, new Map([["2026-01-04", 0.55]]));
+  const p = detail?.participants.find((x) => x.address === "0xb");
+  assert.ok(p);
+  assert.equal(p.state, "closed");
+  assert.equal(p.pnl, null);
+  assert.equal(p.avgEntry, null);
+  assert.equal(p.value, null);
+});
+
 test("buildCrowdMarketDetail returns null when no wallet participates", () => {
   assert.equal(buildCrowdMarketDetail("c1", [], [], [], lookups, new Map()), null);
 });

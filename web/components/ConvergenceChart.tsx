@@ -81,10 +81,17 @@ export default function ConvergenceChart({ timeline }: ConvergenceChartProps) {
     const val = maxCost - (g / 4) * maxCost;
     return { y, val };
   });
+  // Evenly-spaced ticks, but drop duplicate day labels (a sub-week span otherwise repeats e.g.
+  // "Jun 13" several times).
+  const seenTicks = new Set<string>();
   const xticks = Array.from({ length: 4 }, (_, k) => {
     const ms = startMs + (k / 3) * (endMs - startMs);
     const anchor: "start" | "middle" | "end" = k === 0 ? "start" : k === 3 ? "end" : "middle";
     return { x: nx(ms), label: tickLabel(ms), anchor };
+  }).filter((t) => {
+    if (seenTicks.has(t.label)) return false;
+    seenTicks.add(t.label);
+    return true;
   });
 
   return (

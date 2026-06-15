@@ -294,6 +294,14 @@ export function buildCrowdMarketDetail(
     if (p.outcomeIndex === 1 && curPrice === null) curPrice = 1 - p.curPrice;
   }
 
+  // Best available YES mark for valuing fill-only participants (no position-cache row): an open
+  // position's price, else the freshest cached daily price.
+  let latestYes = curPrice;
+  if (latestYes === null && pricesByDay.size > 0) {
+    const lastDay = [...pricesByDay.keys()].sort().pop();
+    latestYes = lastDay !== undefined ? pricesByDay.get(lastDay) ?? null : null;
+  }
+
   const participants: CrowdParticipant[] = [];
   let yesTraders = 0;
   let noTraders = 0;
@@ -351,17 +359,43 @@ export function buildCrowdMarketDetail(
       pnlPct = basis > 0 ? closedRow.realizedPnl / basis : null;
       costBasis = closedCost(closedRow);
     } else {
-      // No cache row (opened/closed outside the tracked position caches) — derive from fills alone.
+      // No cache row (opened/closed outside the tracked position caches) — derive from fills alone,
+      // then mark to the current YES price so value/P-L aren't blank.
       const buys = myFills.filter((f) => isBuy(f.side));
+      const sells = myFills.filter((f) => !isBuy(f.side));
       const buySize = buys.reduce((sum, f) => sum + (f.size ?? 0), 0);
       const buyCost = buys.reduce((sum, f) => sum + fillUsdc(f), 0);
-      const sellSize = myFills.filter((f) => !isBuy(f.side)).reduce((sum, f) => sum + (f.size ?? 0), 0);
+      const sellSize = sells.reduce((sum, f) => sum + (f.size ?? 0), 0);
+      const sellProceeds = sells.reduce((sum, f) => sum + fillUsdc(f), 0);
       const net = buySize - sellSize;
       outcomeIndex = myFills[0]?.outcomeIndex ?? null;
       avgEntry = buySize > 0 ? buyCost / buySize : null;
       state = net > 1 ? "open" : "closed";
       size = Math.max(0, net);
       costBasis = avgEntry !== null ? avgEntry * size : 0;
+
+      // Mark the remaining holding to the current YES price (NO side = its complement). P/L is only
+      // computed when we actually observed the cost basis (buyCost > 0): the fill cache keeps just the
+      // last-N fills per wallet, so a wallet whose buys predate the window shows sells only — reporting
+      // proceeds as pure profit would massively overstate it, so we leave P/L blank instead.
+      const mark = outcomeIndex === 1 ? (latestYes !== null ? 1 - latestYes : null) : latestYes;
+      if (buyCost > 0) {
+        if (state === "closed") {
+          // Fully exited within the window: realized P/L is proceeds minus what was paid.
+          pnl = sellProceeds - buyCost;
+          pnlPct = pnl / buyCost;
+        } else if (mark !== null) {
+          // Still holding: mark-to-market value + realized (sells − buys) on the rest.
+          curMark = mark;
+          value = size * mark;
+          pnl = sellProceeds - buyCost + value;
+          pnlPct = pnl / buyCost;
+        }
+      } else if (state === "open" && mark !== null) {
+        // Buys predate the window but the wallet still holds: we can at least mark the holding's value.
+        curMark = mark;
+        value = size * mark;
+      }
     }
 
     if (outcomeIndex === 1) {

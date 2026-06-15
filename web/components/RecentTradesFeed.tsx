@@ -219,9 +219,20 @@ function PositionRow({ p }: { p: RecentTradePosition }) {
           </div>
         </td>
         <td className="af-market">
-          <span className="q" title={p.market ?? ""}>
-            {p.market || "—"}
-          </span>
+          {p.conditionId ? (
+            <Link
+              href={`/market/${encodeURIComponent(p.conditionId)}`}
+              className="q"
+              title={p.market ? `${p.market} — open market analytics` : "Open market analytics"}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {p.market || "—"}
+            </Link>
+          ) : (
+            <span className="q" title={p.market ?? ""}>
+              {p.market || "—"}
+            </span>
+          )}
           {out ? <span className={`af-out ${out === "YES" ? "yes" : "no"}`}>{out}</span> : null}
         </td>
         <td className="af-fill">

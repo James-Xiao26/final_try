@@ -8,7 +8,7 @@ import type { CrowdMarketDetail, CrowdParticipant } from "./types";
 // ── Price series ────────────────────────────────────────────────────────────────
 
 export interface PricePoint {
-  ts: string;   // UTC day "YYYY-MM-DD"
+  ts: string;    // ISO timestamp (intraday) or "YYYY-MM-DD"
   price: number; // YES probability in [0,1]
 }
 
@@ -20,7 +20,7 @@ export interface RegimeShift {
 }
 
 export interface PriceSeries {
-  points: PricePoint[];
+  points: PricePoint[]; // intraday line points, sorted ascending by ts
   latest: number | null;
   first: number | null;
   changeAbs: number | null;   // latest − first, in probability points
@@ -46,16 +46,14 @@ function stdev(values: number[]): number {
   return Math.sqrt(variance);
 }
 
-// Collapse raw price rows to one point per UTC day (last write wins), sorted ascending, then derive
-// the headline stats. `regimeK` is how many stdevs a daily move must exceed to flag a regime shift.
+// Keep the raw (intraday) price points for an accurate line, sorted ascending, and derive the headline
+// stats from a day-over-day collapse (so "24h drift" / "daily swing" / regime shifts stay daily, while
+// the chart line itself captures every intraday move). `regimeK` is how many stdevs a daily move must
+// exceed to flag a regime shift.
 export function buildPriceSeries(rows: PricePoint[], regimeK = 2.5): PriceSeries {
-  const byDay = new Map<string, number>();
-  for (const r of rows) {
-    if (typeof r.price !== "number" || Number.isNaN(r.price)) continue;
-    byDay.set(dayOf(r.ts), r.price);
-  }
-  const points = [...byDay.entries()]
-    .map(([ts, price]) => ({ ts, price }))
+  const points = rows
+    .filter((r) => typeof r.price === "number" && !Number.isNaN(r.price))
+    .slice()
     .sort((a, b) => a.ts.localeCompare(b.ts));
 
   if (points.length === 0) {
@@ -73,31 +71,37 @@ export function buildPriceSeries(rows: PricePoint[], regimeK = 2.5): PriceSeries
     };
   }
 
-  const prices = points.map((p) => p.price);
-  const latest = prices[prices.length - 1] ?? null;
-  const first = prices[0] ?? null;
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
+  const allPrices = points.map((p) => p.price);
+  const latest = allPrices[allPrices.length - 1] ?? null; // most recent intraday price
+  const first = allPrices[0] ?? null;
+  const min = Math.min(...allPrices);
+  const max = Math.max(...allPrices);
+
+  // Daily closes (last point of each UTC day) for the day-over-day stats.
+  const byDay = new Map<string, number>();
+  for (const p of points) byDay.set(dayOf(p.ts), p.price);
+  const dailyPoints = [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([ts, price]) => ({ ts, price }));
 
   const deltas: number[] = [];
-  for (let i = 1; i < points.length; i += 1) {
-    deltas.push((points[i]?.price ?? 0) - (points[i - 1]?.price ?? 0));
+  for (let i = 1; i < dailyPoints.length; i += 1) {
+    deltas.push((dailyPoints[i]?.price ?? 0) - (dailyPoints[i - 1]?.price ?? 0));
   }
   const volatility = deltas.length ? stdev(deltas) : 0;
-
   const lastDelta = deltas.length ? deltas[deltas.length - 1] ?? null : null;
-  const sevenAgo = points[Math.max(0, points.length - 8)]?.price ?? first;
+  const sevenAgo = dailyPoints[Math.max(0, dailyPoints.length - 8)]?.price ?? first;
   const change7d = latest !== null && sevenAgo !== null ? latest - sevenAgo : null;
 
   const regimeShifts: RegimeShift[] = [];
   if (volatility > 0) {
-    for (let i = 1; i < points.length; i += 1) {
-      const delta = (points[i]?.price ?? 0) - (points[i - 1]?.price ?? 0);
+    for (let i = 1; i < dailyPoints.length; i += 1) {
+      const delta = (dailyPoints[i]?.price ?? 0) - (dailyPoints[i - 1]?.price ?? 0);
       if (Math.abs(delta) >= regimeK * volatility) {
         regimeShifts.push({
-          ts: points[i]?.ts ?? "",
-          from: points[i - 1]?.price ?? 0,
-          to: points[i]?.price ?? 0,
+          ts: dailyPoints[i]?.ts ?? "",
+          from: dailyPoints[i - 1]?.price ?? 0,
+          to: dailyPoints[i]?.price ?? 0,
           delta
         });
       }
@@ -143,7 +147,8 @@ export interface WhaleTrade {
   side: "BUY" | "SELL";
   outcome: "YES" | "NO" | "—";
   outcomeIndex: number | null;
-  price: number | null;
+  price: number | null;     // the traded outcome's price (what the wallet paid, for display)
+  yesPrice: number | null;  // YES-equivalent price for chart placement (NO → 1 − price)
   usdc: number;
   tradedAt: string;
   ts: number; // epoch ms, for chart placement
@@ -195,6 +200,8 @@ export function detectWhaleTrades(
     outcome: outcomeOf(f.outcomeIndex),
     outcomeIndex: f.outcomeIndex,
     price: f.price,
+    // On a YES-probability chart a NO fill sits at its complement (a NO buy at 47¢ is YES 53¢).
+    yesPrice: f.price === null ? null : f.outcomeIndex === 1 ? 1 - f.price : f.price,
     usdc: usdcOf(f),
     tradedAt: f.tradedAt,
     ts: Date.parse(f.tradedAt)
@@ -421,6 +428,108 @@ export function smartMoneyLean(participants: CrowdParticipant[], baseWeight = 1)
   return { yesWeight, noWeight, yesPct, label, yesCapital, noCapital };
 }
 
+// ── Market resolution ───────────────────────────────────────────────────────────
+
+export interface MarketResolution {
+  winnerIndex: number;   // 0 = YES, 1 = NO (or the leading candidate index)
+  winnerLabel: string;   // human label, e.g. "Yes" / "Hurricanes"
+  winnerSide: "YES" | "NO" | "—";
+}
+
+// Decode the resolved outcome of a closed market. Prefers explicit `outcomePrices` (a winner settles
+// at ~1, losers at 0); falls back to the settled YES price (`latestYes`) for the common case where the
+// cached `markets` row carries no outcome prices but the price series already shows the binary settling
+// at ~1 (YES won) or ~0 (NO won). Returns null for open or ambiguous/void resolutions.
+export function marketResolution(meta: MarketMeta | null, latestYes?: number | null): MarketResolution | null {
+  if (!meta || !meta.closed) return null;
+  const label = (i: number): string => meta.outcomes?.[i] ?? (i === 0 ? "Yes" : i === 1 ? "No" : `Outcome ${i}`);
+
+  const prices = meta.outcomePrices;
+  if (prices && prices.length > 0) {
+    let winnerIndex = -1;
+    let best = 0.5;
+    prices.forEach((p, i) => {
+      if (typeof p === "number" && p > best) {
+        best = p;
+        winnerIndex = i;
+      }
+    });
+    if (winnerIndex >= 0) {
+      const winnerSide = winnerIndex === 0 ? "YES" : winnerIndex === 1 ? "NO" : "—";
+      return { winnerIndex, winnerLabel: label(winnerIndex), winnerSide };
+    }
+  }
+
+  // Fallback: infer the binary winner from where the YES price settled.
+  if (typeof latestYes === "number") {
+    if (latestYes >= 0.98) return { winnerIndex: 0, winnerLabel: label(0), winnerSide: "YES" };
+    if (latestYes <= 0.02) return { winnerIndex: 1, winnerLabel: label(1), winnerSide: "NO" };
+  }
+  return null;
+}
+
+// ── Multi-outcome candidates ──────────────────────────────────────────────────────
+
+// One favored option of a grouped event (e.g. a team in "World Cup Winner"), with its YES price line.
+export interface PriceLine {
+  label: string;        // candidate name, e.g. "Spain"
+  points: PricePoint[]; // its YES price series
+}
+
+// Colors for the price chart's lines: index 0 is the primary (tracked) line, 1+ the other candidates.
+export const PRICE_LINE_COLORS = ["#36ecd0", "#5aa9ff", "#c08bff"] as const;
+
+interface RawEventMarket {
+  groupItemTitle?: unknown;
+  conditionId?: unknown;
+  clobTokenIds?: unknown; // JSON-string array [yesToken, noToken]
+  outcomePrices?: unknown; // JSON-string array
+  lastTradePrice?: unknown;
+}
+
+export interface EventCandidate {
+  label: string;
+  conditionId: string;
+  yesTokenId: string;
+  price: number; // current implied YES probability
+}
+
+// Gamma encodes several array fields as JSON strings (outcomePrices, clobTokenIds, …). Tolerate both
+// the already-parsed array and the string form.
+export function parseJsonArray(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const p = JSON.parse(value);
+      return Array.isArray(p) ? p : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+// Pure: roll an event's candidate markets into ranked EventCandidates (favored first). Each candidate
+// is a binary market with a groupItemTitle and a YES (outcome-0) token. Returns [] when the event isn't
+// a multi-candidate group (0/1 candidates).
+export function parseEventCandidates(eventMarkets: RawEventMarket[]): EventCandidate[] {
+  const out: EventCandidate[] = [];
+  for (const m of eventMarkets) {
+    const label = typeof m.groupItemTitle === "string" && m.groupItemTitle.length > 0 ? m.groupItemTitle : null;
+    const conditionId = typeof m.conditionId === "string" && m.conditionId.length > 0 ? m.conditionId : null;
+    const yesTokenId = parseJsonArray(m.clobTokenIds).map(String)[0] ?? null;
+    if (!label || !conditionId || !yesTokenId) continue;
+    const prices = parseJsonArray(m.outcomePrices)
+      .map((x) => Number(x))
+      .filter((x) => Number.isFinite(x));
+    const last = typeof m.lastTradePrice === "number" ? m.lastTradePrice : null;
+    const price = prices[0] ?? last ?? 0;
+    out.push({ label, conditionId, yesTokenId, price });
+  }
+  if (out.length <= 1) return [];
+  return out.sort((a, b) => b.price - a.price);
+}
+
 // ── Page-level aggregate ─────────────────────────────────────────────────────────
 
 // Market-level snapshot from the `markets` table (one grouped Polymarket event). Present even when no
@@ -456,4 +565,8 @@ export interface MarketAnalytics {
   detail: CrowdMarketDetail | null;
   priceRows: PricePoint[];
   whaleFills: WhaleFillInput[];
+  // For multi-outcome events: the OTHER top-favored candidate lines to overlay (the tracked market is
+  // the primary line, built from priceRows), and the tracked candidate's label for the legend.
+  extraLines: PriceLine[];
+  primaryLabel: string | null;
 }

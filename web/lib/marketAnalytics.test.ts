@@ -4,13 +4,39 @@ import {
   buildPriceSeries,
   concentration,
   detectWhaleTrades,
+  marketResolution,
+  parseEventCandidates,
   pnlDistribution,
   smartMoneyLean,
   summarizeWhaleMoves,
+  type MarketMeta,
   type PricePoint,
   type WhaleFillInput
 } from "./marketAnalytics";
 import type { CrowdParticipant } from "./types";
+
+function marketMeta(p: Partial<MarketMeta>): MarketMeta {
+  return {
+    question: "Will it rain?",
+    slug: null,
+    category: null,
+    image: null,
+    endDate: null,
+    liquidityUsd: 0,
+    volumeUsd: 0,
+    volume24hrUsd: 0,
+    volume1wkUsd: 0,
+    spread: null,
+    lastTradePrice: null,
+    topOutcome: null,
+    oneDayPriceChange: null,
+    outcomes: ["Yes", "No"],
+    outcomePrices: null,
+    active: false,
+    closed: true,
+    ...p
+  };
+}
 
 function participant(p: Partial<CrowdParticipant>): CrowdParticipant {
   return {
@@ -52,23 +78,33 @@ function fill(p: Partial<WhaleFillInput>): WhaleFillInput {
 
 // ── buildPriceSeries ──────────────────────────────────────────────────────────
 
-test("buildPriceSeries collapses to one point per day and derives headline stats", () => {
+test("buildPriceSeries keeps intraday points and derives day-over-day stats", () => {
   const rows: PricePoint[] = [
     { ts: "2026-06-01T01:00:00Z", price: 0.4 },
-    { ts: "2026-06-01T20:00:00Z", price: 0.45 }, // same day → last wins
+    { ts: "2026-06-01T20:00:00Z", price: 0.45 }, // same day — kept as a distinct intraday point
     { ts: "2026-06-02", price: 0.5 },
     { ts: "2026-06-03", price: 0.48 }
   ];
   const s = buildPriceSeries(rows);
-  assert.equal(s.points.length, 3);
-  assert.equal(s.points[0]?.price, 0.45);
-  assert.equal(s.first, 0.45);
-  assert.equal(s.latest, 0.48);
-  assert.ok(Math.abs((s.changeAbs ?? 0) - 0.03) < 1e-9);
-  assert.ok(Math.abs((s.change24h ?? 0) - -0.02) < 1e-9);
-  assert.equal(s.min, 0.45);
+  // Intraday points are NOT collapsed — every move is on the line.
+  assert.equal(s.points.length, 4);
+  assert.equal(s.first, 0.4); // earliest intraday
+  assert.equal(s.latest, 0.48); // most recent intraday
+  // min/max span all intraday points.
+  assert.equal(s.min, 0.4);
   assert.equal(s.max, 0.5);
+  // Stats are day-over-day: daily closes 0.45 (Jun 1 last), 0.5, 0.48 → last delta −0.02.
+  assert.ok(Math.abs((s.change24h ?? 0) - -0.02) < 1e-9);
   assert.ok((s.volatility ?? 0) > 0);
+});
+
+test("buildPriceSeries sorts unordered points ascending by ts", () => {
+  const s = buildPriceSeries([
+    { ts: "2026-06-03", price: 0.48 },
+    { ts: "2026-06-01T01:00:00Z", price: 0.4 },
+    { ts: "2026-06-02", price: 0.5 }
+  ]);
+  assert.deepEqual(s.points.map((p) => p.price), [0.4, 0.5, 0.48]);
 });
 
 test("buildPriceSeries handles empty input without dividing by zero", () => {
@@ -106,6 +142,23 @@ test("detectWhaleTrades keeps fills above the threshold and tallies direction", 
   assert.equal(a.netUsd, 2200);
   assert.equal(a.yesBuyUsd, 5200);
   assert.equal(a.biggest?.usdc, 5000);
+});
+
+test("detectWhaleTrades sets yesPrice to the YES-equivalent (NO fills inverted)", () => {
+  const a = detectWhaleTrades(
+    [
+      fill({ outcomeIndex: 0, price: 0.62, usdcSize: 2000 }), // YES → yesPrice 0.62
+      fill({ outcomeIndex: 1, price: 0.47, usdcSize: 2000 }), // NO 47¢ → YES 53¢
+      fill({ outcomeIndex: 1, price: null, usdcSize: 2000 }) // no price → null
+    ],
+    { topN: 3 }
+  );
+  const yes = a.trades.find((t) => t.outcome === "YES");
+  const no = a.trades.find((t) => t.outcome === "NO" && t.price === 0.47);
+  const noNull = a.trades.find((t) => t.price === null);
+  assert.equal(yes?.yesPrice, 0.62);
+  assert.equal(Number(no?.yesPrice?.toFixed(4)), 0.53);
+  assert.equal(noNull?.yesPrice, null);
 });
 
 test("detectWhaleTrades always surfaces the topN largest even below threshold", () => {
@@ -213,4 +266,52 @@ test("smartMoneyLean reports SPLIT when weights tie", () => {
     participant({ outcomeIndex: 1, skillScore: 5 })
   ]);
   assert.equal(l.label, "SPLIT");
+});
+
+test("marketResolution decodes the winning leg from a closed market's prices", () => {
+  const yesWon = marketResolution(marketMeta({ closed: true, outcomePrices: [1, 0] }));
+  assert.deepEqual(yesWon, { winnerIndex: 0, winnerLabel: "Yes", winnerSide: "YES" });
+  const noWon = marketResolution(marketMeta({ closed: true, outcomePrices: [0, 1] }));
+  assert.deepEqual(noWon, { winnerIndex: 1, winnerLabel: "No", winnerSide: "NO" });
+});
+
+test("marketResolution uses the outcome labels when present", () => {
+  const r = marketResolution(marketMeta({ closed: true, outcomes: ["Hurricanes", "Golden Knights"], outcomePrices: [1, 0] }));
+  assert.equal(r?.winnerLabel, "Hurricanes");
+  assert.equal(r?.winnerSide, "YES");
+});
+
+test("marketResolution falls back to the settled YES price when outcomePrices is absent", () => {
+  // Listed resolved markets carry no outcome_prices, but the series shows the binary settling at ~1/0.
+  const yesWon = marketResolution(marketMeta({ closed: true, outcomePrices: null }), 1);
+  assert.equal(yesWon?.winnerSide, "YES");
+  const noWon = marketResolution(marketMeta({ closed: true, outcomePrices: null }), 0.01);
+  assert.equal(noWon?.winnerSide, "NO");
+  // A still-contested price (didn't settle to an extreme) → no verdict.
+  assert.equal(marketResolution(marketMeta({ closed: true, outcomePrices: null }), 0.6), null);
+});
+
+test("marketResolution returns null for open, ambiguous, or unpriced markets", () => {
+  assert.equal(marketResolution(marketMeta({ closed: false, outcomePrices: [1, 0] })), null);
+  assert.equal(marketResolution(marketMeta({ closed: true, outcomePrices: null })), null);
+  assert.equal(marketResolution(marketMeta({ closed: true, outcomePrices: [0.5, 0.5] })), null);
+  assert.equal(marketResolution(null), null);
+});
+
+test("parseEventCandidates ranks grouped-event candidates favored-first", () => {
+  const cands = parseEventCandidates([
+    { groupItemTitle: "Spain", conditionId: "0xspain", clobTokenIds: '["spainYes","spainNo"]', outcomePrices: '["0.16","0.84"]' },
+    { groupItemTitle: "France", conditionId: "0xfrance", clobTokenIds: '["frYes","frNo"]', outcomePrices: '["0.20","0.80"]' },
+    { groupItemTitle: "Portugal", conditionId: "0xpt", clobTokenIds: '["ptYes","ptNo"]', lastTradePrice: 0.11 }, // price via lastTradePrice
+    { groupItemTitle: "", conditionId: "0xbad", clobTokenIds: '["x","y"]', outcomePrices: '["0.5"]' }, // no label → skipped
+    { groupItemTitle: "NoToken", conditionId: "0xz", clobTokenIds: "[]", outcomePrices: '["0.9"]' } // no YES token → skipped
+  ]);
+  assert.deepEqual(cands.map((c) => c.label), ["France", "Spain", "Portugal"]);
+  assert.equal(cands[0]?.yesTokenId, "frYes");
+  assert.equal(cands[2]?.price, 0.11);
+});
+
+test("parseEventCandidates returns [] for a non-grouped (binary) event", () => {
+  assert.deepEqual(parseEventCandidates([{ conditionId: "0x1", clobTokenIds: '["a","b"]', outcomePrices: '["0.5","0.5"]' }]), []);
+  assert.deepEqual(parseEventCandidates([]), []);
 });

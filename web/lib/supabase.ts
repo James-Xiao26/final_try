@@ -6,7 +6,8 @@ import { HORIZONS } from "./types";
 import { groupWalletTrades } from "./walletTrades";
 import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis } from "./recentTrades";
 import { buildCrowdMarketDetail, summarizeCrowdedMarkets, type CrowdClosedPosition, type CrowdLookups, type CrowdOpenPosition, type CrowdTradeFill } from "./marketCrowd";
-import type { MarketAnalytics, MarketMeta, PricePoint, WhaleFillInput } from "./marketAnalytics";
+import type { MarketAnalytics, MarketMeta, PriceLine, PricePoint, WhaleFillInput } from "./marketAnalytics";
+import { fetchEventCandidates, fetchLiveMarket, fetchLivePriceSeries, type LiveMarket } from "./polymarketLive";
 import { summarizeResolvedMarkets } from "./resolvedMarkets";
 
 type WalletRow = Database["public"]["Tables"]["wallets"]["Row"];
@@ -881,11 +882,12 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
 
   const { data: byConditionData, error: byConditionError } = await supabase
     .from("market_price_history")
-    .select("ts, price")
+    .select("ts, price, asset")
     .eq("condition_id", conditionId)
     .order("ts", { ascending: true });
   if (byConditionError && !isMissingSchemaError(byConditionError)) throw byConditionError;
-  const byConditionRows = (byConditionData ?? []) as unknown as { ts: string; price: number }[];
+  const byConditionRows = (byConditionData ?? []) as unknown as { ts: string; price: number; asset: string }[];
+  const listedAsset = byConditionRows[0]?.asset ?? null; // the cached listed YES token, if any
 
   if (byConditionRows.length > 0) {
     byConditionRows.forEach((row) => pushPrice(row.ts, row.price));
@@ -901,6 +903,65 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
       ((byAssetData ?? []) as unknown as { ts: string; price: number }[]).forEach((row) => {
         pushPrice(row.ts, yesAsset !== null ? row.price : 1 - row.price);
       });
+    }
+  }
+
+  // ── Live enrichment ─────────────────────────────────────────────────────────────
+  // Two gaps to fill live (server-side, Next-cached) so no market renders blank:
+  //  • meta — markets not in the top-N listed set have no `markets` row.
+  //  • intraday price line — the cache stores only one CLOSE per day, but the chart wants every
+  //    intraday move so whale fills line up with the line. We source a multi-fidelity series from CLOB.
+  // The YES token is known up-front for listed (cached asset) or wallet-held markets, so that fetch
+  // runs concurrently with the Gamma meta lookup; only an unlisted, unheld market needs the token from
+  // Gamma first (a rare market with no whale overlay anyway).
+  let resolvedMeta = meta;
+  const heldToken = yesAsset ?? noAsset; // an outcome token of this market from a tracked position
+  const upfrontToken = listedAsset ?? heldToken; // a YES token we can fetch the series for immediately
+  const upfrontInvert = listedAsset === null && yesAsset === null && noAsset !== null; // held NO → invert
+
+  const [live, upfrontSeries] = await Promise.all([
+    resolvedMeta === null ? fetchLiveMarket(conditionId) : Promise.resolve<LiveMarket | null>(null),
+    upfrontToken ? fetchLivePriceSeries(upfrontToken, upfrontInvert) : Promise.resolve<PricePoint[]>([])
+  ]);
+  if (resolvedMeta === null && live) resolvedMeta = live.meta;
+
+  let liveSeries = upfrontSeries;
+  if (liveSeries.length === 0) {
+    // No cached/held token — use Gamma's canonical YES token (or NO inverted).
+    const liveYes = live?.yesTokenId ?? null;
+    const liveNo = live?.noTokenId ?? null;
+    const token = liveYes ?? liveNo;
+    if (token) liveSeries = await fetchLivePriceSeries(token, liveYes === null && liveNo !== null);
+  }
+
+  // The live intraday series supersedes the close-only cache for the chart and the convergence overlay.
+  if (liveSeries.length > 0) {
+    priceRows.length = 0;
+    pricesByDay.clear();
+    for (const pt of liveSeries) {
+      priceRows.push({ ts: pt.ts, price: pt.price });
+      pricesByDay.set(pt.ts.slice(0, "YYYY-MM-DD".length), pt.price); // daily key for the YES overlay
+    }
+  }
+
+  // ── Multi-outcome candidate lines ───────────────────────────────────────────────
+  // For a grouped event (e.g. "World Cup Winner"), overlay the top-3 favored candidates. The tracked
+  // market is the primary line (priceRows); fetch the two other top candidates' series as extras. Skip
+  // the lookup for plain Yes/No markets to avoid a needless Gamma call.
+  let extraLines: PriceLine[] = [];
+  let primaryLabel: string | null = null;
+  const maybeMulti = resolvedMeta === null || (resolvedMeta.topOutcome !== "Yes" && resolvedMeta.topOutcome !== "No");
+  if (maybeMulti) {
+    const candidates = await fetchEventCandidates(conditionId);
+    if (candidates && candidates.length > 1) {
+      const lc = conditionId.toLowerCase();
+      const top3 = candidates.slice(0, 3);
+      primaryLabel = candidates.find((c) => c.conditionId.toLowerCase() === lc)?.label ?? resolvedMeta?.topOutcome ?? null;
+      const others = top3.filter((c) => c.conditionId.toLowerCase() !== lc).slice(0, 2);
+      const fetched = await Promise.all(
+        others.map(async (c) => ({ label: c.label, points: await fetchLivePriceSeries(c.yesTokenId, false) }))
+      );
+      extraLines = fetched.filter((l) => l.points.length > 0);
     }
   }
 
@@ -923,7 +984,7 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
     tradedAt: f.tradedAt
   }));
 
-  return { conditionId, meta, detail, priceRows, whaleFills };
+  return { conditionId, meta: resolvedMeta, detail, priceRows, whaleFills, extraLines, primaryLabel };
 }
 
 // Resolved Markets panel: closed positions from the last 7 days, grouped by market (conditionId),

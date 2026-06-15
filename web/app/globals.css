@@ -402,7 +402,8 @@ input:focus { border-color: var(--green) !important; }
 .af-fillcount { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted-d); }
 
 .af-market { max-width: 320px; }
-.af-market .q { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 13.5px; }
+.af-market .q { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 13.5px; transition: color .15s; }
+.af-market a.q:hover { color: var(--green); }
 .af-market .af-out { margin-top: 6px; display: inline-flex; align-items: center; font-family: var(--font-display); font-weight: 600;
   font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 8px; border-radius: 2px; }
 .af-market .af-out.yes { color: var(--green); border: 1px solid rgba(54,236,208,0.28); background: rgba(54,236,208,0.05); }
@@ -1060,6 +1061,20 @@ input:focus { border-color: var(--green) !important; }
   color: var(--muted); transition: color .2s; }
 .ma-ext:hover { color: var(--green); }
 
+/* Resolved-market banner: winning side + smart-money verdict */
+.ma-resolution { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px;
+  padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line-2);
+  background: linear-gradient(90deg, rgba(54,236,208,0.06), rgba(54,236,208,0)); }
+.ma-resolution.no { background: linear-gradient(90deg, rgba(255,122,89,0.07), rgba(255,122,89,0)); }
+.ma-res-badge { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--yellow);
+  border: 1px solid rgba(255,210,122,0.3); border-radius: 999px; padding: 3px 9px; }
+.ma-res-outcome { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+.ma-resolution.yes .ma-res-outcome { color: var(--green); }
+.ma-resolution.no .ma-res-outcome { color: var(--coral, #ff7a59); }
+.ma-res-verdict { margin-left: auto; font-size: 11px; letter-spacing: 0.04em; padding: 3px 10px; border-radius: 999px; }
+.ma-res-verdict.right { color: var(--green); border: 1px solid var(--line-2); }
+.ma-res-verdict.wrong { color: #ff7a59; border: 1px solid rgba(255,122,89,0.3); }
+
 .ma-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .ma-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 3px; }
 .ma-card-k { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-d); }
@@ -1079,7 +1094,7 @@ input:focus { border-color: var(--green) !important; }
 
 .ma-legend { display: flex; gap: 14px; flex-wrap: wrap; }
 .ma-leg { font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
-.ma-leg::before { content: ""; width: 10px; height: 2.5px; border-radius: 2px; display: inline-block; }
+.ma-leg::before { content: ""; width: 10px; height: 2.5px; border-radius: 2px; display: inline-block; background: var(--leg-color, transparent); }
 .ma-leg.price::before { background: var(--green); }
 .ma-leg.buy::before { background: var(--green); border-radius: 50%; width: 8px; height: 8px; }
 .ma-leg.sell::before { background: transparent; border: 1.5px solid var(--red); border-radius: 50%; width: 8px; height: 8px; }
