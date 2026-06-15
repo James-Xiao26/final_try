@@ -50,6 +50,18 @@ test("mapLiveMarketRow picks the favored outcome regardless of order", () => {
   assert.equal(live?.meta.topOutcome, "Golden Knights");
 });
 
+test("mapLiveMarketRow captures groupItemTitle for a grouped-event leg", () => {
+  // A grouped leg ("Spain" in "World Cup Winner") is itself a Yes/No market, so topOutcome is Yes/No —
+  // groupItemTitle is the only signal that it belongs to a multi-candidate event.
+  const leg = mapLiveMarketRow(gammaRow({ groupItemTitle: "Spain", outcomes: '["Yes", "No"]', outcomePrices: '["0.16", "0.84"]' }));
+  assert.equal(leg?.groupItemTitle, "Spain");
+  assert.equal(leg?.meta.topOutcome, "No");
+  // A plain binary market carries no group title.
+  const plain = mapLiveMarketRow(gammaRow());
+  assert.ok(plain);
+  assert.equal(plain.groupItemTitle, null);
+});
+
 test("mapLiveMarketRow falls back to event slug/image and clob volume keys", () => {
   const live = mapLiveMarketRow(
     gammaRow({

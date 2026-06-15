@@ -950,7 +950,15 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
   // the lookup for plain Yes/No markets to avoid a needless Gamma call.
   let extraLines: PriceLine[] = [];
   let primaryLabel: string | null = null;
-  const maybeMulti = resolvedMeta === null || (resolvedMeta.topOutcome !== "Yes" && resolvedMeta.topOutcome !== "No");
+  // A market is worth the candidate lookup when it might belong to a multi-candidate event. Two signals:
+  //  • the live fetch found a `groupItemTitle` (this market is a leg of a grouped event) — required
+  //    because grouped legs are themselves Yes/No markets, so topOutcome can't reveal them; and
+  //  • the (listed) `markets` row's topOutcome isn't Yes/No — mapEvent rolls a multi-outcome event up to
+  //    its favored candidate label there.
+  // Plain standalone Yes/No markets match neither and skip the extra Gamma call.
+  const liveGrouped = live?.groupItemTitle != null;
+  const metaMaybeMulti = resolvedMeta !== null && resolvedMeta.topOutcome !== "Yes" && resolvedMeta.topOutcome !== "No";
+  const maybeMulti = resolvedMeta === null || liveGrouped || metaMaybeMulti;
   if (maybeMulti) {
     const candidates = await fetchEventCandidates(conditionId);
     if (candidates && candidates.length > 1) {

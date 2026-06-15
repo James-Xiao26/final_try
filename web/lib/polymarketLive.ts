@@ -58,6 +58,10 @@ export interface LiveMarket {
   meta: MarketMeta;
   yesTokenId: string | null;
   noTokenId: string | null;
+  // Set when this market is one leg of a grouped event (e.g. "Spain" in "World Cup Winner"). Grouped
+  // legs are themselves Yes/No markets, so topOutcome can't distinguish them — the caller uses this to
+  // decide whether to fetch the sibling candidate lines.
+  groupItemTitle: string | null;
 }
 
 // Pure mapping of one Gamma `/markets` row into LiveMarket. Exported (and unit-tested) separately from
@@ -111,7 +115,12 @@ export function mapLiveMarketRow(row: Record<string, unknown> | null): LiveMarke
     closed: row.closed === true
   };
 
-  return { meta, yesTokenId: tokenIds[0] ?? null, noTokenId: tokenIds[1] ?? null };
+  return {
+    meta,
+    yesTokenId: tokenIds[0] ?? null,
+    noTokenId: tokenIds[1] ?? null,
+    groupItemTitle: toOptionalString(row.groupItemTitle)
+  };
 }
 
 type RawPoint = { t?: unknown; p?: unknown };
