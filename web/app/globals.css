@@ -1043,6 +1043,267 @@ input:focus { border-color: var(--green) !important; }
   .ea-final { padding: 40px 22px; }
 }
 
+/* ============================================================
+   FIRE CONTROL — skill-weighted trade signal feed
+   Markets where leaderboard wallets hold above current price,
+   ranked by edge × confidence × depth. Teal = bullish signal,
+   coral = risk / NO side, amber = warning / personalized.
+   ============================================================ */
+
+/* ── Universe strip ── */
+.de-universe-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr) 74px;
+  align-items: stretch;
+  gap: 1px;
+  padding: 0;
+  overflow: hidden;
+  background: var(--line);
+  margin-bottom: 18px;
+}
+.de-uni-meta { background: rgba(4,20,30,0.55); padding: 18px 22px; }
+.de-uni-meta .k { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-d); }
+.de-uni-meta .v {
+  font-family: var(--font-display); font-weight: 700; font-size: 28px; color: var(--text);
+  margin-top: 5px; letter-spacing: 0.02em; font-variant-numeric: tabular-nums;
+}
+
+/* ── Targeting reticle (in universe strip) ── */
+.de-reticle {
+  background: rgba(4,20,30,0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 14px;
+}
+.de-reticle svg { width: 46px; height: 46px; display: block; }
+
+/* ── Disclaimer banner ── */
+.de-disclaimer {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 13px 20px;
+  background: rgba(255,210,122,0.04); border-color: rgba(255,210,122,0.18);
+  margin-bottom: 22px;
+}
+.de-disc-label {
+  font-family: var(--font-plex-mono); font-size: 9px; letter-spacing: 0.24em;
+  text-transform: uppercase; color: var(--yellow); white-space: nowrap;
+  padding-top: 1px; flex: none;
+}
+.de-disc-text { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+/* ── Feed section ── */
+.de-feed-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 16px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.de-feed-head h2 {
+  font-family: var(--font-display); font-weight: 600; font-size: 16px;
+  letter-spacing: 0.14em; text-transform: uppercase; margin: 0;
+}
+.de-feed-head h2 .g { color: var(--green); }
+.de-feed-meta { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted-d); }
+
+/* ── Cards grid ── */
+.de-cards { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Recommendation card ── */
+.de-card { padding: 24px 26px 20px; position: relative; overflow: hidden; }
+.de-card::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--green); box-shadow: 0 0 12px var(--green); border-radius: 0 2px 2px 0;
+}
+
+/* ── Card header ── */
+.de-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.de-card-head-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.de-card-head-right { display: flex; align-items: center; gap: 8px; }
+
+/* ── Solution number ── */
+.de-solution-num {
+  font-family: var(--font-plex-mono); font-size: 10.5px; letter-spacing: 0.18em;
+  color: var(--muted-d); font-weight: 500;
+}
+
+/* ── Side badge (BUY YES / BUY NO) ── */
+.de-side-badge {
+  font-family: var(--font-display); font-weight: 600; font-size: 11px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 4px 11px; border-radius: 2px;
+}
+.de-side-badge.yes { color: var(--green); border: 1px solid rgba(54,236,208,0.35); background: rgba(54,236,208,0.08); }
+.de-side-badge.no  { color: var(--red);   border: 1px solid rgba(255,122,89,0.35);  background: rgba(255,122,89,0.08); }
+
+/* ── Confidence badge ── */
+.de-conf-badge {
+  font-family: var(--font-plex-mono); font-size: 10px; letter-spacing: 0.1em;
+  padding: 4px 10px; border-radius: 2px; white-space: nowrap;
+}
+.de-conf-badge.low      { color: var(--muted);   border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
+.de-conf-badge.medium   { color: var(--yellow);  border: 1px solid rgba(255,210,122,0.3); background: rgba(255,210,122,0.06); }
+.de-conf-badge.high     { color: var(--green);   border: 1px solid rgba(54,236,208,0.3); background: rgba(54,236,208,0.06); }
+.de-conf-badge.very_high {
+  color: var(--green); border: 1px solid rgba(54,236,208,0.5);
+  background: rgba(54,236,208,0.12); box-shadow: 0 0 10px rgba(54,236,208,0.15);
+}
+
+/* ── Personalized tag ── */
+.de-personalized {
+  font-family: var(--font-display); font-size: 9.5px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--yellow);
+  border: 1px solid rgba(255,210,122,0.28); background: rgba(255,210,122,0.06);
+  border-radius: 2px; padding: 4px 9px;
+}
+
+/* ── Category + expiry tags ── */
+.de-cat, .de-expiry {
+  font-family: var(--font-plex-mono); font-size: 9.5px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--muted-d);
+  border: 1px solid var(--line); border-radius: 2px; padding: 4px 9px;
+}
+.de-expiry.urgent { color: var(--red); border-color: rgba(255,122,89,0.32); background: rgba(255,122,89,0.06); }
+
+/* ── Market title row ── */
+.de-card-title { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 18px; }
+.de-market-link {
+  font-family: var(--font-display); font-weight: 600; font-size: 17px;
+  line-height: 1.28; letter-spacing: 0.01em; color: var(--text);
+  transition: color .15s; text-decoration: none;
+}
+.de-market-link:hover { color: var(--green); }
+.de-ext-link {
+  flex: none; margin-top: 3px; color: var(--muted-d);
+  transition: color .15s; display: inline-flex;
+}
+.de-ext-link:hover { color: var(--green); }
+
+/* ── Price row ── */
+.de-price-row {
+  display: flex; align-items: center; gap: 14px;
+  flex-wrap: wrap; margin-bottom: 16px;
+}
+.de-price-block { display: flex; flex-direction: column; gap: 3px; }
+.de-price-label { font-size: 8.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-d); }
+.de-price-val {
+  font-family: var(--font-display); font-weight: 700; font-size: 20px;
+  letter-spacing: 0.02em; color: var(--text); font-variant-numeric: tabular-nums;
+}
+.de-price-val.muted { color: var(--muted); }
+.de-price-val.dim   { color: var(--muted-d); font-weight: 600; font-size: 18px; }
+.de-price-block.accent .de-price-val { color: var(--green); text-shadow: 0 0 14px rgba(54,236,208,0.3); }
+.de-price-arrow { font-size: 16px; color: var(--muted-d); flex: none; }
+.de-edge-block {
+  margin-left: auto; text-align: right;
+  border-left: 1px solid var(--line); padding-left: 18px;
+}
+.de-edge-num {
+  font-family: var(--font-display); font-weight: 700; font-size: 24px;
+  color: var(--green); letter-spacing: 0.02em; text-shadow: 0 0 16px rgba(54,236,208,0.35);
+}
+.de-edge-sub {
+  font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted-d); margin-top: 2px;
+}
+
+/* ── Signal bars row ── */
+.de-signals-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; margin-bottom: 14px;
+}
+.de-signals-left { display: flex; align-items: center; gap: 10px; }
+.de-sig-bars { display: flex; gap: 4px; }
+.de-sig-bar { width: 8px; height: 22px; border-radius: 2px; transition: background .3s, box-shadow .3s; }
+.de-sig-bar.off          { background: rgba(54,236,208,0.08); }
+.de-sig-bar.on           { background: rgba(54,236,208,0.30); }
+.de-sig-bar.on.weak      { background: rgba(54,236,208,0.40); box-shadow: 0 0 4px rgba(54,236,208,0.2); }
+.de-sig-bar.on.moderate  { background: rgba(54,236,208,0.60); box-shadow: 0 0 6px rgba(54,236,208,0.35); }
+.de-sig-bar.on.strong    { background: var(--green); box-shadow: 0 0 10px rgba(54,236,208,0.55); }
+.de-sig-count { font-family: var(--font-plex-mono); font-size: 10px; letter-spacing: 0.12em; color: var(--muted); }
+.de-liq { font-family: var(--font-plex-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-d); }
+
+/* ── Holders strip ── */
+.de-holders { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.de-holder-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border: 1px solid var(--line); border-radius: 3px;
+  background: rgba(4,20,30,0.4); text-decoration: none;
+  transition: border-color .15s, background .15s;
+}
+.de-holder-chip:hover { border-color: var(--line-2); background: rgba(54,236,208,0.06); }
+.de-holder-rank  { font-family: var(--font-plex-mono); font-size: 9.5px; letter-spacing: 0.1em; color: var(--yellow); }
+.de-holder-name  { font-family: var(--font-display); font-weight: 500; font-size: 12px; color: var(--text); letter-spacing: 0.02em; }
+.de-holder-entry { font-family: var(--font-plex-mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--muted-d); }
+.de-holder-more  { font-family: var(--font-plex-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--muted-d); padding: 5px 8px; }
+.de-committed {
+  margin-left: auto; font-family: var(--font-plex-mono); font-size: 10px;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-d);
+}
+
+/* ── Explanation ── */
+.de-explanation { font-size: 13.5px; line-height: 1.65; color: var(--muted); margin: 0 0 14px; }
+
+/* ── Warnings ── */
+.de-warnings { list-style: none; padding: 0; margin: 0 0 14px; display: flex; flex-direction: column; gap: 5px; }
+.de-warnings li { font-size: 11.5px; letter-spacing: 0.04em; color: var(--yellow); line-height: 1.5; }
+
+/* ── Expand button ── */
+.de-expand-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: 1px solid var(--line); color: var(--muted);
+  border-radius: 3px; padding: 6px 12px; cursor: pointer;
+  transition: border-color .15s, color .15s; margin-top: 4px;
+}
+.de-expand-btn:hover { border-color: var(--line-2); color: var(--text); }
+.de-expand-label { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; }
+.de-expand-chev { width: 16px; height: 16px; transition: transform .2s; flex: none; }
+.de-expand-chev.open { transform: rotate(180deg); }
+
+/* ── Signal detail panel ── */
+.de-detail-panel {
+  margin-top: 14px; border: 1px solid var(--line); border-radius: 4px;
+  overflow: hidden; background: rgba(4,20,30,0.4);
+}
+.de-checklist { display: flex; flex-direction: column; }
+.de-check-row {
+  display: grid; grid-template-columns: 18px 1fr auto;
+  align-items: center; gap: 12px; padding: 10px 14px;
+}
+.de-check-row + .de-check-row { border-top: 1px solid rgba(54,236,208,0.06); }
+.de-check-row.fired { background: rgba(54,236,208,0.03); }
+.de-check-row.dark  { opacity: 0.5; }
+.de-check-icon { font-size: 11px; color: var(--green); text-align: center; }
+.de-check-row.dark .de-check-icon { color: var(--muted-d); }
+.de-check-name { font-family: var(--font-display); font-weight: 500; font-size: 12.5px; color: var(--text); }
+.de-check-val { font-family: var(--font-plex-mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--muted-d); white-space: nowrap; }
+
+/* ── Empty state ── */
+.de-empty { display: flex; align-items: center; gap: 32px; padding: 40px 36px; }
+.de-empty-reticle { flex: none; }
+.de-empty-reticle svg { width: 74px; height: 74px; display: block; }
+.de-empty-title {
+  font-family: var(--font-display); font-weight: 600; font-size: 17px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+}
+.de-empty-sub { font-size: 13px; line-height: 1.65; color: var(--muted-d); margin-top: 8px; max-width: 40ch; }
+
+/* ── Responsive ── */
+@media (max-width: 760px) {
+  .de-universe-strip { grid-template-columns: repeat(2, 1fr) 74px; }
+  .de-uni-meta:nth-child(3), .de-uni-meta:nth-child(4) { display: none; }
+  .de-edge-block { margin-left: 0; padding-left: 0; border-left: none; margin-top: 8px; width: 100%; text-align: left; }
+  .de-empty { flex-direction: column; text-align: center; padding: 32px 24px; }
+  .de-empty-sub { max-width: none; }
+}
+@media (max-width: 560px) {
+  .de-universe-strip { grid-template-columns: 1fr 1fr; }
+  .de-reticle { display: none; }
+  .de-card { padding: 18px 18px 16px; }
+  .de-card-head { gap: 6px; }
+  .de-holder-chip { padding: 4px 8px; }
+  .de-holder-entry { display: none; }
+}
+
 /* ── Market Analytics page ─────────────────────────────────────────────────── */
 .ma-page { display: flex; flex-direction: column; gap: 16px; }
 

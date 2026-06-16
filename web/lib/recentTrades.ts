@@ -38,6 +38,11 @@ function ratio(numerator: number, denominator: number): number | null {
   return denominator > 0 ? numerator / denominator : null;
 }
 
+// Minimum in-window buy value (USDC) for a BUY-last position to appear in the feed.
+// Tiny buys (noise, dust, test fills) are excluded. Pure-sell rows (no in-window buys) are
+// always kept — smart-money exits are always interesting regardless of fill size.
+const MIN_BUY_USD = 100;
+
 // Collapse the flat feed fills (expected newest-first) into one row per market position. The headline
 // is the most recent fill; the aggregate prefers the position caches and falls back to the in-window
 // fills. Returns positions most-recent-activity first.
@@ -81,6 +86,12 @@ export function groupRecentTrades(
 
   return [...groups.entries()]
     .sort((a, b) => b[1].latestMs - a[1].latestMs)
+    .filter(([, acc]) => {
+      // Keep pure-sell rows (no in-window buys) always — exits are always worth surfacing.
+      if (acc.buySize === 0) return true;
+      // Drop in-window buy totals below the minimum threshold.
+      return acc.buyWeighted >= MIN_BUY_USD;
+    })
     .map(([key, acc]) => buildPosition(key, acc, openByKey.get(key), closedByKey.get(key)));
 }
 
@@ -112,7 +123,11 @@ function buildPosition(key: string, acc: Acc, open: OpenBasis | undefined, close
   //    basis + mark + value), with the in-window fills as the recent-activity ledger.
   if (open) {
     const avgEntry = open.avgEntry ?? avgBuy;
-    const mark = open.curPrice;
+    // Derive mark from curPrice; fall back to currentValue/size when curPrice is null.
+    const mark = open.curPrice ??
+      (open.currentValue !== null && open.size !== null && open.size > 0
+        ? open.currentValue / open.size
+        : null);
     const unrealizedPct =
       avgEntry !== null && avgEntry > 0 && mark !== null ? (mark - avgEntry) / avgEntry : null;
     return {
@@ -122,7 +137,7 @@ function buildPosition(key: string, acc: Acc, open: OpenBasis | undefined, close
       avgEntry,
       mark,
       remainingSize: open.size ?? Math.max(0, acc.buySize - acc.sellSize),
-      positionValue: open.currentValue ?? (avgEntry !== null && open.size !== null ? avgEntry * open.size : null),
+      positionValue: open.currentValue ?? (mark !== null && open.size !== null ? mark * open.size : null),
       unrealizedPct,
       realizedPct: null,
       realizedPnl: null
@@ -154,17 +169,22 @@ function buildPosition(key: string, acc: Acc, open: OpenBasis | undefined, close
   // 3) No cache row: reconstruct from in-window fills alone.
   const netRemaining = acc.buySize - acc.sellSize;
   if (netRemaining > EPS) {
-    // Opened (and added) within the window, still held. We have no mark, so value is at cost.
+    // Opened (and added) within the window, still held. Use the most-recent fill price as a
+    // proxy for the current market price — it's the last known price point we have. For a
+    // single-fill position this gives 0% (entered at cost), which is accurate at entry time.
     const avgEntry = avgBuy;
+    const mark = acc.trade.price;
+    const unrealizedPct =
+      avgEntry !== null && avgEntry > 0 && mark !== null ? (mark - avgEntry) / avgEntry : null;
     return {
       ...base,
       state: "open",
       basisSource: avgEntry !== null ? "fills" : "none",
       avgEntry,
-      mark: null,
+      mark,
       remainingSize: netRemaining,
-      positionValue: avgEntry !== null ? avgEntry * netRemaining : null,
-      unrealizedPct: null,
+      positionValue: mark !== null ? mark * netRemaining : (avgEntry !== null ? avgEntry * netRemaining : null),
+      unrealizedPct,
       realizedPct: null,
       realizedPnl: null
     };

@@ -4,11 +4,12 @@ import { createClient } from "@supabase/supabase-js";
 import { botSignal, type BotSignal } from "./botDetection.js";
 import { CONFIG } from "./config.js";
 import { computeMetrics, type WalletMetrics } from "./metrics.js";
-import { apiStats, discoverTopWallets, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet, type EventSummary } from "./polymarket.js";
+import { apiStats, discoverTopWallets, discoverCandidateAddresses, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet, type EventSummary } from "./polymarket.js";
 import { recentTradesFromActivity, type RecentTrade } from "./recentTrades.js";
 import { buildMarkToMarketCurve, type CurvePosition } from "./equityCurve.js";
 import { dailyPointsFromHistory, planPriceFetches, type CacheState } from "./priceHistory.js";
 import { earliestEntryDates, latestFillDates, openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
+import { bestSkillScore, computeScoringOutcome, selectCandidateBatch, type CandidateWallet, type CandidateStatus } from "./candidateDiscovery.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -420,6 +421,43 @@ interface Database {
         Update: {
           max_ts?: string | null;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      candidate_wallets: {
+        Row: {
+          address: string;
+          discovery_source: string;
+          status: CandidateStatus;
+          first_seen_at: string;
+          last_scored_at: string | null;
+          skill_score: number | null;
+          times_scored: number;
+          consecutive_below_threshold: number;
+          promoted_at: string | null;
+          retired_at: string | null;
+        };
+        Insert: {
+          address: string;
+          discovery_source?: string;
+          status?: CandidateStatus;
+          first_seen_at?: string;
+          last_scored_at?: string | null;
+          skill_score?: number | null;
+          times_scored?: number;
+          consecutive_below_threshold?: number;
+          promoted_at?: string | null;
+          retired_at?: string | null;
+        };
+        Update: {
+          discovery_source?: string;
+          status?: CandidateStatus;
+          last_scored_at?: string | null;
+          skill_score?: number | null;
+          times_scored?: number;
+          consecutive_below_threshold?: number;
+          promoted_at?: string | null;
+          retired_at?: string | null;
         };
         Relationships: [];
       };
@@ -1367,6 +1405,265 @@ async function refreshLeaderboardFeed(
   return { wallets: addresses.length, trades: collected.length, walletTrades: collectedFills.length };
 }
 
+// ── Candidate discovery and promotion pipeline ─────────────────────────────────────────
+
+// Load all 'tracked' candidates from candidate_wallets for inclusion in the main worker
+// pool. Tracked wallets have demonstrated positive forecasting edge in at least one prior
+// scoring pass and compete for the same TOP_N leaderboard slots as leaderboard-seeded
+// wallets — no special treatment beyond being in the pool.
+async function loadTrackedCandidates(supabase: SupabaseClient): Promise<DiscoveredWallet[]> {
+  const { data, error } = await supabase
+    .from("candidate_wallets")
+    .select("address")
+    .eq("status", "tracked");
+  if (error) {
+    throw error;
+  }
+  // userName/lifetimePnl are unknown for most candidate sources; processWallet only uses them
+  // for the wallets upsert (handle + lifetime_pnl columns), so null is safe — prior full-ingest
+  // runs may have already written a handle from /activity userName.
+  return (data ?? []).map((row) => ({ address: row.address, userName: null, lifetimePnl: null }));
+}
+
+// Insert newly discovered candidate addresses into candidate_wallets. ignoreDuplicates
+// ensures existing rows (with their status/scoring history) are never overwritten —
+// only brand-new addresses produce a row.
+async function registerCandidates(
+  supabase: SupabaseClient,
+  candidates: Array<{ address: string; discoverySource: string }>
+): Promise<number> {
+  if (candidates.length === 0) {
+    return 0;
+  }
+  for (let offset = 0; offset < candidates.length; offset += CONFIG.RECENT_TRADES_INSERT_CHUNK) {
+    const slice = candidates.slice(offset, offset + CONFIG.RECENT_TRADES_INSERT_CHUNK);
+    const { error } = await supabase
+      .from("candidate_wallets")
+      .upsert(
+        slice.map((c) => ({ address: c.address, discovery_source: c.discoverySource })),
+        { onConflict: "address", ignoreDuplicates: true }
+      );
+    if (error) {
+      throw error;
+    }
+  }
+  return candidates.length;
+}
+
+// Run the candidate discovery pass: pull multi-source leaderboard variants + /trades
+// stream, register genuinely-new addresses into candidate_wallets, and return summary
+// counts. Fails gracefully — a partial failure (one leaderboard source down) still
+// registers all other discovered addresses.
+async function discoverAndRegisterCandidates(
+  supabase: SupabaseClient,
+  knownAddresses: Set<string>
+): Promise<{ discovered: number; registered: number }> {
+  const candidates = await discoverCandidateAddresses(knownAddresses);
+  const registered = await registerCandidates(supabase, candidates);
+  return { discovered: candidates.length, registered };
+}
+
+interface CandidateScoringResult {
+  scored: number;
+  promoted: number;  // candidate → tracked
+  retired: number;   // tracked → retired (handled in updateTrackedCandidateStatuses)
+}
+
+// Score a batch of unscored/stale candidates using the same processWallet pipeline as
+// the main leaderboard pass. Updates candidate_wallets with the new scores and status
+// transitions. Errors on individual wallets are logged and skipped without aborting the
+// batch — one bad wallet doesn't waste the rest of the run's quota.
+async function scoreCandidateBatch(
+  supabase: SupabaseClient,
+  client: PolymarketClient,
+  recentTradeCutoffMs: number
+): Promise<CandidateScoringResult> {
+  const rescoringIntervalMs = CONFIG.CANDIDATE_RESCORE_DAYS * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
+
+  // Load unscored/stale candidates (status='candidate' only — tracked wallets are handled
+  // by the main worker pool; retired wallets are never scored again).
+  const { data: candidateRows, error: loadError } = await supabase
+    .from("candidate_wallets")
+    .select("address, discovery_source, status, first_seen_at, last_scored_at, skill_score, times_scored, consecutive_below_threshold, promoted_at, retired_at")
+    .eq("status", "candidate");
+  if (loadError) {
+    throw loadError;
+  }
+
+  const allCandidates: CandidateWallet[] = (candidateRows ?? []).map((row) => ({
+    address: row.address,
+    discoverySource: row.discovery_source,
+    status: row.status as CandidateStatus,
+    firstSeenAt: row.first_seen_at,
+    lastScoredAt: row.last_scored_at,
+    skillScore: row.skill_score,
+    timesScored: row.times_scored,
+    consecutiveBelowThreshold: row.consecutive_below_threshold,
+    promotedAt: row.promoted_at,
+    retiredAt: row.retired_at
+  }));
+
+  const batch = selectCandidateBatch(allCandidates, CONFIG.CANDIDATE_BATCH_PER_RUN, Date.now(), rescoringIntervalMs);
+  if (batch.length === 0) {
+    return { scored: 0, promoted: 0, retired: 0 };
+  }
+
+  // Score each candidate — same processWallet call as the main pass, just discarded
+  // feeds/positions (they're not on the board yet; the leaderboard rebuild will include
+  // them if they get promoted and rank in the top N).
+  const scoreByAddress = new Map<string, number | null>();
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    while (cursor < batch.length) {
+      const candidate = batch[cursor];
+      cursor += 1;
+      if (!candidate) {
+        continue;
+      }
+      try {
+        await processWallet(
+          supabase,
+          client,
+          { address: candidate.address, userName: null, lifetimePnl: null },
+          recentTradeCutoffMs
+        );
+        // Fetch the skill scores just written to wallet_stats (processWallet upserts them).
+        const { data: statsRows } = await supabase
+          .from("wallet_stats")
+          .select("skill_score")
+          .eq("address", candidate.address);
+        const scores = (statsRows ?? []).map((r) => r.skill_score);
+        scoreByAddress.set(candidate.address, bestSkillScore(scores));
+      } catch (reason) {
+        console.warn(`Candidate scoring ${candidate.address}: ${describeError(reason)}`);
+        scoreByAddress.set(candidate.address, null); // treat as ineligible
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONFIG.WALLET_CONCURRENCY, batch.length) }, () => worker()));
+
+  // Compute and persist status transitions.
+  const nowIso = new Date().toISOString();
+  const scoringConfig = {
+    promotionThreshold: CONFIG.CANDIDATE_PROMOTION_THRESHOLD,
+    retirementThreshold: CONFIG.CANDIDATE_RETIREMENT_THRESHOLD,
+    retirementConsecutive: CONFIG.CANDIDATE_RETIREMENT_CONSECUTIVE
+  };
+  let promoted = 0;
+  for (const candidate of batch) {
+    const newScore = scoreByAddress.get(candidate.address) ?? null;
+    const outcome = computeScoringOutcome(candidate, newScore, nowIso, scoringConfig);
+    if (outcome.newStatus === "tracked") {
+      promoted += 1;
+    }
+    const { error: updateError } = await supabase
+      .from("candidate_wallets")
+      .update({
+        status: outcome.newStatus,
+        skill_score: outcome.skillScore,
+        times_scored: outcome.timesScored,
+        consecutive_below_threshold: outcome.consecutiveBelowThreshold,
+        last_scored_at: outcome.lastScoredAt,
+        promoted_at: outcome.promotedAt,
+        retired_at: outcome.retiredAt
+      })
+      .eq("address", candidate.address);
+    if (updateError) {
+      console.warn(`candidate_wallets update ${candidate.address}: ${describeError(updateError)}`);
+    }
+  }
+
+  return { scored: batch.length, promoted, retired: 0 };
+}
+
+// After the main leaderboard rebuild, update tracked candidates whose wallet_stats
+// changed. A tracked wallet that falls below CANDIDATE_RETIREMENT_THRESHOLD for
+// CANDIDATE_RETIREMENT_CONSECUTIVE consecutive runs is retired.
+async function updateTrackedCandidateStatuses(supabase: SupabaseClient): Promise<number> {
+  const { data: trackedRows, error: loadError } = await supabase
+    .from("candidate_wallets")
+    .select("address, discovery_source, status, first_seen_at, last_scored_at, skill_score, times_scored, consecutive_below_threshold, promoted_at, retired_at")
+    .eq("status", "tracked");
+  if (loadError) {
+    throw loadError;
+  }
+  if (!trackedRows || trackedRows.length === 0) {
+    return 0;
+  }
+
+  // Read the latest skill scores from wallet_stats for all tracked wallets.
+  const trackedAddresses = trackedRows.map((r) => r.address);
+  const bestScores = new Map<string, number | null>();
+  for (let offset = 0; offset < trackedAddresses.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
+    const slice = trackedAddresses.slice(offset, offset + CONFIG.LEADERBOARD_FILTER_CHUNK);
+    const { data: statsRows, error: statsError } = await supabase
+      .from("wallet_stats")
+      .select("address, skill_score")
+      .in("address", slice);
+    if (statsError) {
+      throw statsError;
+    }
+    for (const row of statsRows ?? []) {
+      const current = bestScores.get(row.address) ?? null;
+      const s = row.skill_score;
+      if (s !== null && (current === null || s > current)) {
+        bestScores.set(row.address, s);
+      }
+    }
+  }
+
+  const nowIso = new Date().toISOString();
+  const scoringConfig = {
+    promotionThreshold: CONFIG.CANDIDATE_PROMOTION_THRESHOLD,
+    retirementThreshold: CONFIG.CANDIDATE_RETIREMENT_THRESHOLD,
+    retirementConsecutive: CONFIG.CANDIDATE_RETIREMENT_CONSECUTIVE
+  };
+  let retired = 0;
+  for (const row of trackedRows) {
+    const wallet: CandidateWallet = {
+      address: row.address,
+      discoverySource: row.discovery_source,
+      status: row.status as CandidateStatus,
+      firstSeenAt: row.first_seen_at,
+      lastScoredAt: row.last_scored_at,
+      skillScore: row.skill_score,
+      timesScored: row.times_scored,
+      consecutiveBelowThreshold: row.consecutive_below_threshold,
+      promotedAt: row.promoted_at,
+      retiredAt: row.retired_at
+    };
+    const newScore = bestScores.get(row.address) ?? null;
+    const outcome = computeScoringOutcome(wallet, newScore, nowIso, scoringConfig);
+    if (outcome.newStatus === "retired") {
+      retired += 1;
+    }
+    // Only write if something changed (status, streak counter, or score).
+    const changed =
+      outcome.newStatus !== wallet.status ||
+      outcome.consecutiveBelowThreshold !== wallet.consecutiveBelowThreshold ||
+      outcome.skillScore !== wallet.skillScore;
+    if (!changed) {
+      continue;
+    }
+    const { error: updateError } = await supabase
+      .from("candidate_wallets")
+      .update({
+        status: outcome.newStatus,
+        skill_score: outcome.skillScore,
+        times_scored: outcome.timesScored,
+        consecutive_below_threshold: outcome.consecutiveBelowThreshold,
+        last_scored_at: outcome.lastScoredAt,
+        promoted_at: outcome.promotedAt,
+        retired_at: outcome.retiredAt
+      })
+      .eq("address", row.address);
+    if (updateError) {
+      console.warn(`candidate_wallets tracked update ${row.address}: ${describeError(updateError)}`);
+    }
+  }
+  return retired;
+}
+
 async function main(): Promise<void> {
   const startedAt = Date.now();
   const supabase = createClient<Database>(
@@ -1422,8 +1719,37 @@ async function main(): Promise<void> {
   }
 
   const polymarket = new PolymarketClient();
-  const wallets = await discoverTopWallets();
+  const discoveredWallets = await discoverTopWallets();
   const recentTradeCutoffMs = Date.now() - CONFIG.RECENT_TRADE_WINDOW_HOURS * 60 * 60 * CONFIG.MS_PER_SECOND;
+
+  // ── Candidate pipeline: discover + register, then load tracked into main pool ──────────
+  // Build the known address set from the main leaderboard discovery to avoid re-registering
+  // addresses we're already about to score in this run.
+  const mainAddressSet = new Set(discoveredWallets.map((w) => w.address));
+  let candidatesDiscovered = 0;
+  let candidatesRegistered = 0;
+  try {
+    const cdResult = await discoverAndRegisterCandidates(supabase, mainAddressSet);
+    candidatesDiscovered = cdResult.discovered;
+    candidatesRegistered = cdResult.registered;
+    console.log(`Candidate discovery: ${candidatesDiscovered} new addresses found, ${candidatesRegistered} registered`);
+  } catch (reason) {
+    console.warn(`Candidate discovery failed (non-fatal): ${describeError(reason)}`);
+  }
+  // Load tracked candidates and append to the worker pool so they compete for leaderboard
+  // slots on every full run — no separate pass needed, their scores land in wallet_stats
+  // just like any leaderboard-seeded wallet.
+  let trackedCandidates: DiscoveredWallet[] = [];
+  try {
+    trackedCandidates = await loadTrackedCandidates(supabase);
+    console.log(`Loaded ${trackedCandidates.length} tracked candidates for main pool`);
+  } catch (reason) {
+    console.warn(`Loading tracked candidates failed (non-fatal): ${describeError(reason)}`);
+  }
+  // Deduplicate: a tracked candidate already in the main leaderboard set adds no work.
+  const newTracked = trackedCandidates.filter((w) => !mainAddressSet.has(w.address));
+  const wallets = [...discoveredWallets, ...newTracked];
+
   const collectedTrades: RecentTrade[] = [];
   const collectedFills: ProfileFill[] = [];
   const collectedPositions: OpenPositionRecord[] = [];
@@ -1438,7 +1764,7 @@ async function main(): Promise<void> {
   let insufficient = 0;
   const botBreakdown: Record<BotSignal, number> = { trade_rate: 0, dust_trades: 0, simultaneous_markets: 0 };
 
-  console.log(`Discovered ${wallets.length} wallets`);
+  console.log(`Discovered ${discoveredWallets.length} wallets + ${newTracked.length} tracked candidates = ${wallets.length} total`);
 
   // Worker pool: each worker pulls the next wallet from a shared cursor and never waits on its
   // siblings, so fast wallets (bots) don't idle behind slow ones (deep-history whales). This keeps
@@ -1488,6 +1814,31 @@ async function main(): Promise<void> {
 
   await rebuildLeaderboardCache(supabase);
 
+  // ── Candidate pipeline: score batch + update tracked statuses ────────────────────────
+  // Score a batch of unscored/stale candidates. Runs after the main worker pool so the
+  // restricted-lane budget has already been spent on leaderboard wallets — candidates get
+  // the remaining slot allowance, capped by CANDIDATE_BATCH_PER_RUN.
+  let candidateScored = 0;
+  let candidatePromoted = 0;
+  let candidateRetired = 0;
+  try {
+    const batchResult = await scoreCandidateBatch(supabase, polymarket, recentTradeCutoffMs);
+    candidateScored = batchResult.scored;
+    candidatePromoted = batchResult.promoted;
+    console.log(`Candidate batch: scored=${candidateScored}, promoted=${candidatePromoted}`);
+  } catch (reason) {
+    console.warn(`Candidate batch scoring failed (non-fatal): ${describeError(reason)}`);
+  }
+  // Update tracked candidates whose scores changed in this run (promotion/retirement).
+  try {
+    candidateRetired = await updateTrackedCandidateStatuses(supabase);
+    if (candidateRetired > 0) {
+      console.log(`Candidate retirement: retired=${candidateRetired} tracked wallets`);
+    }
+  } catch (reason) {
+    console.warn(`Tracked candidate status update failed (non-fatal): ${describeError(reason)}`);
+  }
+
   // Persist the activity feed from fills collected during processing. Done after the leaderboard
   // rebuild so the read-time membership join has fresh ranks to filter against.
   const recentTradeCount = await replaceRecentTrades(supabase, collectedTrades);
@@ -1515,8 +1866,9 @@ async function main(): Promise<void> {
   const marketCount = await ingestMarkets(supabase, polymarket);
 
   const elapsedSeconds = (Date.now() - startedAt) / CONFIG.MS_PER_SECOND;
-  console.log(`Processed ${processed} wallets; excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades, ${walletTradeCount} profile fills, ${walletPositionCount} open positions, ${closedPositionCount} closed positions; price-history ${priceHistory.upserted} rows across ${priceHistory.fetched} markets (deferred=${priceHistory.deferred}, pruned=${priceHistory.pruned}); equity-curve ${equityCurveCount} daily rows; elapsed=${elapsedSeconds.toFixed(1)}s`);
+  console.log(`Processed ${processed} wallets (${newTracked.length} tracked candidates); excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades, ${walletTradeCount} profile fills, ${walletPositionCount} open positions, ${closedPositionCount} closed positions; price-history ${priceHistory.upserted} rows across ${priceHistory.fetched} markets (deferred=${priceHistory.deferred}, pruned=${priceHistory.pruned}); equity-curve ${equityCurveCount} daily rows; elapsed=${elapsedSeconds.toFixed(1)}s`);
   console.log(`Bot breakdown: trade_rate=${botBreakdown.trade_rate}, dust_trades=${botBreakdown.dust_trades}, simultaneous_markets=${botBreakdown.simultaneous_markets}`);
+  console.log(`Candidate pipeline: discovered=${candidatesDiscovered} new, registered=${candidatesRegistered}; scored=${candidateScored}, promoted=${candidatePromoted}, retired=${candidateRetired}`);
 
   // Diagnostic: the restricted lane (closed-positions) is the dominant cost. Its theoretical floor
   // is requests * interval; if processing took ~that, we're gate-bound (near the rate-limit ceiling)

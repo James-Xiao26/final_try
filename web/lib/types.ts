@@ -288,6 +288,77 @@ export interface CrowdMarketDetail {
   timeline: CrowdTimelinePoint[];
 }
 
+// ── Decision Engine ───────────────────────────────────────────────────────────
+
+// One of six signals that contribute to a recommendation's confidence.
+export interface DecisionSignalResult {
+  name: string;
+  description: string;
+  fired: boolean;
+  strength: "none" | "weak" | "moderate" | "strong";
+  value: string;
+}
+
+// One leaderboard wallet holding a position that drives a recommendation.
+export interface SmartMoneyHolder {
+  address: string;
+  handle: string | null;
+  rank: number | null;
+  skillScore: number;
+  side: "YES" | "NO";
+  avgEntry: number;
+  size: number;
+  currentValue: number;
+  lastTradedAt: string | null;
+}
+
+export type ConfidenceLevel = "low" | "medium" | "high" | "very_high";
+
+// One trade recommendation from the Decision Engine.
+export interface TradeRecommendation {
+  conditionId: string;
+  market: string;
+  side: "YES" | "NO";
+  maxEntryPrice: number;
+  currentPrice: number;
+  smartMoneyPrice: number;
+  edgeCents: number;
+  edgePct: number;
+  confidenceLevel: ConfidenceLevel;
+  confidenceRange: [number, number];
+  signalsFired: number;
+  totalSignals: number;
+  signals: DecisionSignalResult[];
+  topHolders: SmartMoneyHolder[];
+  holderCount: number;
+  avgHolderSkill: number;
+  totalCommittedUsd: number;
+  category: string | null;
+  slug: string | null;
+  endDate: string | null;
+  daysToExpiry: number | null;
+  liquidityUsd: number;
+  spread: number | null;
+  image: string | null;
+  explanation: string;
+  warnings: string[];
+  personalizedBoost: boolean;
+  rankingScore: number;
+}
+
+export interface DecisionEngineUniverseSummary {
+  marketsScanned: number;
+  marketsWithSmartMoney: number;
+  totalLeaderboardHolders: number;
+  generatedAt: string;
+}
+
+export interface DecisionEngineResult {
+  recommendations: TradeRecommendation[];
+  universeSummary: DecisionEngineUniverseSummary;
+  disclaimer: string;
+}
+
 export interface Database {
   public: {
     Tables: {

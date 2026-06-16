@@ -602,6 +602,90 @@ export interface DiscoveredWallet {
   lifetimePnl: number | null;
 }
 
+// A wallet surfaced by the extended candidate discovery pipeline (multi-period leaderboard
+// variants + /trades stream). Carries a `discoverySource` annotation so candidate_wallets
+// can record how each wallet was first found. Merges into the candidate scoring batch
+// without touching any existing status/scoring history.
+export interface DiscoveredCandidate {
+  address: string;
+  discoverySource: string;
+  userName: string | null;
+  lifetimePnl: number | null;
+}
+
+// Pull wallets from every CANDIDATE_SOURCES variant and the live /trades stream.
+// Returns only addresses not already in `knownAddresses` (main leaderboard pass + existing
+// candidate_wallets rows) — callers insert with ignoreDuplicates so no existing scoring
+// history is overwritten.
+//
+// Each leaderboard source runs independently: a network failure in one is logged and
+// skipped without aborting the others. The trades stream is similarly non-fatal.
+export async function discoverCandidateAddresses(
+  knownAddresses: Set<string>
+): Promise<DiscoveredCandidate[]> {
+  const found = new Map<string, DiscoveredCandidate>();
+
+  const remember = (address: string, source: string, userName: string | null, lifetimePnl: number | null): void => {
+    const normalized = address.toLowerCase();
+    if (!normalized.startsWith("0x")) {
+      return;
+    }
+    if (found.has(normalized)) {
+      return; // first source wins — never overwrite the lineage annotation
+    }
+    found.set(normalized, { address: normalized, discoverySource: source, userName, lifetimePnl });
+  };
+
+  for (const { timePeriod, orderBy } of CONFIG.CANDIDATE_SOURCES) {
+    const source = `leaderboard_${orderBy.toLowerCase()}_${timePeriod}`;
+    try {
+      for (let offset = 0; offset < CONFIG.SEED_WALLET_COUNT; offset += CONFIG.LEADERBOARD_PAGE_SIZE) {
+        const params = new URLSearchParams({
+          category: "OVERALL",
+          timePeriod,
+          orderBy,
+          limit: String(CONFIG.LEADERBOARD_PAGE_SIZE),
+          offset: String(offset)
+        });
+        const page = asArray(await fetchJson("/v1/leaderboard", params)).map(mapLeaderboard);
+        page.forEach((entry) => remember(entry.proxyWallet, source, entry.userName, entry.pnl));
+        if (page.length < CONFIG.LEADERBOARD_PAGE_SIZE) {
+          break;
+        }
+      }
+    } catch (error) {
+      console.warn(
+        `Candidate discovery (${source}) failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  // /trades stream: captures active traders absent from every leaderboard variant.
+  // Always run (not just as a fallback) so recent activity supplements ranked lists.
+  try {
+    const params = new URLSearchParams({
+      limit: String(CONFIG.TRADES_DISCOVERY_LIMIT),
+      offset: "0",
+      takerOnly: "false"
+    });
+    const trades = asArray(await fetchJson("/trades", params));
+    trades.forEach((trade) => {
+      [
+        readString(trade, ["maker", "makerAddress"]),
+        readString(trade, ["taker", "takerAddress"]),
+        readString(trade, ["proxyWallet", "user", "wallet"])
+      ].forEach((addr) => remember(addr, "trades_stream", null, null));
+    });
+  } catch (error) {
+    console.warn(
+      `Candidate trades-stream discovery failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+
+  // Exclude already-known addresses so the caller only receives genuinely new wallets.
+  return [...found.values()].filter((c) => !knownAddresses.has(c.address));
+}
+
 export async function discoverTopWallets(): Promise<DiscoveredWallet[]> {
   const wallets = new Map<string, { userName: string | null; lifetimePnl: number | null }>();
   const remember = (address: string, userName: string | null, lifetimePnl: number | null): void => {

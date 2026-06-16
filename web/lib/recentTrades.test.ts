@@ -81,8 +81,9 @@ test("sold-out position with no cache and out-of-window buys reports P/L n/a (ba
 test("round-trip fully inside the window reconstructs realized % from fills alone", () => {
   const [p] = groupRecentTrades(
     [
-      trade({ side: "SELL", price: 0.5, size: 100, tradedAt: "2026-01-02T00:00:00.000Z" }),
-      trade({ side: "BUY", price: 0.4, size: 100, tradedAt: "2026-01-01T00:00:00.000Z" })
+      // size 300: buyWeighted = 0.4 * 300 = 120 ≥ MIN_BUY_USD
+      trade({ side: "SELL", price: 0.5, size: 300, tradedAt: "2026-01-02T00:00:00.000Z" }),
+      trade({ side: "BUY", price: 0.4, size: 300, tradedAt: "2026-01-01T00:00:00.000Z" })
     ],
     noOpen,
     noClosed
@@ -108,16 +109,19 @@ test("open position built from in-window adds (no cache) uses the volume-weighte
   assert.equal(p.basisSource, "fills");
   // (100*0.6 + 300*0.4) / 400 = 0.45
   assert.equal(p.avgEntry, 0.45);
-  assert.equal(p.mark, null);
+  // mark = most recent fill price (2026-01-02 trade at 0.6); unrealizedPct = (0.6-0.45)/0.45
+  assert.equal(p.mark, 0.6);
+  assert.ok(p.unrealizedPct !== null && Math.abs(p.unrealizedPct - (0.6 - 0.45) / 0.45) < 1e-9);
   assert.equal(p.remainingSize, 400);
 });
 
 test("groups by conditionId + outcomeIndex, keeps all fills, orders newest-first", () => {
   const positions = groupRecentTrades(
     [
-      trade({ conditionId: "newer", market: "newer", tradedAt: "2026-02-01T00:00:00.000Z" }),
-      trade({ conditionId: "older", market: "older", tradedAt: "2026-01-01T00:00:00.000Z" }),
-      trade({ conditionId: "older", market: "older", tradedAt: "2026-01-01T06:00:00.000Z" })
+      // size 300: buyWeighted = 0.5 * 300 = 150 ≥ MIN_BUY_USD
+      trade({ conditionId: "newer", market: "newer", tradedAt: "2026-02-01T00:00:00.000Z", size: 300 }),
+      trade({ conditionId: "older", market: "older", tradedAt: "2026-01-01T00:00:00.000Z", size: 300 }),
+      trade({ conditionId: "older", market: "older", tradedAt: "2026-01-01T06:00:00.000Z", size: 300 })
     ],
     noOpen,
     noClosed

@@ -134,7 +134,54 @@ export const CONFIG = {
   LEADERBOARD_FILTER_CHUNK: 200,
   TRADES_DISCOVERY_LIMIT: 10000,
   SECONDS_PER_DAY: 86400,
-  MS_PER_SECOND: 1000
+  MS_PER_SECOND: 1000,
+
+  // ── Candidate discovery and promotion ──────────────────────────────────────────────────
+  //
+  // The main leaderboard pass (discoverTopWallets) only surfaces the top 5,000 traders by
+  // all-time volume. Skilled traders with smaller capital bases never appear there. The
+  // candidate pipeline finds them through additional leaderboard slices and the /trades
+  // stream, scores them in nightly batches, and promotes those with demonstrated edge to
+  // 'tracked' status — competing for the same TOP_N leaderboard slots every full run.
+
+  // Additional /v1/leaderboard slices pulled during candidate discovery. Each variant
+  // surfaces a different population from the main VOL/ALL pass: monthly winners find
+  // recently-ascendant traders; the trades_stream catches anyone who traded recently
+  // regardless of leaderboard standing. Each source runs independently — a failure in
+  // one is logged and skipped without aborting the rest.
+  CANDIDATE_SOURCES: [
+    { timePeriod: "ALL", orderBy: "PNL" }, // all-time top earners (different from VOL-sorted)
+    { timePeriod: "1m",  orderBy: "VOL" }, // highest monthly volume
+    { timePeriod: "1m",  orderBy: "PNL" }, // highest monthly profit
+    { timePeriod: "1w",  orderBy: "VOL" }, // highest weekly volume
+    { timePeriod: "1w",  orderBy: "PNL" }, // highest weekly profit
+  ] as Array<{ timePeriod: string; orderBy: string }>,
+
+  // Candidates scored per full ingest run. Each costs the same restricted-lane API
+  // budget as a main leaderboard wallet. At 500/day with ~20k first-pass candidates
+  // the full initial universe is covered in ~40 days; on steady state (new /trades stream
+  // candidates only) the batch clears in minutes.
+  CANDIDATE_BATCH_PER_RUN: 500,
+
+  // Minimum skill_score on any horizon to promote a candidate to 'tracked'. Set to
+  // SCORE_FLOOR (4.0) — any wallet with proven positive forecasting edge qualifies. The
+  // Bayesian shrinkage already requires at least MIN_TRADES resolved positions before the
+  // score can be non-zero, so this threshold is conservative despite being the floor.
+  CANDIDATE_PROMOTION_THRESHOLD: 4.0,
+
+  // Score below which a tracked wallet's consecutive_below_threshold counter increments.
+  // Set below SCORE_FLOOR so a wallet that loses its edge (drops to 0) begins accumulating
+  // toward retirement, while a single unlucky run near the floor doesn't immediately fire.
+  CANDIDATE_RETIREMENT_THRESHOLD: 3.0,
+
+  // Consecutive full-ingest runs with score < CANDIDATE_RETIREMENT_THRESHOLD before
+  // retirement. 3 daily runs = 3 days of sustained below-threshold performance.
+  CANDIDATE_RETIREMENT_CONSECUTIVE: 3,
+
+  // Minimum days between re-scoring a candidate that previously fell short of the
+  // promotion threshold. Prevents the batch from being dominated by confirmed duds.
+  // Aligns with the 30-day scoring horizon: edge can meaningfully shift month to month.
+  CANDIDATE_RESCORE_DAYS: 30
 };
 
 export type HorizonDays = (typeof CONFIG.HORIZONS)[number];

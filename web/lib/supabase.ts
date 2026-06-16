@@ -2,6 +2,7 @@ import { createBrowserClient, createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, ResolvedMarket, WalletMetrics, WalletPosition, WalletProfile } from "./types";
+import type { DECategoryWin, DELeaderboardEntry, DEMarket, DEPosition, DecisionEngineInputs } from "./decisionEngine";
 import { HORIZONS } from "./types";
 import { groupWalletTrades } from "./walletTrades";
 import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis } from "./recentTrades";
@@ -993,6 +994,217 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
   }));
 
   return { conditionId, meta: resolvedMeta, detail, priceRows, whaleFills, extraLines, primaryLabel };
+}
+
+// ── Decision Engine data assembly ────────────────────────────────────────────
+// Assembles raw DB rows for buildRecommendations(). Separate from the page-level readers above
+// because it spans several tables and intentionally keeps its own row-type definitions local.
+
+interface DEPositionRow {
+  address: string;
+  condition_id: string | null;
+  market: string | null;
+  outcome_index: number | null;
+  size: number | null;
+  avg_price: number | null;
+  cur_price: number | null;
+  end_date: string | null;
+  first_traded_at: string | null;
+  last_traded_at: string | null;
+}
+
+interface DEMarketRow {
+  condition_id: string | null;
+  question: string;
+  slug: string | null;
+  category: string | null;
+  liquidity_usd: number | null;
+  last_trade_price: number | null;
+  end_date: string | null;
+  image: string | null;
+  spread: number | null;
+}
+
+// Fetch everything the Decision Engine needs in parallel where possible.
+// Optional `walletAddress` enables personalization: the requesting wallet's
+// per-category win rate is computed from their closed positions.
+export async function getDecisionEngineData(
+  opts: { walletAddress?: string } = {}
+): Promise<DecisionEngineInputs> {
+  const supabase = createSupabaseServerClient();
+
+  // Wave 1: leaderboard only — need the address set before we can scope subsequent queries.
+  // wallet_positions accumulates stale rows from past leaderboard runs (the wipe-and-replace
+  // in ingest only deletes the current board's addresses, leaving former wallets' rows). Querying
+  // unfiltered gives 500+ unique addresses → 22KB .in() URL → PostgREST 414 headers overflow.
+  const { data: cacheData, error: cacheError } = await supabase
+    .from("leaderboard_cache")
+    .select("address, skill_score, rank");
+
+  if (cacheError && !isMissingSchemaError(cacheError)) throw cacheError;
+
+  const leaderboard: DELeaderboardEntry[] = ((cacheData ?? []) as unknown as {
+    address: string;
+    skill_score: number | null;
+    rank: number;
+  }[]).map((row) => ({
+    address: row.address,
+    skillScore: row.skill_score ?? 0,
+    rank: row.rank,
+  }));
+
+  const leaderboardAddresses = leaderboard.map((e) => e.address);
+
+  // Wave 2: positions (filtered to leaderboard), markets, and handles — all independent, run in parallel.
+  // Filtering wallet_positions to leaderboard addresses avoids scanning stale wallet data and keeps
+  // the result set small (100 wallets × ~30 positions = ~3000 rows instead of ~16000 unfiltered).
+  // Note: "Recent Accumulation" is derived from wallet_positions.last_traded_at (already fetched
+  // here) rather than querying wallet_trades, which has no index on (traded_at, side).
+  const [posRes, allMarketsRes, walletHandleRes] = await Promise.all([
+    leaderboardAddresses.length > 0
+      ? fetchAllPaged((from, to) =>
+          supabase
+            .from("wallet_positions")
+            .select(
+              "address, condition_id, market, outcome_index, size, avg_price, cur_price, end_date, first_traded_at, last_traded_at"
+            )
+            .in("address", leaderboardAddresses)
+            .range(from, to)
+        )
+      : Promise.resolve<PagedResult>({ rows: [], missing: false }),
+    supabase
+      .from("markets")
+      .select("condition_id, question, slug, category, liquidity_usd, last_trade_price, end_date, image, spread")
+      .eq("active", true)
+      .eq("closed", false),
+    leaderboardAddresses.length > 0
+      ? supabase.from("wallets").select("address, handle").in("address", leaderboardAddresses)
+      : Promise.resolve({ data: [] as unknown[], error: null }),
+  ]);
+
+  const positions: DEPosition[] = (posRes.rows as unknown as DEPositionRow[]).map((row) => ({
+    address: row.address,
+    conditionId: row.condition_id,
+    market: row.market,
+    outcomeIndex: row.outcome_index,
+    size: toNumber(row.size),
+    avgPrice: toNumber(row.avg_price),
+    curPrice: toNumber(row.cur_price),
+    endDate: row.end_date,
+    firstTradedAt: row.first_traded_at,
+    lastTradedAt: row.last_traded_at,
+  }));
+
+  if (allMarketsRes.error && !isMissingSchemaError(allMarketsRes.error)) throw allMarketsRes.error;
+  if (walletHandleRes.error && !isMissingSchemaError(walletHandleRes.error)) throw walletHandleRes.error;
+
+  // Build the markets Map from positions (primary source: question, curPrice, endDate are in
+  // wallet_positions). Markets in the top-300 table get enriched with slug, category, liquidity,
+  // and spread; positions in less-liquid markets outside the top-300 still appear with nulls for
+  // those fields — the recommendation signals degrade gracefully.
+  const markets = new Map<string, DEMarket>();
+  for (const pos of positions) {
+    if (pos.conditionId && !markets.has(pos.conditionId)) {
+      markets.set(pos.conditionId, {
+        conditionId: pos.conditionId,
+        question: pos.market ?? "",
+        slug: null,
+        category: null,
+        liquidityUsd: 0,
+        lastTradePrice: pos.curPrice,
+        endDate: pos.endDate,
+        image: null,
+        spread: null,
+      });
+    }
+  }
+
+  // Enrich from markets table (top-300 by liquidity) — adds slug, category, liquidity, spread.
+  ((allMarketsRes.data ?? []) as unknown as DEMarketRow[]).forEach((row) => {
+    if (row.condition_id && markets.has(row.condition_id)) {
+      const existing = markets.get(row.condition_id)!;
+      markets.set(row.condition_id, {
+        ...existing,
+        slug: row.slug ?? existing.slug,
+        category: row.category ?? existing.category,
+        liquidityUsd: row.liquidity_usd != null ? toNumber(row.liquidity_usd) : existing.liquidityUsd,
+        lastTradePrice: row.last_trade_price ?? existing.lastTradePrice,
+        endDate: row.end_date ?? existing.endDate,
+        image: row.image ?? existing.image,
+        spread: row.spread ?? existing.spread,
+      });
+    }
+  });
+
+  const handles = new Map<string, string | null>();
+  ((walletHandleRes.data ?? []) as unknown as WalletHandleRow[]).forEach((w) =>
+    handles.set(w.address, w.handle)
+  );
+
+  // 6. Personalization: if a wallet address is provided, compute per-category win rate from
+  //    that wallet's closed positions joined to the markets table for categories.
+  let categoryWins: DECategoryWin[] | undefined;
+  if (opts.walletAddress) {
+    const normalized = opts.walletAddress.toLowerCase();
+    const { data: closedData, error: closedError } = await supabase
+      .from("wallet_closed_positions")
+      .select("condition_id, realized_pnl")
+      .eq("address", normalized);
+    if (closedError && !isMissingSchemaError(closedError)) throw closedError;
+
+    const closedRows = (closedData ?? []) as unknown as {
+      condition_id: string | null;
+      realized_pnl: number | null;
+    }[];
+
+    const closedConditionIds = [
+      ...new Set(closedRows.map((r) => r.condition_id).filter((id): id is string => id !== null)),
+    ];
+
+    if (closedConditionIds.length > 0) {
+      const { data: catData, error: catError } = await supabase
+        .from("markets")
+        .select("condition_id, category")
+        .in("condition_id", closedConditionIds.slice(0, 200));
+      if (catError && !isMissingSchemaError(catError)) throw catError;
+
+      const categoryByCondition = new Map<string, string | null>();
+      ((catData ?? []) as unknown as { condition_id: string | null; category: string | null }[]).forEach(
+        (r) => {
+          if (r.condition_id) categoryByCondition.set(r.condition_id, r.category);
+        }
+      );
+
+      const catStats = new Map<string, { wins: number; total: number }>();
+      for (const row of closedRows) {
+        if (!row.condition_id) continue;
+        const cat = categoryByCondition.get(row.condition_id) ?? "Unknown";
+        const existing = catStats.get(cat) ?? { wins: 0, total: 0 };
+        existing.total += 1;
+        if ((row.realized_pnl ?? 0) > 0) existing.wins += 1;
+        catStats.set(cat, existing);
+      }
+
+      categoryWins = [...catStats.entries()]
+        .filter(([, s]) => s.total >= 5)
+        .map(([category, { wins, total }]) => ({
+          category,
+          wins,
+          total,
+          winRate: wins / total,
+        }))
+        .sort((a, b) => b.winRate - a.winRate);
+    }
+  }
+
+  return {
+    leaderboard,
+    positions,
+    markets,
+    handles,
+    ...(categoryWins !== undefined ? { categoryWins } : {}),
+    asOf: new Date(),
+  };
 }
 
 // Resolved Markets panel: closed positions from the last 7 days, grouped by market (conditionId),
