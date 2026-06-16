@@ -5,7 +5,7 @@ import type { CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, Ho
 import type { DECategoryWin, DELeaderboardEntry, DEMarket, DEPosition, DecisionEngineInputs } from "./decisionEngine";
 import { HORIZONS } from "./types";
 import { groupWalletTrades } from "./walletTrades";
-import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis } from "./recentTrades";
+import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis, type TradeBasis } from "./recentTrades";
 import { buildCrowdMarketDetail, summarizeCrowdedMarkets, type CrowdClosedPosition, type CrowdLookups, type CrowdOpenPosition, type CrowdTradeFill } from "./marketCrowd";
 import type { MarketAnalytics, MarketMeta, PriceLine, PricePoint, WhaleFillInput } from "./marketAnalytics";
 import { fetchEventCandidates, fetchLiveMarket, fetchLivePriceSeries, type LiveMarket } from "./polymarketLive";
@@ -276,12 +276,13 @@ export async function getRecentLeaderboardTrades(
   const feedAddresses = [...new Set(trades.map((trade) => trade.address))];
   const openByKey = new Map<string, OpenBasis>();
   const closedByKey = new Map<string, ClosedBasis>();
+  const tradeByKey = new Map<string, TradeBasis>();
   if (feedAddresses.length > 0) {
     // Active leaderboard wallets hold thousands of positions combined (the closed cache especially),
     // so these MUST page — a single PostgREST response caps at 1000 rows, which would silently drop
     // most positions and leave the feed unable to find their basis (→ "P/L n/a" on otherwise-known
     // positions). Page through with the same .range() helper the board-wide scans use.
-    const [openRes, closedRes] = await Promise.all([
+    const [openRes, closedRes, tradeRes] = await Promise.all([
       fetchAllPaged((from, to) =>
         supabase
           .from("wallet_positions")
@@ -294,6 +295,19 @@ export async function getRecentLeaderboardTrades(
           .from("wallet_closed_positions")
           .select("address, condition_id, outcome_index, avg_price, realized_pnl, size")
           .in("address", feedAddresses)
+          .range(from, to)
+      ),
+      // Pre-window BUY fills from wallet_trades (the per-wallet fill history from the last full ingest,
+      // up to PROFILE_TRADES_LIMIT fills). Filtered to traded_at < cutoff so they don't overlap with
+      // the in-window recent_trades fills; blended in buildPosition to give a complete cost basis.
+      // Zero new Polymarket API calls — all data is already in the DB.
+      fetchAllPaged((from, to) =>
+        supabase
+          .from("wallet_trades")
+          .select("address, condition_id, outcome_index, price, size")
+          .in("address", feedAddresses)
+          .eq("side", "BUY")
+          .lt("traded_at", cutoff)
           .range(from, to)
       )
     ]);
@@ -314,9 +328,26 @@ export async function getRecentLeaderboardTrades(
         size: row.size
       });
     });
+
+    type FeedTradeHistoryRow = {
+      address: string;
+      condition_id: string | null;
+      outcome_index: number | null;
+      price: number | null;
+      size: number | null;
+    };
+    (tradeRes.rows as unknown as FeedTradeHistoryRow[]).forEach((row) => {
+      if (row.price === null || row.size === null) return;
+      const key = positionKey(row.address, row.condition_id, row.outcome_index);
+      const current = tradeByKey.get(key) ?? { preWindowWeighted: 0, preWindowSize: 0 };
+      tradeByKey.set(key, {
+        preWindowWeighted: current.preWindowWeighted + row.price * row.size,
+        preWindowSize: current.preWindowSize + row.size,
+      });
+    });
   }
 
-  const positions = groupRecentTrades(trades, openByKey, closedByKey);
+  const positions = groupRecentTrades(trades, openByKey, closedByKey, tradeByKey);
   return { positions, traderCount };
 }
 

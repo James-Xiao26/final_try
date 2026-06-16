@@ -142,9 +142,13 @@ export interface RecentFill {
 // collapsed from the fills in the feed window: adds and partial sells fold into a single row instead
 // of one row per fill. The headline (lastSide/lastSize/lastPrice) is the most recent fill; the
 // aggregate (avgEntry, mark, value, P/L) prefers the authoritative position cache (wallet_positions
-// for open, wallet_closed_positions for closed) and falls back to the in-window fills. `basisSource`
-// records where avgEntry came from: "cache" (Polymarket position data), "fills" (reconstructed from
-// in-window buys), or "none" (opened before the window with no cache row → P/L unknown).
+// for open, wallet_closed_positions for closed) and falls back to the blended fill history, then
+// in-window fills. `basisSource` records where avgEntry came from:
+// - "cache"  = Polymarket position data (wallet_positions or wallet_closed_positions)
+// - "trades" = wallet_trades fill history (pre-window buys blended with in-window adds, covers most
+//              positions beyond the 24h window)
+// - "fills"  = in-window fills only (24h window)
+// - "none"   = genuinely unknown (no buy data available anywhere)
 export interface RecentTradePosition {
   address: string;
   handle: string | null;
@@ -160,7 +164,7 @@ export interface RecentTradePosition {
   lastUsdcSize: number | null; // USDC value of the headline fill (price·size when the API omits it)
   // aggregate position state
   state: "open" | "closed";
-  basisSource: "cache" | "fills" | "none";
+  basisSource: "cache" | "trades" | "fills" | "none";
   avgEntry: number | null;        // cost basis; null when unknown
   mark: number | null;            // current outcome price (open positions); null otherwise
   remainingSize: number;          // shares still held (open); 0 when closed

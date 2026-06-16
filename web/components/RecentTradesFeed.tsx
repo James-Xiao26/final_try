@@ -162,10 +162,13 @@ function PositionRow({ p }: { p: RecentTradePosition }) {
   let avgSub: string;
   if (p.avgEntry === null) {
     avgLead = <>—</>;
-    avgSub = "opened earlier";
+    avgSub = "basis unknown";
   } else if (p.basisSource === "cache") {
     avgLead = <>{formatPrice(p.avgEntry)}</>;
     avgSub = p.state === "open" ? "cost basis" : "realized basis";
+  } else if (p.basisSource === "trades") {
+    avgLead = <>{formatPrice(p.avgEntry)}</>;
+    avgSub = "fill history";
   } else {
     avgLead = <>{formatPrice(p.avgEntry)}</>;
     avgSub = grouped ? "blended basis" : "single fill";
