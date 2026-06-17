@@ -37,7 +37,7 @@ export default async function WalletPage({ params, searchParams }: WalletPagePro
   // wallet) and let the visitor retry.
   let profile: Awaited<ReturnType<typeof getWalletProfile>>;
   try {
-    profile = await withTimeout(getWalletProfile(address), 7000, null);
+    profile = await withTimeout(getWalletProfile(address), 3000, null);
   } catch {
     return (
       <main className="page">

@@ -10,9 +10,9 @@ export default async function HomePage() {
   // timeout on the first hit) must never crash the whole page. The client components poll their
   // /api/* routes on mount, so empty initial data just renders the shell and then hydrates live.
   const [{ positions, traderCount }, resolvedMarkets, crowdedMarkets] = await Promise.all([
-    withTimeout(getRecentLeaderboardTrades(), 7000, { positions: [], traderCount: 0 }).catch(() => ({ positions: [], traderCount: 0 })),
-    withTimeout(getResolvedMarkets(), 7000, []).catch(() => []),
-    withTimeout(getCrowdedMarkets(), 7000, []).catch(() => [])
+    withTimeout(getRecentLeaderboardTrades(), 1500, { positions: [], traderCount: 0 }).catch(() => ({ positions: [], traderCount: 0 })),
+    withTimeout(getResolvedMarkets(), 1500, []).catch(() => []),
+    withTimeout(getCrowdedMarkets(), 1500, []).catch(() => [])
   ]);
 
   return (

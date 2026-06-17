@@ -76,7 +76,7 @@ export default async function MarketPage({ params }: MarketPageProps) {
   // instead of throwing a server-side exception.
   let analytics: Awaited<ReturnType<typeof getMarketAnalytics>> | null = null;
   try {
-    analytics = await withTimeout(getMarketAnalytics(conditionId), 9000, null);
+    analytics = await withTimeout(getMarketAnalytics(conditionId), 3000, null);
   } catch {
     analytics = null;
   }

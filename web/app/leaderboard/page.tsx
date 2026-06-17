@@ -6,7 +6,7 @@ export const revalidate = 300;
 export default async function LeaderboardPage() {
   // Degrade gracefully on a Supabase failure (free-tier cold-start 57014 timeout, etc.) rather than
   // throwing a server-side exception — LeaderboardTable polls /api/leaderboard on mount to fill in.
-  const initialRows = await withTimeout(getLeaderboard(90), 7000, []).catch(() => []);
+  const initialRows = await withTimeout(getLeaderboard(90), 1500, []).catch(() => []);
 
   return (
     <main className="page">

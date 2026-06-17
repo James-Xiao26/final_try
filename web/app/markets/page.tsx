@@ -6,7 +6,7 @@ export const revalidate = 300;
 export default async function MarketsPage() {
   // Degrade gracefully on a Supabase failure (free-tier cold-start 57014 timeout, etc.) rather than
   // throwing a server-side exception — MarketsTable polls /api/markets on mount to fill in.
-  const initialRows = await withTimeout(getMarkets({ sort: "volume" }), 7000, []).catch(() => []);
+  const initialRows = await withTimeout(getMarkets({ sort: "volume" }), 1500, []).catch(() => []);
 
   return (
     <main className="page">
