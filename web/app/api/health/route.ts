@@ -14,24 +14,38 @@ export async function GET() {
     keyPrefix: key ? key.slice(0, 20) + "..." : null,
   };
 
-  // Try the simplest possible query — count rows in leaderboard_cache.
+  // Try the simplest possible query with a hard 5s timeout so this endpoint always responds.
   let dbResult: unknown = null;
   let dbError: unknown = null;
   let durationMs: number | null = null;
+  let timedOut = false;
+
   try {
     const supabase = createSupabaseServerClient();
     const start = Date.now();
-    const { data, error, count } = await supabase
+
+    const queryPromise = supabase
       .from("leaderboard_cache")
       .select("rank", { count: "exact", head: true });
+
+    const timeoutPromise = new Promise<null>((resolve) =>
+      setTimeout(() => { timedOut = true; resolve(null); }, 5000)
+    );
+
+    const winner = await Promise.race([queryPromise, timeoutPromise]);
     durationMs = Date.now() - start;
-    dbResult = { count, data };
-    dbError = error;
+
+    if (!timedOut && winner !== null) {
+      const { data, error, count } = winner as Awaited<typeof queryPromise>;
+      dbResult = { count, data };
+      dbError = error ? { code: error.code, message: error.message } : null;
+    }
   } catch (e) {
     dbError = e instanceof Error ? { message: e.message, name: e.name } : String(e);
   }
 
-  return NextResponse.json({ envStatus, dbResult, dbError, durationMs }, {
-    headers: { "Cache-Control": "no-store" }
-  });
+  return NextResponse.json(
+    { envStatus, dbResult, dbError, timedOut, durationMs },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
