@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLeaderboard } from "@/lib/supabase";
+import { getLeaderboard, withTimeout } from "@/lib/supabase";
 import { HORIZONS, type HorizonDays } from "@/lib/types";
 
 function parseHorizon(value: string | null): HorizonDays {
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const horizon = parseHorizon(url.searchParams.get("horizon"));
-    const rows = await getLeaderboard(horizon);
+    const rows = await withTimeout(getLeaderboard(horizon), 8000, []);
 
     return NextResponse.json(rows, {
       headers: {

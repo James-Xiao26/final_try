@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { getRecentLeaderboardTrades } from "@/lib/supabase";
+import { getRecentLeaderboardTrades, withTimeout } from "@/lib/supabase";
 
 export async function GET() {
   try {
-    const feed = await getRecentLeaderboardTrades();
+    const feed = await withTimeout(getRecentLeaderboardTrades(), 8000, { positions: [], traderCount: 0 });
 
     return NextResponse.json(feed, {
       headers: {
