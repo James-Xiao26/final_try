@@ -19,6 +19,7 @@ export async function GET(request: Request) {
       }
     });
   } catch (error) {
+    console.error("[api/leaderboard] error:", error instanceof Error ? error.message : JSON.stringify(error));
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to load leaderboard" },
       { status: 500 }
