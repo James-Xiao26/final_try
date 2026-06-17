@@ -6,10 +6,13 @@ import { getCrowdedMarkets, getRecentLeaderboardTrades, getResolvedMarkets } fro
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  // Each section degrades independently: a Supabase failure (e.g. free-tier cold-start 57014
+  // timeout on the first hit) must never crash the whole page. The client components poll their
+  // /api/* routes on mount, so empty initial data just renders the shell and then hydrates live.
   const [{ positions, traderCount }, resolvedMarkets, crowdedMarkets] = await Promise.all([
-    getRecentLeaderboardTrades(),
-    getResolvedMarkets(),
-    getCrowdedMarkets()
+    getRecentLeaderboardTrades().catch(() => ({ positions: [], traderCount: 0 })),
+    getResolvedMarkets().catch(() => []),
+    getCrowdedMarkets().catch(() => [])
   ]);
 
   return (

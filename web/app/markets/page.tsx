@@ -4,7 +4,9 @@ import { getMarkets } from "@/lib/supabase";
 export const dynamic = "force-dynamic";
 
 export default async function MarketsPage() {
-  const initialRows = await getMarkets({ sort: "volume" });
+  // Degrade gracefully on a Supabase failure (free-tier cold-start 57014 timeout, etc.) rather than
+  // throwing a server-side exception — MarketsTable polls /api/markets on mount to fill in.
+  const initialRows = await getMarkets({ sort: "volume" }).catch(() => []);
 
   return (
     <main className="page">

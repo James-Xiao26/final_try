@@ -70,10 +70,18 @@ function LeanBar({ label, yes, no, hint }: { label: string; yes: number; no: num
 
 export default async function MarketPage({ params }: MarketPageProps) {
   const conditionId = decodeURIComponent(params.conditionId);
-  const analytics = await getMarketAnalytics(conditionId);
-  const { meta, detail } = analytics;
 
-  if (!meta && !detail) {
+  // getMarketAnalytics reads Supabase and falls back to the live Polymarket API; either can fail
+  // (DB cold-start 57014, an upstream timeout). Catch it so the page degrades to a friendly panel
+  // instead of throwing a server-side exception.
+  let analytics: Awaited<ReturnType<typeof getMarketAnalytics>> | null = null;
+  try {
+    analytics = await getMarketAnalytics(conditionId);
+  } catch {
+    analytics = null;
+  }
+
+  if (!analytics || (!analytics.meta && !analytics.detail)) {
     return (
       <main className="page">
         <Link href="/markets" className="wl-back">← Back to Markets</Link>
@@ -84,6 +92,8 @@ export default async function MarketPage({ params }: MarketPageProps) {
       </main>
     );
   }
+
+  const { meta, detail } = analytics;
 
   const title = meta?.question ?? detail?.market ?? "Untitled market";
   const series = buildPriceSeries(analytics.priceRows);
