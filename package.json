@@ -11,6 +11,7 @@
     "ingest": "pnpm --filter edgeboard-scripts ingest",
     "ingest:feed": "pnpm --filter edgeboard-scripts ingest:feed",
     "ingest:markets": "pnpm --filter edgeboard-scripts ingest:markets",
+    "ingest:rescore": "pnpm --filter edgeboard-scripts ingest:rescore",
     "webhook": "pnpm --filter edgeboard-scripts webhook",
     "heroku-postbuild": "echo \"Scheduler-only deploy: skipping web build\""
   },

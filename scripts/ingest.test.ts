@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import { CONFIG } from "./config.js";
 import {
   describeError,
+  dedupeRescoreAddresses,
   processWallet,
   rebuildLeaderboardCache,
+  rescoreTopWallets,
   toRecentTradeRow
 } from "./ingest.js";
 import type { ClosedPosition, Position, PolymarketClient, TradeActivity } from "./polymarket.js";
@@ -28,6 +30,7 @@ interface RecordedOp {
   filters: Record<string, unknown>;
   inValues: unknown[] | undefined;
   payload: unknown;
+  limit: number | undefined;
 }
 
 class FakeQueryBuilder implements PromiseLike<QueryResponse> {
@@ -35,6 +38,7 @@ class FakeQueryBuilder implements PromiseLike<QueryResponse> {
   private filters: Record<string, unknown> = {};
   private inValues: unknown[] | undefined = undefined;
   private payload: unknown = undefined;
+  private limitValue: number | undefined = undefined;
 
   constructor(
     private readonly table: string,
@@ -52,6 +56,10 @@ class FakeQueryBuilder implements PromiseLike<QueryResponse> {
     return this;
   }
   order(): this {
+    return this;
+  }
+  limit(n: number): this {
+    this.limitValue = n;
     return this;
   }
   eq(column: string, value: unknown): this {
@@ -91,7 +99,8 @@ class FakeQueryBuilder implements PromiseLike<QueryResponse> {
       op: this.op,
       filters: this.filters,
       inValues: this.inValues,
-      payload: this.payload
+      payload: this.payload,
+      limit: this.limitValue
     };
     this.log.push(op);
     return Promise.resolve(this.resolver(op)).then(onFulfilled, onRejected);
@@ -388,4 +397,144 @@ test("processWallet scores an eligible wallet and upserts stats for every horizo
   const walletUpsert = log.find((o) => o.table === "wallets" && o.op === "upsert");
   assert.ok(walletUpsert);
   assert.equal((walletUpsert.payload as Record<string, unknown>).is_bot_suspected, false);
+});
+
+// ---------------------------------------------------------------------------
+// dedupeRescoreAddresses
+// ---------------------------------------------------------------------------
+
+test("dedupeRescoreAddresses keeps first-seen order across horizon lists", () => {
+  const result = dedupeRescoreAddresses([
+    ["a", "b"],
+    ["b", "c"]
+  ]);
+  assert.deepEqual(result, ["a", "b", "c"]);
+});
+
+test("dedupeRescoreAddresses lowercases and dedupes case-insensitively", () => {
+  const result = dedupeRescoreAddresses([
+    ["0xAbC", "0xDEF"],
+    ["0xabc", "0xGhi"]
+  ]);
+  assert.deepEqual(result, ["0xabc", "0xdef", "0xghi"]);
+});
+
+test("dedupeRescoreAddresses returns an empty list for empty input", () => {
+  assert.deepEqual(dedupeRescoreAddresses([]), []);
+  assert.deepEqual(dedupeRescoreAddresses([[], []]), []);
+});
+
+// ---------------------------------------------------------------------------
+// rescoreTopWallets
+// ---------------------------------------------------------------------------
+
+// A PolymarketClient stub that records which addresses were fetched and can be told to fail or to
+// return an ineligible (empty closed-positions) wallet. An eligible wallet returns 25 winning
+// resolved positions so processWallet scores it on every horizon.
+function rescoreClient(opts: {
+  activityCalls: string[];
+  failOn?: Set<string>;
+  eligible?: boolean;
+}): PolymarketClient {
+  const closed = Array.from({ length: 25 }, (_, i) => closedPosition({ conditionId: `k${i}`, asset: `t${i}` }));
+  return {
+    getActivity: async (address: string) => {
+      opts.activityCalls.push(address);
+      if (opts.failOn?.has(address)) {
+        throw new Error(`boom ${address}`);
+      }
+      return [activity({ conditionId: "m1", asset: "a1" })];
+    },
+    getClosedPositions: async () => (opts.eligible === false ? [] : closed),
+    getCurrentPositions: async () => []
+  } as unknown as PolymarketClient;
+}
+
+// wallet_stats fixture keyed by the two configured horizons, so the per-horizon selection returns
+// distinct lists and the dedup path is exercised end-to-end.
+function statsByHorizon(
+  first: string[],
+  second: string[]
+): Map<number, Array<Record<string, unknown>>> {
+  const [h0, h1] = CONFIG.HORIZONS;
+  const map = new Map<number, Array<Record<string, unknown>>>();
+  map.set(h0 as number, first.map(statRow));
+  map.set(h1 as number, second.map(statRow));
+  return map;
+}
+
+test("rescoreTopWallets selects the top wallets per horizon with a RESCORE_TOP_N cap", async () => {
+  const fx: Fixtures = { walletStatsByHorizon: statsByHorizon(["a", "b"], ["c"]), allowed: new Set(["a", "b", "c"]) };
+  const log: RecordedOp[] = [];
+  const activityCalls: string[] = [];
+  const supabase = asSupabase(makeSupabase(defaultResolver(fx), log));
+
+  await rescoreTopWallets(supabase, rescoreClient({ activityCalls }), Date.now());
+
+  // Selection issues one capped wallet_stats select per horizon (the rebuild's selects are uncapped).
+  const cappedSelects = log.filter(
+    (o) => o.table === "wallet_stats" && o.op === "select" && o.limit === CONFIG.RESCORE_TOP_N
+  );
+  assert.equal(cappedSelects.length, CONFIG.HORIZONS.length);
+});
+
+test("rescoreTopWallets dedupes across horizons and processes each wallet once, then rebuilds", async () => {
+  // 'b' appears in both horizons; it must be scored once, not twice.
+  const fx: Fixtures = { walletStatsByHorizon: statsByHorizon(["a", "b"], ["b", "c"]), allowed: new Set(["a", "b", "c"]) };
+  const log: RecordedOp[] = [];
+  const activityCalls: string[] = [];
+  const supabase = asSupabase(makeSupabase(defaultResolver(fx), log));
+
+  const result = await rescoreTopWallets(supabase, rescoreClient({ activityCalls }), Date.now());
+
+  assert.equal(result.selected, 3);
+  assert.equal(result.scored, 3);
+  assert.equal(result.failed, 0);
+  assert.equal(result.bots, 0);
+  assert.deepEqual(activityCalls.sort(), ["a", "b", "c"]);
+
+  // The board was rebuilt: a delete + insert per horizon.
+  const lbInserts = log.filter((o) => o.table === "leaderboard_cache" && o.op === "insert");
+  assert.equal(lbInserts.length, CONFIG.HORIZONS.length);
+
+  // Scores are refreshed (wallet_stats upserts) but the equity curve is NOT — the daily full ingest
+  // owns the mark-to-market series, so the rescore must not overwrite it with the sparse realized one.
+  assert.ok(log.some((o) => o.table === "wallet_stats" && o.op === "upsert"));
+  assert.equal(log.filter((o) => o.table === "equity_curve").length, 0);
+});
+
+test("rescoreTopWallets returns zeros and skips the rebuild when wallet_stats is empty", async () => {
+  const fx: Fixtures = { walletStatsByHorizon: statsByHorizon([], []), allowed: new Set() };
+  const log: RecordedOp[] = [];
+  const activityCalls: string[] = [];
+  const supabase = asSupabase(makeSupabase(defaultResolver(fx), log));
+
+  const result = await rescoreTopWallets(supabase, rescoreClient({ activityCalls }), Date.now());
+
+  assert.deepEqual(result, { selected: 0, scored: 0, failed: 0, bots: 0 });
+  assert.equal(activityCalls.length, 0);
+  // No selection produced no work, so the board is left untouched (no delete/insert).
+  assert.equal(log.filter((o) => o.table === "leaderboard_cache").length, 0);
+});
+
+test("rescoreTopWallets counts a failed wallet without aborting the batch", async () => {
+  const fx: Fixtures = {
+    walletStatsByHorizon: statsByHorizon(["a", "b", "c"], ["a", "b", "c"]),
+    allowed: new Set(["a", "b", "c"])
+  };
+  const log: RecordedOp[] = [];
+  const activityCalls: string[] = [];
+  const supabase = asSupabase(makeSupabase(defaultResolver(fx), log));
+
+  const result = await rescoreTopWallets(
+    supabase,
+    rescoreClient({ activityCalls, failOn: new Set(["b"]) }),
+    Date.now()
+  );
+
+  assert.equal(result.selected, 3);
+  assert.equal(result.scored, 2);
+  assert.equal(result.failed, 1);
+  // The rebuild still runs after a partial failure.
+  assert.equal(log.filter((o) => o.table === "leaderboard_cache" && o.op === "insert").length, CONFIG.HORIZONS.length);
 });

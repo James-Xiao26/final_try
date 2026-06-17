@@ -550,7 +550,13 @@ function requiredEnv(name: string): string {
 async function upsertMetrics(
   supabase: SupabaseClient,
   address: string,
-  metrics: WalletMetrics
+  metrics: WalletMetrics,
+  // The realized-PnL equity curve computeMetrics produces is sparse (a point per close-day + today).
+  // The full ingest later overwrites board wallets' curves with the richer daily mark-to-market
+  // series. The hourly rescore touches only scores, so it skips this write: upserting the sparse
+  // realized points over an existing mark-to-market curve would leave a sawtooth until the next full
+  // ingest. Defaults true so every other caller (full ingest, candidate batch) is unchanged.
+  writeEquityCurve = true
 ): Promise<void> {
   const { error: statsError } = await supabase.from("wallet_stats").upsert({
     address,
@@ -572,7 +578,7 @@ async function upsertMetrics(
     throw statsError;
   }
 
-  if (metrics.equityCurve.length > 0) {
+  if (writeEquityCurve && metrics.equityCurve.length > 0) {
     const { error: curveError } = await supabase.from("equity_curve").upsert(
       metrics.equityCurve.map((point) => ({
         address,
@@ -593,7 +599,10 @@ export async function processWallet(
   supabase: SupabaseClient,
   client: PolymarketClient,
   wallet: DiscoveredWallet,
-  recentTradeCutoffMs: number
+  recentTradeCutoffMs: number,
+  // When false, skips the realized equity-curve write (the hourly rescore owns only scores; the full
+  // ingest owns the mark-to-market curve — see upsertMetrics). Defaults true for all other callers.
+  writeEquityCurve = true
 ): Promise<ProcessResult> {
   const normalized = wallet.address.toLowerCase();
   const activity = await client.getActivity(normalized);
@@ -634,7 +643,7 @@ export async function processWallet(
   const positions = [...closedPositions, ...resolvedPositions];
   const metrics = CONFIG.HORIZONS.map((horizon) => computeMetrics(positions, horizon, CONFIG, unrealizedPnlUsd));
 
-  await Promise.all(metrics.map((metric) => upsertMetrics(supabase, normalized, metric)));
+  await Promise.all(metrics.map((metric) => upsertMetrics(supabase, normalized, metric, writeEquityCurve)));
 
   // Only persist recent fills for wallets that can actually reach the leaderboard (some horizon has a
   // skill score). The feed's read path further restricts to wallets currently in leaderboard_cache.
@@ -1405,6 +1414,128 @@ async function refreshLeaderboardFeed(
   return { wallets: addresses.length, trades: collected.length, walletTrades: collectedFills.length };
 }
 
+// ── Hourly leaderboard rescore ─────────────────────────────────────────────────────────
+
+export interface RescoreResult {
+  selected: number; // distinct wallets selected across all horizons (deduped)
+  scored: number; // wallets processWallet completed without throwing
+  failed: number; // wallets that threw (logged + skipped, never abort the batch)
+  bots: number; // wallets newly flagged as bots during this rescore
+}
+
+// Collapse the per-horizon top-N address lists into a single deduped, lowercased work list,
+// preserving first-seen order (horizon order, then rank within a horizon). A wallet ranking in
+// both the 30d and 90d boards is processed once. Pure so the selection logic is unit-tested
+// independently of the DB. Addresses are normalized to lowercase to match the rest of the
+// pipeline; processWallet would lowercase again, but deduping pre-normalized keys here means a
+// wallet listed under different casings across horizons collapses to one unit of work.
+export function dedupeRescoreAddresses(perHorizonAddresses: string[][]): string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const list of perHorizonAddresses) {
+    for (const address of list) {
+      const normalized = address.toLowerCase();
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        ordered.push(normalized);
+      }
+    }
+  }
+  return ordered;
+}
+
+// Top-RESCORE_TOP_N addresses for one horizon from wallet_stats, ranked exactly as
+// rebuildLeaderboardCache ranks (skill_score desc, then avg_edge_per_share desc as the tiebreak),
+// so the rescored set is precisely the wallets at or near the top of the board — including ranks
+// just past TOP_N that could break in if their score improved since the last full ingest. The
+// server-side .limit() keeps the payload to RESCORE_TOP_N rows.
+async function selectTopWalletsByHorizon(
+  supabase: SupabaseClient,
+  horizon: number,
+  limit: number
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("wallet_stats")
+    .select("address, skill_score, avg_edge_per_share")
+    .eq("horizon_days", horizon)
+    .not("skill_score", "is", null)
+    .order("skill_score", { ascending: false })
+    .order("avg_edge_per_share", { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map((row) => row.address);
+}
+
+// Cheap, hourly-cadence refresh of the leaderboard standings without a full multi-thousand-wallet
+// ingest. Selects the top RESCORE_TOP_N wallets per horizon from the already-scored wallet_stats
+// table (deduped across horizons), re-runs each through the same processWallet pipeline the full
+// ingest uses — re-pulling /activity, /closed-positions, /positions and recomputing every horizon's
+// metrics into wallet_stats + equity_curve — then rebuilds leaderboard_cache so the new scores
+// re-rank the board. A few hundred wallets instead of thousands, so it finishes in minutes.
+//
+// Scope is deliberately just the standings: the activity feed has its own --feed-only job and the
+// open/closed-position caches + price-history equity curve are refreshed by the daily full ingest,
+// so the recentTrades/positions processWallet returns are discarded here (same as the candidate
+// batch). Requires a prior full ingest to have populated wallet_stats — with an empty table the
+// selection is empty and the rebuild is a no-op.
+export async function rescoreTopWallets(
+  supabase: SupabaseClient,
+  client: PolymarketClient,
+  recentTradeCutoffMs: number
+): Promise<RescoreResult> {
+  // Select per horizon, then dedupe. Sequential is fine: two cheap general-lane reads.
+  const perHorizon: string[][] = [];
+  for (const horizon of CONFIG.HORIZONS) {
+    perHorizon.push(await selectTopWalletsByHorizon(supabase, horizon, CONFIG.RESCORE_TOP_N));
+  }
+  const addresses = dedupeRescoreAddresses(perHorizon);
+  if (addresses.length === 0) {
+    return { selected: 0, scored: 0, failed: 0, bots: 0 };
+  }
+
+  // Worker pool over the deduped set, mirroring the main ingest loop. processWallet upserts
+  // wallet_stats + equity_curve + the wallets row itself; we keep only the aggregate counters.
+  let cursor = 0;
+  let scored = 0;
+  let failed = 0;
+  let bots = 0;
+  const worker = async (): Promise<void> => {
+    while (cursor < addresses.length) {
+      const address = addresses[cursor];
+      cursor += 1; // single-threaded JS: read+increment is atomic between awaits, so no double-claim.
+      if (!address) {
+        continue;
+      }
+      try {
+        // writeEquityCurve=false: the rescore refreshes only scores; the equity_curve mark-to-market
+        // series is owned by the daily full ingest (see upsertMetrics).
+        const result = await processWallet(
+          supabase,
+          client,
+          { address, userName: null, lifetimePnl: null },
+          recentTradeCutoffMs,
+          false
+        );
+        scored += 1;
+        bots += result.bot ? 1 : 0;
+      } catch (reason) {
+        failed += 1;
+        console.warn(`Rescore ${address}: ${describeError(reason)}`);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONFIG.WALLET_CONCURRENCY, addresses.length) }, () => worker()));
+
+  // Re-rank the whole board from the refreshed scores. The rebuild ranks across ALL wallet_stats
+  // rows, so a rescored wallet whose score dropped can fall below a wallet we didn't touch — exactly
+  // the intended behavior, and why the selection window (RESCORE_TOP_N) is wider than TOP_N.
+  await rebuildLeaderboardCache(supabase);
+
+  return { selected: addresses.length, scored, failed, bots };
+}
+
 // ── Candidate discovery and promotion pipeline ─────────────────────────────────────────
 
 // Load all 'tracked' candidates from candidate_wallets for inclusion in the main worker
@@ -1696,6 +1827,20 @@ async function main(): Promise<void> {
     console.log(
       `Refreshed feed: ${trades} recent trades + ${walletTrades} profile fills across ${wallets} leaderboard wallets; ` +
         `elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`
+    );
+    return;
+  }
+
+  // Hourly leaderboard rescore: re-fetch positions/activity for the top RESCORE_TOP_N wallets per
+  // horizon (deduped), recompute their scores, and rebuild leaderboard_cache. A few hundred wallets
+  // instead of the full pass's thousands, so it runs in minutes and is safe to schedule hourly.
+  // Requires a prior full ingest to have populated wallet_stats (the selection source).
+  if (process.argv.includes("--rescore-top")) {
+    const recentTradeCutoffMs = Date.now() - CONFIG.RECENT_TRADE_WINDOW_HOURS * 60 * 60 * CONFIG.MS_PER_SECOND;
+    const result = await rescoreTopWallets(supabase, new PolymarketClient(), recentTradeCutoffMs);
+    console.log(
+      `Rescored top ${CONFIG.RESCORE_TOP_N}/horizon: selected=${result.selected} wallets, scored=${result.scored}, ` +
+        `failed=${result.failed}, bots=${result.bots}; elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`
     );
     return;
   }

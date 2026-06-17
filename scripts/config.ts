@@ -181,7 +181,22 @@ export const CONFIG = {
   // Minimum days between re-scoring a candidate that previously fell short of the
   // promotion threshold. Prevents the batch from being dominated by confirmed duds.
   // Aligns with the 30-day scoring horizon: edge can meaningfully shift month to month.
-  CANDIDATE_RESCORE_DAYS: 30
+  CANDIDATE_RESCORE_DAYS: 30,
+
+  // ── Hourly leaderboard rescore ─────────────────────────────────────────────────────────
+  //
+  // The full ingest runs daily (expensive: 5k+ wallets, closed-positions pagination, price
+  // history). Between full runs the leaderboard drifts as markets resolve and traders close
+  // positions. The `--rescore-top` mode closes that gap cheaply: it re-fetches closed/open
+  // positions and activity for the top RESCORE_TOP_N wallets per horizon (deduped across
+  // horizons), recomputes their scores, and rebuilds leaderboard_cache. Runs in minutes vs
+  // the full ingest's ~hour, making it safe to schedule every hour on Heroku.
+  //
+  // Set larger than TOP_N so wallets just outside the current board (ranks 101–200) can
+  // break in if their scores improved since the last full ingest. The marginal cost of the
+  // extra wallets is low because they have shallow closed-position history compared to the
+  // long-standing top-100 whales.
+  RESCORE_TOP_N: 200
 };
 
 export type HorizonDays = (typeof CONFIG.HORIZONS)[number];
