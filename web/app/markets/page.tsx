@@ -1,7 +1,7 @@
 import MarketsTable from "@/components/MarketsTable";
 import { getMarkets } from "@/lib/supabase";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function MarketsPage() {
   // Degrade gracefully on a Supabase failure (free-tier cold-start 57014 timeout, etc.) rather than

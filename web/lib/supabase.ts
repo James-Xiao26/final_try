@@ -103,6 +103,17 @@ export function createSupabaseBrowserClient() {
   );
 }
 
+// Plain anon client for stateless server-side reads. Does NOT call cookies() so pages using it
+// can use ISR (revalidate) instead of force-dynamic. RLS is disabled on read tables so no session
+// is needed; the anon key governs access at the Postgres row level.
+export function createSupabaseReadClient() {
+  return createClient<Database>(
+    env("NEXT_PUBLIC_SUPABASE_URL"),
+    env("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    { auth: { persistSession: false } }
+  );
+}
+
 // Plain anon client for stateless server-side writes (the waitlist insert). The @supabase/ssr
 // server client above is for session/cookie-bound reads; an anonymous INSERT needs no session, and
 // that client's generics also mis-resolve write types (collapsing Insert to never). What this key
@@ -124,7 +135,7 @@ function isMissingSchemaError(error: { code?: string } | null): boolean {
 }
 
 export async function getLeaderboard(horizonDays: number): Promise<LeaderboardRow[]> {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseReadClient();
   const { data, error } = await supabase
     .from("leaderboard_cache")
     .select("rank, address, skill_score, avg_edge_per_share, win_rate, n_trades")
@@ -177,7 +188,7 @@ export async function getLeaderboard(horizonDays: number): Promise<LeaderboardRo
 export async function getRecentLeaderboardTrades(
   opts: { windowHours?: number; limit?: number } = {}
 ): Promise<RecentTradesFeed> {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseReadClient();
   const windowHours = opts.windowHours ?? 24;
   const limit = opts.limit ?? 200;
   const cutoff = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
@@ -363,7 +374,7 @@ const MARKET_SORT_COLUMNS: Record<MarketSort, keyof MarketSelectRow> = {
 export async function getMarkets(
   opts: { sort?: MarketSort; category?: string | null; limit?: number } = {}
 ): Promise<MarketRow[]> {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseReadClient();
   const sort = opts.sort ?? "liquidity";
   const column = MARKET_SORT_COLUMNS[sort];
 
@@ -448,7 +459,7 @@ function mapWalletPosition(row: WalletPositionSelectRow): WalletPosition {
 
 
 export async function getWalletProfile(address: string): Promise<WalletProfile | null> {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseReadClient();
   const normalized = address.toLowerCase();
   const { data: walletData, error: walletError } = await supabase
     .from("wallets")
@@ -665,7 +676,7 @@ function toCrowdFill(row: CrowdFillRowDb): CrowdTradeFill {
 
 // Best (lowest-number) leaderboard rank per address across horizons.
 async function leaderboardRanks(
-  supabase: ReturnType<typeof createSupabaseServerClient>
+  supabase: ReturnType<typeof createSupabaseReadClient>
 ): Promise<Map<string, number> | null> {
   const { data, error } = await supabase.from("leaderboard_cache").select("address, rank");
   if (error) {
@@ -687,16 +698,20 @@ async function leaderboardRanks(
 // The ranked "crowded markets" list for the Activity page: the markets the most leaderboard wallets
 // are converging on, with the YES/NO split and committed capital. Built from the position caches only.
 export async function getCrowdedMarkets(limit = 40): Promise<CrowdedMarketSummary[]> {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseReadClient();
 
   const rankByAddress = await leaderboardRanks(supabase);
   if (rankByAddress === null || rankByAddress.size === 0) {
     return [];
   }
 
+  // Limit closed positions to the last 90 days so the full-table scan becomes an indexed range
+  // scan (idx_wallet_closed_positions_close_time). Positions older than 90 days are outside all
+  // displayed horizons and don't affect the crowded-markets ranking.
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
   const [openRes, closedRes] = await Promise.all([
     fetchAllPaged((from, to) => supabase.from("wallet_positions").select(OPEN_POSITION_COLUMNS).range(from, to)),
-    fetchAllPaged((from, to) => supabase.from("wallet_closed_positions").select(CLOSED_POSITION_COLUMNS).range(from, to))
+    fetchAllPaged((from, to) => supabase.from("wallet_closed_positions").select(CLOSED_POSITION_COLUMNS).gte("close_time", cutoff).range(from, to))
   ]);
   if (openRes.missing && closedRes.missing) {
     return [];
@@ -711,7 +726,7 @@ export async function getCrowdedMarkets(limit = 40): Promise<CrowdedMarketSummar
 // timeline (cumulative net leaderboard holdings, with the YES price overlaid when known). Returns
 // null when no leaderboard wallet participates in the given condition.
 export async function getCrowdMarketDetail(conditionId: string): Promise<CrowdMarketDetail | null> {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseReadClient();
 
   const [openRes, closedRes, fillsRes] = await Promise.all([
     supabase.from("wallet_positions").select(OPEN_POSITION_COLUMNS).eq("condition_id", conditionId),
@@ -818,7 +833,7 @@ interface MarketMetaSelectRow {
 // helpers in marketAnalytics.ts. Either of `meta`/`detail` may be null; only an all-empty result (no
 // market row AND no participation) is treated as "not found" by the page.
 export async function getMarketAnalytics(conditionId: string): Promise<MarketAnalytics> {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseReadClient();
 
   const [metaRes, openRes, closedRes, fillsRes] = await Promise.all([
     supabase
@@ -1062,7 +1077,7 @@ interface DEMarketRow {
 export async function getDecisionEngineData(
   opts: { walletAddress?: string } = {}
 ): Promise<DecisionEngineInputs> {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseReadClient();
 
   // Wave 1: leaderboard only — need the address set before we can scope subsequent queries.
   // wallet_positions accumulates stale rows from past leaderboard runs (the wipe-and-replace
@@ -1254,7 +1269,7 @@ interface ResolvedClosedSelectRow {
 }
 
 export async function getResolvedMarkets(limit = 40): Promise<ResolvedMarket[]> {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseReadClient();
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const { rows, missing } = await fetchAllPaged((from, to) =>

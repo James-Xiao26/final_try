@@ -7,7 +7,7 @@ import { getWalletProfile } from "@/lib/supabase";
 import { HORIZONS } from "@/lib/types";
 import type { HorizonDays } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 interface WalletPageProps {
   params: {
