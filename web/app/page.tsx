@@ -1,7 +1,7 @@
 import ConvergencePanel from "@/components/ConvergencePanel";
 import RecentTradesFeed from "@/components/RecentTradesFeed";
 import ResolvedMarketsPanel from "@/components/ResolvedMarketsPanel";
-import { getCrowdedMarkets, getRecentLeaderboardTrades, getResolvedMarkets } from "@/lib/supabase";
+import { getCrowdedMarkets, getRecentLeaderboardTrades, getResolvedMarkets, withTimeout } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +10,9 @@ export default async function HomePage() {
   // timeout on the first hit) must never crash the whole page. The client components poll their
   // /api/* routes on mount, so empty initial data just renders the shell and then hydrates live.
   const [{ positions, traderCount }, resolvedMarkets, crowdedMarkets] = await Promise.all([
-    getRecentLeaderboardTrades().catch(() => ({ positions: [], traderCount: 0 })),
-    getResolvedMarkets().catch(() => []),
-    getCrowdedMarkets().catch(() => [])
+    withTimeout(getRecentLeaderboardTrades(), 7000, { positions: [], traderCount: 0 }).catch(() => ({ positions: [], traderCount: 0 })),
+    withTimeout(getResolvedMarkets(), 7000, []).catch(() => []),
+    withTimeout(getCrowdedMarkets(), 7000, []).catch(() => [])
   ]);
 
   return (

@@ -74,6 +74,15 @@ function env(name: string): string {
   return value;
 }
 
+// Race a promise against a wall-clock deadline. If the deadline fires first, resolves to the
+// fallback value. Prevents a hanging Supabase fetch from blocking the entire SSR response.
+export function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms))
+  ]);
+}
+
 export function createSupabaseServerClient() {
   const cookieStore = cookies();
 

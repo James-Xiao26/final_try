@@ -8,7 +8,7 @@ import ConcentrationChart from "@/components/ConcentrationChart";
 import PnlHistogram from "@/components/PnlHistogram";
 import MetricCard from "@/components/MetricCard";
 import { formatCompactUsd } from "@/lib/format";
-import { getMarketAnalytics } from "@/lib/supabase";
+import { getMarketAnalytics, withTimeout } from "@/lib/supabase";
 import {
   buildPriceSeries,
   concentration,
@@ -76,7 +76,7 @@ export default async function MarketPage({ params }: MarketPageProps) {
   // instead of throwing a server-side exception.
   let analytics: Awaited<ReturnType<typeof getMarketAnalytics>> | null = null;
   try {
-    analytics = await getMarketAnalytics(conditionId);
+    analytics = await withTimeout(getMarketAnalytics(conditionId), 9000, null);
   } catch {
     analytics = null;
   }

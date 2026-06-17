@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import WalletActivity from "@/components/WalletActivity";
 import WalletDossier from "@/components/WalletDossier";
 import WalletTelemetry from "@/components/WalletTelemetry";
-import { getWalletProfile } from "@/lib/supabase";
+import { getWalletProfile, withTimeout } from "@/lib/supabase";
 import { HORIZONS } from "@/lib/types";
 import type { HorizonDays } from "@/lib/types";
 
@@ -37,7 +37,7 @@ export default async function WalletPage({ params, searchParams }: WalletPagePro
   // wallet) and let the visitor retry.
   let profile: Awaited<ReturnType<typeof getWalletProfile>>;
   try {
-    profile = await getWalletProfile(address);
+    profile = await withTimeout(getWalletProfile(address), 7000, null);
   } catch {
     return (
       <main className="page">
