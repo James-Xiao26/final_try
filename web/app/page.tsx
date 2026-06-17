@@ -3,7 +3,7 @@ import RecentTradesFeed from "@/components/RecentTradesFeed";
 import ResolvedMarketsPanel from "@/components/ResolvedMarketsPanel";
 import { getCrowdedMarkets, getRecentLeaderboardTrades, getResolvedMarkets, withTimeout } from "@/lib/supabase";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function HomePage() {
   // Each section degrades independently: a Supabase failure (e.g. free-tier cold-start 57014
