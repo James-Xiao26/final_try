@@ -1442,3 +1442,64 @@ input:focus { border-color: var(--green) !important; }
   .ma-whale-item { grid-template-columns: 42px 36px 1fr 60px 50px; }
   .ma-whale-item .ma-whale-px { display: none; }
 }
+
+/* ============================================================
+   Maintenance screen (web/app/maintenance/page.tsx). Fixed full-
+   viewport overlay shown for every route while MAINTENANCE_MODE is
+   on; sits above the topnav/ocean scene. Namespaced `wm-`.
+   ============================================================ */
+.wm {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(54,236,208,0.10), transparent 55%),
+    linear-gradient(180deg, #04141f 0%, #03101a 45%, #020a12 100%);
+}
+.wm-card {
+  width: 100%; max-width: 480px; text-align: center;
+  padding: 40px 32px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+}
+.wm-status {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 28px;
+}
+.wm-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--yellow); box-shadow: 0 0 8px var(--yellow);
+  animation: wm-pulse 1.8s ease-in-out infinite;
+}
+@keyframes wm-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+.wm-scope {
+  position: relative; width: 150px; height: 150px; margin: 0 auto 28px;
+  border-radius: 50%; overflow: hidden;
+}
+.wm-scope svg { width: 100%; height: 100%; display: block; }
+.wm-sweep {
+  position: absolute; inset: 0;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(54,236,208,0.22) 40deg, transparent 70deg);
+  animation: wm-sweep 4s linear infinite;
+}
+@keyframes wm-sweep { to { transform: rotate(360deg); } }
+.wm-title {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 28px; font-weight: 600; line-height: 1.15;
+  margin: 0 0 14px; color: var(--text);
+}
+.wm-title .g { color: var(--green); }
+.wm-sub { color: var(--muted); font-size: 14px; margin: 0 0 28px; }
+.wm-foot {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted-d);
+}
+.wm-foot .g { color: var(--green); }
+@media (prefers-reduced-motion: reduce) {
+  .wm-sweep, .wm-dot { animation: none; }
+}
