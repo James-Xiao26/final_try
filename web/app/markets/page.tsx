@@ -1,10 +1,12 @@
 import MarketsTable from "@/components/MarketsTable";
-import { getMarkets } from "@/lib/supabase";
+import { getMarkets, withTimeout } from "@/lib/supabase";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function MarketsPage() {
-  const initialRows = await getMarkets({ sort: "volume" });
+  // Degrade gracefully on a Supabase failure (free-tier cold-start 57014 timeout, etc.) rather than
+  // throwing a server-side exception — MarketsTable polls /api/markets on mount to fill in.
+  const initialRows = await withTimeout(getMarkets({ sort: "volume" }), 1500, []).catch(() => []);
 
   return (
     <main className="page">

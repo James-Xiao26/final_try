@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { getCrowdedMarkets } from "@/lib/supabase";
+import { getCrowdedMarkets, withTimeout } from "@/lib/supabase";
 
 export async function GET() {
   try {
-    const markets = await getCrowdedMarkets();
+    const markets = await withTimeout(getCrowdedMarkets(), 8000, []);
 
     return NextResponse.json(
       { markets },

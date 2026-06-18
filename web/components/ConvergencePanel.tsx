@@ -89,6 +89,7 @@ export default function ConvergencePanel({ initialRows }: ConvergencePanelProps)
         });
     };
     const id = setInterval(poll, POLL_INTERVAL_MS);
+    poll(); // fetch immediately so empty SSR data hydrates without waiting 60 s
     return () => {
       active = false;
       clearInterval(id);

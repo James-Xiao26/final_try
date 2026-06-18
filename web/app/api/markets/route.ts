@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMarkets } from "@/lib/supabase";
+import { getMarkets, withTimeout } from "@/lib/supabase";
 import { MARKET_SORTS, type MarketSort } from "@/lib/types";
 
 function parseSort(value: string | null): MarketSort {
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const sort = parseSort(url.searchParams.get("sort"));
     const category = url.searchParams.get("category");
-    const rows = await getMarkets({ sort, category });
+    const rows = await withTimeout(getMarkets({ sort, category }), 8000, []);
 
     return NextResponse.json(rows, {
       headers: {

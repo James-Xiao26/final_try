@@ -3,11 +3,11 @@ import { notFound } from "next/navigation";
 import WalletActivity from "@/components/WalletActivity";
 import WalletDossier from "@/components/WalletDossier";
 import WalletTelemetry from "@/components/WalletTelemetry";
-import { getWalletProfile } from "@/lib/supabase";
+import { getWalletProfile, withTimeout } from "@/lib/supabase";
 import { HORIZONS } from "@/lib/types";
 import type { HorizonDays } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 interface WalletPageProps {
   params: {
@@ -31,7 +31,24 @@ export default async function WalletPage({ params, searchParams }: WalletPagePro
     notFound();
   }
 
-  const profile = await getWalletProfile(address);
+  // A Supabase failure (free-tier cold-start 57014 timeout, etc.) must not throw a server-side
+  // exception. This page is fully server-rendered with no client poll, so on a read error we show a
+  // distinct "temporarily unavailable" panel (vs the "not indexed" state for a genuinely absent
+  // wallet) and let the visitor retry.
+  let profile: Awaited<ReturnType<typeof getWalletProfile>>;
+  try {
+    profile = await withTimeout(getWalletProfile(address), 3000, null);
+  } catch {
+    return (
+      <main className="page">
+        <Link href="/leaderboard" className="wl-back">← Return to Contact Log</Link>
+        <section className="panel" style={{ marginTop: 16, padding: 28 }}>
+          <h1 className="brand">Sonar temporarily down</h1>
+          <p className="subtitle">We couldn&apos;t reach the contact archive just now. Refresh in a moment to try again.</p>
+        </section>
+      </main>
+    );
+  }
 
   if (!profile) {
     return (

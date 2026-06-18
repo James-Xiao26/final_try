@@ -99,6 +99,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
         });
     };
     const intervalId = setInterval(poll, POLL_INTERVAL_MS);
+    poll(); // fetch immediately so empty SSR data hydrates without waiting 60 s
     const onVisibility = (): void => {
       if (!document.hidden) poll();
     };

@@ -1,10 +1,12 @@
 import LeaderboardTable from "@/components/LeaderboardTable";
-import { getLeaderboard } from "@/lib/supabase";
+import { getLeaderboard, withTimeout } from "@/lib/supabase";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function LeaderboardPage() {
-  const initialRows = await getLeaderboard(90);
+  // Degrade gracefully on a Supabase failure (free-tier cold-start 57014 timeout, etc.) rather than
+  // throwing a server-side exception — LeaderboardTable polls /api/leaderboard on mount to fill in.
+  const initialRows = await withTimeout(getLeaderboard(90), 1500, []).catch(() => []);
 
   return (
     <main className="page">

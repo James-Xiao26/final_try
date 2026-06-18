@@ -1,15 +1,18 @@
 import ConvergencePanel from "@/components/ConvergencePanel";
 import RecentTradesFeed from "@/components/RecentTradesFeed";
 import ResolvedMarketsPanel from "@/components/ResolvedMarketsPanel";
-import { getCrowdedMarkets, getRecentLeaderboardTrades, getResolvedMarkets } from "@/lib/supabase";
+import { getCrowdedMarkets, getRecentLeaderboardTrades, getResolvedMarkets, withTimeout } from "@/lib/supabase";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function HomePage() {
+  // Each section degrades independently: a Supabase failure (e.g. free-tier cold-start 57014
+  // timeout on the first hit) must never crash the whole page. The client components poll their
+  // /api/* routes on mount, so empty initial data just renders the shell and then hydrates live.
   const [{ positions, traderCount }, resolvedMarkets, crowdedMarkets] = await Promise.all([
-    getRecentLeaderboardTrades(),
-    getResolvedMarkets(),
-    getCrowdedMarkets()
+    withTimeout(getRecentLeaderboardTrades(), 1500, { positions: [], traderCount: 0 }).catch(() => ({ positions: [], traderCount: 0 })),
+    withTimeout(getResolvedMarkets(), 1500, []).catch(() => []),
+    withTimeout(getCrowdedMarkets(), 1500, []).catch(() => [])
   ]);
 
   return (
