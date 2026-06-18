@@ -103,8 +103,11 @@ export const CONFIG = {
   // (below) are the real rate limiter, so this only needs to be high enough to keep those gates
   // saturated despite uneven per-wallet work (bots finish in 1 request; whales paginate deeply).
   // Raising it past that point costs nothing on the API but a little memory; it does NOT raise
-  // the request rate, which the gates cap independently.
-  WALLET_CONCURRENCY: 24,
+  // the request rate, which the gates cap independently. Overridable via the WALLET_CONCURRENCY
+  // env var: the webhook server (scripts/server.ts) injects a lower value for the partial refreshes
+  // it spawns, because those run *inside* the 512MB web dyno where 24 in-flight /activity payloads
+  // exhaust memory (R14). The daily full ingest runs on its own one-off dyno and keeps the default.
+  WALLET_CONCURRENCY: Number(process.env.WALLET_CONCURRENCY) || 24,
   // Per-endpoint request spacing (ms), honoring Polymarket's Data API limits over a 10s
   // sliding window. Each lane is a separate serial gate (see polymarket.ts), so cheap
   // general calls don't queue behind expensive closed-position pagination.

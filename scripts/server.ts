@@ -17,24 +17,33 @@ if (!SECRET) {
 
 const ROOT = resolve(fileURLToPath(import.meta.url), "../../");
 
+// Wallets processed concurrently by jobs spawned here. These partial refreshes run *inside* this
+// 512MB web dyno (not a dedicated dyno), so we cap concurrency well below the ingest default of 24
+// to keep in-flight /activity payloads from exhausting memory (R14). Override per-deploy via env.
+const PARTIAL_WALLET_CONCURRENCY = process.env.PARTIAL_WALLET_CONCURRENCY ?? "8";
+
 type JobMode = "feed" | "markets" | "rescore";
 
-const running: Record<JobMode, boolean> = { feed: false, markets: false, rescore: false };
+// Single global guard: only ONE job runs at a time, regardless of mode. The jobs share this dyno's
+// 512MB, so letting feed + markets + rescore run concurrently (as a per-mode guard would) stacks
+// their memory and triggers R14. A request that arrives while any job runs gets 409 and is skipped;
+// the external cron will retry on its next tick.
+let busy: JobMode | null = null;
 
 function runJob(mode: JobMode): boolean {
-  if (running[mode]) return false;
-  running[mode] = true;
+  if (busy) return false;
+  busy = mode;
   const child = spawn("pnpm", [`ingest:${mode}`], {
     cwd: ROOT,
     stdio: "inherit",
-    env: process.env,
+    env: { ...process.env, WALLET_CONCURRENCY: PARTIAL_WALLET_CONCURRENCY },
   });
   child.on("close", (code) => {
-    running[mode] = false;
+    busy = null;
     console.log(`[${mode}] finished (exit ${code ?? "?"})`);
   });
   child.on("error", (err) => {
-    running[mode] = false;
+    busy = null;
     console.error(`[${mode}] spawn error:`, err);
   });
   return true;
@@ -62,8 +71,9 @@ const server = createServer((req, res) => {
     return;
   }
 
+  const blockedBy = busy;
   const started = runJob(mode);
-  res.writeHead(started ? 202 : 409).end(started ? "Accepted" : "Already running");
+  res.writeHead(started ? 202 : 409).end(started ? "Accepted" : `Busy: ${blockedBy} job running`);
 });
 
 server.listen(PORT, () => {
