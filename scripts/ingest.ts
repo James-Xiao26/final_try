@@ -10,6 +10,7 @@ import { buildMarkToMarketCurve, type CurvePosition } from "./equityCurve.js";
 import { dailyPointsFromHistory, planPriceFetches, type CacheState } from "./priceHistory.js";
 import { earliestEntryDates, latestFillDates, openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
 import { bestSkillScore, computeScoringOutcome, selectCandidateBatch, type CandidateWallet, type CandidateStatus } from "./candidateDiscovery.js";
+import { summarizeCrowdedMarkets, type CrowdClosedPosition, type CrowdOpenPosition } from "./marketCrowd.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -142,6 +143,45 @@ interface Database {
           win_rate?: number | null;
           n_trades?: number | null;
           avg_edge_per_share?: number | null;
+          cached_at?: string;
+        };
+        Relationships: [];
+      };
+      crowded_markets_cache: {
+        Row: {
+          condition_id: string;
+          rank: number;
+          market: string | null;
+          trader_count: number;
+          yes_traders: number;
+          no_traders: number;
+          open_count: number;
+          closed_count: number;
+          committed_usd: number;
+          net_exposure_usd: number;
+          top_rank: number | null;
+          cur_price: number | null;
+          last_traded_at: string | null;
+          cached_at: string;
+        };
+        Insert: {
+          condition_id: string;
+          rank: number;
+          market?: string | null;
+          trader_count: number;
+          yes_traders: number;
+          no_traders: number;
+          open_count: number;
+          closed_count: number;
+          committed_usd: number;
+          net_exposure_usd: number;
+          top_rank?: number | null;
+          cur_price?: number | null;
+          last_traded_at?: string | null;
+          cached_at?: string;
+        };
+        Update: {
+          rank?: number;
           cached_at?: string;
         };
         Relationships: [];
@@ -1119,6 +1159,143 @@ async function replaceWalletClosedPositions(
   return scoped.length;
 }
 
+// How many ranked markets to persist into crowded_markets_cache. The web reads the top 40; storing a
+// bit more leaves headroom without bloating the table.
+const CROWDED_MARKETS_CACHE_LIMIT = 100;
+
+// Page through a leaderboard-scoped table (PostgREST caps one response at 1000 rows). The factory
+// rebuilds the query per page (a query builder is single-use).
+async function fetchAllRows<T>(
+  factory: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message?: string } | null }>
+): Promise<T[]> {
+  const PAGE = 1000;
+  const rows: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await factory(from, from + PAGE - 1);
+    if (error) {
+      throw error;
+    }
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < PAGE) {
+      break;
+    }
+    from += PAGE;
+  }
+  return rows;
+}
+
+// Fix C — precompute the Convergence ("crowded markets") ranked list into crowded_markets_cache.
+// Previously the web app rebuilt this on every request by scanning the whole wallet_positions table
+// (+ 90 days of closed positions) and aggregating in-process — on the home page's SSR path under a
+// 1.5s timeout. The inputs only change when this full ingest repopulates the position caches, so we
+// run the same summarizeCrowdedMarkets() aggregation here once and store the ranked rows; the web
+// read collapses to a tiny "ORDER BY rank LIMIT n". Must run after replaceWalletPositions /
+// replaceWalletClosedPositions (reads them back) and after rebuildLeaderboardCache (for the ranks).
+async function cacheCrowdedMarkets(supabase: SupabaseClient): Promise<number> {
+  // Best (lowest-number) leaderboard rank per address, for the participant rank overlay.
+  const { data: cacheData, error: cacheError } = await supabase.from("leaderboard_cache").select("address, rank");
+  if (cacheError) {
+    throw cacheError;
+  }
+  const rankByAddress = new Map<string, number>();
+  for (const row of cacheData ?? []) {
+    const prev = rankByAddress.get(row.address);
+    if (prev === undefined || row.rank < prev) {
+      rankByAddress.set(row.address, row.rank);
+    }
+  }
+
+  // Match the read-time window: closed positions are limited to the last 90 days (older positions are
+  // outside every displayed horizon and don't affect the ranking).
+  const cutoff = new Date(Date.now() - 90 * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND).toISOString();
+  const [openRows, closedRows] = await Promise.all([
+    fetchAllRows<{
+      address: string;
+      condition_id: string | null;
+      market: string | null;
+      outcome_index: number | null;
+      size: number | null;
+      avg_price: number | null;
+      cur_price: number | null;
+    }>((from, to) =>
+      supabase
+        .from("wallet_positions")
+        .select("address, condition_id, market, outcome_index, size, avg_price, cur_price")
+        .range(from, to)
+    ),
+    fetchAllRows<{
+      address: string;
+      condition_id: string | null;
+      market: string | null;
+      outcome_index: number | null;
+      size: number | null;
+      avg_price: number | null;
+      close_time: string | null;
+    }>((from, to) =>
+      supabase
+        .from("wallet_closed_positions")
+        .select("address, condition_id, market, outcome_index, size, avg_price, close_time")
+        .gte("close_time", cutoff)
+        .range(from, to)
+    )
+  ]);
+
+  const positions: CrowdOpenPosition[] = openRows.map((row) => ({
+    address: row.address,
+    conditionId: row.condition_id,
+    market: row.market,
+    outcomeIndex: row.outcome_index,
+    size: row.size ?? 0,
+    avgPrice: row.avg_price ?? 0,
+    curPrice: row.cur_price ?? 0
+  }));
+  const closed: CrowdClosedPosition[] = closedRows.map((row) => ({
+    address: row.address,
+    conditionId: row.condition_id,
+    market: row.market,
+    outcomeIndex: row.outcome_index,
+    size: row.size ?? 0,
+    avgPrice: row.avg_price ?? 0,
+    closeTime: row.close_time
+  }));
+
+  const summaries = summarizeCrowdedMarkets(positions, closed, rankByAddress, CROWDED_MARKETS_CACHE_LIMIT);
+
+  // Wipe-and-replace: the table is tiny (≤100 rows) so the dead-row churn is negligible.
+  const { error: deleteError } = await supabase.from("crowded_markets_cache").delete().gte("rank", 0);
+  if (deleteError) {
+    throw deleteError;
+  }
+  if (summaries.length === 0) {
+    return 0;
+  }
+
+  const cachedAt = new Date().toISOString();
+  const rows = summaries.map((s, index) => ({
+    condition_id: s.conditionId,
+    rank: index + 1,
+    market: s.market,
+    trader_count: s.traderCount,
+    yes_traders: s.yesTraders,
+    no_traders: s.noTraders,
+    open_count: s.openCount,
+    closed_count: s.closedCount,
+    committed_usd: s.committedUsd,
+    net_exposure_usd: s.netExposureUsd,
+    top_rank: s.topRank,
+    cur_price: s.curPrice,
+    last_traded_at: s.lastTradedAt,
+    cached_at: cachedAt
+  }));
+  const { error: insertError } = await supabase.from("crowded_markets_cache").insert(rows);
+  if (insertError) {
+    throw insertError;
+  }
+  return rows.length;
+}
+
 interface PriceHistoryResult {
   fetched: number; // markets whose series we (re)pulled this run
   upserted: number; // total daily price rows written
@@ -1997,6 +2174,17 @@ async function main(): Promise<void> {
   const boardAddresses = await getLeaderboardAddresses(supabase);
   const closedPositionCount = await replaceWalletClosedPositions(supabase, collectedClosed, boardAddresses);
 
+  // Precompute the Convergence ("crowded markets") ranked list so the web app reads a tiny cache
+  // instead of scanning the whole position table per request (Fix C). Must run after the position
+  // caches above and the leaderboard rebuild — it reads both back. Non-fatal: a failure here just
+  // leaves the previous cache in place rather than aborting the run.
+  let crowdedMarketCount = 0;
+  try {
+    crowdedMarketCount = await cacheCrowdedMarkets(supabase);
+  } catch (reason) {
+    console.warn(`Crowded-markets cache failed (non-fatal): ${describeError(reason)}`);
+  }
+
   // Historical daily price series for the markets leaderboard wallets hold, for the mark-to-market
   // equity curve. Append-only + immutable (resolved markets fetched once), so it's independent of
   // the wipe-and-replace tables above and the only step that hits the CLOB API.
@@ -2011,7 +2199,7 @@ async function main(): Promise<void> {
   const marketCount = await ingestMarkets(supabase, polymarket);
 
   const elapsedSeconds = (Date.now() - startedAt) / CONFIG.MS_PER_SECOND;
-  console.log(`Processed ${processed} wallets (${newTracked.length} tracked candidates); excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades, ${walletTradeCount} profile fills, ${walletPositionCount} open positions, ${closedPositionCount} closed positions; price-history ${priceHistory.upserted} rows across ${priceHistory.fetched} markets (deferred=${priceHistory.deferred}, pruned=${priceHistory.pruned}); equity-curve ${equityCurveCount} daily rows; elapsed=${elapsedSeconds.toFixed(1)}s`);
+  console.log(`Processed ${processed} wallets (${newTracked.length} tracked candidates); excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades, ${walletTradeCount} profile fills, ${walletPositionCount} open positions, ${closedPositionCount} closed positions, ${crowdedMarketCount} crowded markets; price-history ${priceHistory.upserted} rows across ${priceHistory.fetched} markets (deferred=${priceHistory.deferred}, pruned=${priceHistory.pruned}); equity-curve ${equityCurveCount} daily rows; elapsed=${elapsedSeconds.toFixed(1)}s`);
   console.log(`Bot breakdown: trade_rate=${botBreakdown.trade_rate}, dust_trades=${botBreakdown.dust_trades}, simultaneous_markets=${botBreakdown.simultaneous_markets}`);
   console.log(`Candidate pipeline: discovered=${candidatesDiscovered} new, registered=${candidatesRegistered}; scored=${candidateScored}, promoted=${candidatePromoted}, retired=${candidateRetired}`);
 

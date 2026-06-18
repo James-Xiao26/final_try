@@ -6,7 +6,7 @@ import type { DECategoryWin, DELeaderboardEntry, DEMarket, DEPosition, DecisionE
 import { HORIZONS } from "./types";
 import { groupWalletTrades } from "./walletTrades";
 import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis, type TradeBasis } from "./recentTrades";
-import { buildCrowdMarketDetail, summarizeCrowdedMarkets, type CrowdClosedPosition, type CrowdLookups, type CrowdOpenPosition, type CrowdTradeFill } from "./marketCrowd";
+import { buildCrowdMarketDetail, type CrowdClosedPosition, type CrowdLookups, type CrowdOpenPosition, type CrowdTradeFill } from "./marketCrowd";
 import type { MarketAnalytics, MarketMeta, PriceLine, PricePoint, WhaleFillInput } from "./marketAnalytics";
 import { fetchEventCandidates, fetchLiveMarket, fetchLivePriceSeries, type LiveMarket } from "./polymarketLive";
 import { summarizeResolvedMarkets } from "./resolvedMarkets";
@@ -683,52 +683,59 @@ function toCrowdFill(row: CrowdFillRowDb): CrowdTradeFill {
   };
 }
 
-// Best (lowest-number) leaderboard rank per address across horizons.
-async function leaderboardRanks(
-  supabase: ReturnType<typeof createSupabaseReadClient>
-): Promise<Map<string, number> | null> {
-  const { data, error } = await supabase.from("leaderboard_cache").select("address, rank");
-  if (error) {
-    if (isMissingSchemaError(error)) {
-      return null;
-    }
-    throw error;
-  }
-  const ranks = new Map<string, number>();
-  ((data ?? []) as unknown as { address: string; rank: number }[]).forEach((row) => {
-    const prev = ranks.get(row.address);
-    if (prev === undefined || row.rank < prev) {
-      ranks.set(row.address, row.rank);
-    }
-  });
-  return ranks;
+// The ranked "crowded markets" list for the Activity page: the markets the most leaderboard wallets
+// are converging on, with the YES/NO split and committed capital. Served from crowded_markets_cache,
+// which the daily full ingest precomputes (cacheCrowdedMarkets) — the inputs (the position caches)
+// only change on that run, so recomputing per request was pure waste. Previously this scanned the
+// entire wallet_positions table in-process on the home page's SSR path; now it's a tiny indexed read.
+// Empty until the next full ingest populates the cache (and on a missing table, pre-migration).
+interface CrowdedCacheSelectRow {
+  condition_id: string;
+  market: string | null;
+  trader_count: number;
+  yes_traders: number;
+  no_traders: number;
+  open_count: number;
+  closed_count: number;
+  committed_usd: number | null;
+  net_exposure_usd: number | null;
+  top_rank: number | null;
+  cur_price: number | null;
+  last_traded_at: string | null;
 }
 
-// The ranked "crowded markets" list for the Activity page: the markets the most leaderboard wallets
-// are converging on, with the YES/NO split and committed capital. Built from the position caches only.
 export async function getCrowdedMarkets(limit = 40): Promise<CrowdedMarketSummary[]> {
   const supabase = createSupabaseReadClient();
 
-  const rankByAddress = await leaderboardRanks(supabase);
-  if (rankByAddress === null || rankByAddress.size === 0) {
-    return [];
+  const { data, error } = await supabase
+    .from("crowded_markets_cache")
+    .select(
+      "condition_id, market, trader_count, yes_traders, no_traders, open_count, closed_count, committed_usd, net_exposure_usd, top_rank, cur_price, last_traded_at"
+    )
+    .order("rank", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    if (isMissingSchemaError(error)) {
+      return [];
+    }
+    throw error;
   }
 
-  // Limit closed positions to the last 90 days so the full-table scan becomes an indexed range
-  // scan (idx_wallet_closed_positions_close_time). Positions older than 90 days are outside all
-  // displayed horizons and don't affect the crowded-markets ranking.
-  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-  const [openRes, closedRes] = await Promise.all([
-    fetchAllPaged((from, to) => supabase.from("wallet_positions").select(OPEN_POSITION_COLUMNS).range(from, to)),
-    fetchAllPaged((from, to) => supabase.from("wallet_closed_positions").select(CLOSED_POSITION_COLUMNS).gte("close_time", cutoff).range(from, to))
-  ]);
-  if (openRes.missing && closedRes.missing) {
-    return [];
-  }
-
-  const positions = (openRes.rows as unknown as OpenPositionRowDb[]).map(toOpenPosition);
-  const closed = (closedRes.rows as unknown as ClosedPositionRowDb[]).map(toClosedPosition);
-  return summarizeCrowdedMarkets(positions, closed, { rankByAddress }, limit);
+  return ((data ?? []) as unknown as CrowdedCacheSelectRow[]).map((row) => ({
+    conditionId: row.condition_id,
+    market: row.market,
+    traderCount: row.trader_count,
+    yesTraders: row.yes_traders,
+    noTraders: row.no_traders,
+    openCount: row.open_count,
+    closedCount: row.closed_count,
+    committedUsd: toNumber(row.committed_usd),
+    netExposureUsd: toNumber(row.net_exposure_usd),
+    topRank: row.top_rank,
+    curPrice: row.cur_price,
+    lastTradedAt: row.last_traded_at
+  }));
 }
 
 // Full detail for one market: per-wallet participants (sides, P/L, fill dates) + the convergence

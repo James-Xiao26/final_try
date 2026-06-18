@@ -492,6 +492,45 @@ export interface Database {
         };
         Relationships: [];
       };
+      crowded_markets_cache: {
+        Row: {
+          condition_id: string;
+          rank: number;
+          market: string | null;
+          trader_count: number;
+          yes_traders: number;
+          no_traders: number;
+          open_count: number;
+          closed_count: number;
+          committed_usd: number;
+          net_exposure_usd: number;
+          top_rank: number | null;
+          cur_price: number | null;
+          last_traded_at: string | null;
+          cached_at: string;
+        };
+        Insert: {
+          condition_id: string;
+          rank: number;
+          market?: string | null;
+          trader_count: number;
+          yes_traders: number;
+          no_traders: number;
+          open_count: number;
+          closed_count: number;
+          committed_usd: number;
+          net_exposure_usd: number;
+          top_rank?: number | null;
+          cur_price?: number | null;
+          last_traded_at?: string | null;
+          cached_at?: string;
+        };
+        Update: {
+          rank?: number;
+          cached_at?: string;
+        };
+        Relationships: [];
+      };
       markets: {
         Row: {
           id: string;
