@@ -16,12 +16,14 @@ if (!SECRET) {
 }
 
 const ROOT = resolve(fileURLToPath(import.meta.url), "../../");
-const running: Record<string, boolean> = { feed: false, markets: false };
 
-function runJob(mode: "feed" | "markets"): boolean {
+type JobMode = "feed" | "markets" | "rescore";
+
+const running: Record<JobMode, boolean> = { feed: false, markets: false, rescore: false };
+
+function runJob(mode: JobMode): boolean {
   if (running[mode]) return false;
   running[mode] = true;
-  const flag = mode === "feed" ? "--feed-only" : "--markets-only";
   const child = spawn("pnpm", [`ingest:${mode}`], {
     cwd: ROOT,
     stdio: "inherit",
@@ -38,9 +40,10 @@ function runJob(mode: "feed" | "markets"): boolean {
   return true;
 }
 
-const ROUTES: Record<string, "feed" | "markets"> = {
+const ROUTES: Record<string, JobMode> = {
   "/refresh/feed": "feed",
   "/refresh/markets": "markets",
+  "/refresh/rescore": "rescore",
 };
 
 const server = createServer((req, res) => {
