@@ -15,9 +15,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json(rows, {
       headers: {
-        // Short edge cache so the client poll surfaces a fresh markets ingest within ~a minute,
-        // while still collapsing concurrent requests to one origin hit per window.
-        "Cache-Control": "s-maxage=60, stale-while-revalidate=120"
+        // Markets are repopulated ~hourly by ingest:markets, so a 60s window just re-reads the same
+        // data 60x/hour for no fresher result. Cache 5 min to cut Supabase egress while staying responsive.
+        "Cache-Control": "s-maxage=300, stale-while-revalidate=300"
       }
     });
   } catch (error) {

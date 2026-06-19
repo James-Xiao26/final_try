@@ -7,8 +7,11 @@ export async function GET() {
 
     return NextResponse.json(feed, {
       headers: {
-        // Short edge cache: the feed only changes when the --feed-only cron repopulates recent_trades.
-        "Cache-Control": "s-maxage=60, stale-while-revalidate=120"
+        // The feed only changes when the --feed-only cron repopulates recent_trades (~10 min), but
+        // building it scans the whole position cache (basis lookups). Cache for 10 min to match that
+        // cadence and keep that heavy scan from re-running every minute (Supabase egress). Clients
+        // still poll every 60s; the edge serves them the cached copy until this window expires.
+        "Cache-Control": "s-maxage=600, stale-while-revalidate=300"
       }
     });
   } catch (error) {

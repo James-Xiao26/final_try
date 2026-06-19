@@ -3,7 +3,10 @@ import RecentTradesFeed from "@/components/RecentTradesFeed";
 import ResolvedMarketsPanel from "@/components/ResolvedMarketsPanel";
 import { getCrowdedMarkets, getRecentLeaderboardTrades, getResolvedMarkets, withTimeout } from "@/lib/supabase";
 
-export const revalidate = 300;
+// 10 min: the feed/convergence/resolved data only changes on the ~10-min feed cron and the daily
+// full ingest, and building the feed scans the position cache — regenerating more often just burns
+// Supabase egress for identical output.
+export const revalidate = 600;
 
 export default async function HomePage() {
   // Each section degrades independently: a Supabase failure (e.g. free-tier cold-start 57014
