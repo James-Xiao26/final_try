@@ -167,12 +167,14 @@ export const CONFIG = {
   // recently-ascendant traders; the trades_stream catches anyone who traded recently
   // regardless of leaderboard standing. Each source runs independently — a failure in
   // one is logged and skipped without aborting the rest.
+  // timePeriod values are Polymarket's leaderboard enum: ALL / MONTH / WEEK / DAY (the short
+  // forms 1m/1w return 400 Bad Request).
   CANDIDATE_SOURCES: [
-    { timePeriod: "ALL", orderBy: "PNL" }, // all-time top earners (different from VOL-sorted)
-    { timePeriod: "1m",  orderBy: "VOL" }, // highest monthly volume
-    { timePeriod: "1m",  orderBy: "PNL" }, // highest monthly profit
-    { timePeriod: "1w",  orderBy: "VOL" }, // highest weekly volume
-    { timePeriod: "1w",  orderBy: "PNL" }, // highest weekly profit
+    { timePeriod: "ALL",   orderBy: "PNL" }, // all-time top earners (different from VOL-sorted)
+    { timePeriod: "MONTH", orderBy: "VOL" }, // highest monthly volume
+    { timePeriod: "MONTH", orderBy: "PNL" }, // highest monthly profit
+    { timePeriod: "WEEK",  orderBy: "VOL" }, // highest weekly volume
+    { timePeriod: "WEEK",  orderBy: "PNL" }, // highest weekly profit
   ] as Array<{ timePeriod: string; orderBy: string }>,
 
   // Candidates scored per full ingest run. Each costs the same restricted-lane API
