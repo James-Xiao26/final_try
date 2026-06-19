@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCrowdedMarkets, withTimeout } from "@/lib/supabase";
 
+// Same static-prerender trap as /api/recent-trades: a no-arg GET gets baked at build time and the
+// Convergence list freezes until the next deploy. force-dynamic keeps it live; the Cache-Control
+// header still bounds origin/DB hits to ~once per s-maxage window. See CLAUDE.md "Stuck edge-cache gotcha".
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const markets = await withTimeout(getCrowdedMarkets(), 8000, []);
