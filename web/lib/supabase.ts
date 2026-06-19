@@ -294,45 +294,77 @@ export async function getRecentLeaderboardTrades(
   // (wallet_closed_positions) for the wallets that traded. Both are best-effort — a missing table
   // (migration not yet applied) just degrades to fills-only grouping, never an empty feed.
   const feedAddresses = [...new Set(trades.map((trade) => trade.address))];
+  // The basis maps below are only ever read at keys (address, condition_id, outcome_index) that exist
+  // in the feed, so we only need rows for the markets actually shown. Restricting the lookups to the
+  // feed's condition_ids (≤ `limit` distinct) turns three whole-table scans of the position cache —
+  // every market every board wallet ever held, thousands of rows, the dominant Supabase egress driver —
+  // into a small targeted read. (Convergence was fixed the same way via crowded_markets_cache.)
+  const feedConditionIds = [
+    ...new Set(trades.map((trade) => trade.conditionId).filter((id): id is string => id !== null))
+  ];
   const openByKey = new Map<string, OpenBasis>();
   const closedByKey = new Map<string, ClosedBasis>();
   const tradeByKey = new Map<string, TradeBasis>();
-  if (feedAddresses.length > 0) {
-    // Active leaderboard wallets hold thousands of positions combined (the closed cache especially),
-    // so these MUST page — a single PostgREST response caps at 1000 rows, which would silently drop
-    // most positions and leave the feed unable to find their basis (→ "P/L n/a" on otherwise-known
-    // positions). Page through with the same .range() helper the board-wide scans use.
-    const [openRes, closedRes, tradeRes] = await Promise.all([
-      fetchAllPaged((from, to) =>
+  if (feedAddresses.length > 0 && feedConditionIds.length > 0) {
+    // Still page (the .range() helper): a market with many participating board wallets can exceed the
+    // 1000-row PostgREST cap, which would silently drop basis rows (→ "P/L n/a" on known positions).
+    // And chunk the condition_id list: two .in() filters in one URL (≤200 addresses + ≤200 ids, each
+    // id a 66-char hex string) can approach PostgREST's ~22KB header limit — the 414 the leaderboard
+    // scan note warns about — so batch the longer id dimension and merge the pages.
+    const CONDITION_ID_CHUNK = 60;
+    const cidChunks: string[][] = [];
+    for (let i = 0; i < feedConditionIds.length; i += CONDITION_ID_CHUNK) {
+      cidChunks.push(feedConditionIds.slice(i, i + CONDITION_ID_CHUNK));
+    }
+    const pagedByChunk = async (
+      build: (
+        cids: string[],
+        from: number,
+        to: number
+      ) => PromiseLike<{ data: unknown[] | null; error: { code?: string } | null }>
+    ): Promise<unknown[]> => {
+      const merged: unknown[] = [];
+      for (const cids of cidChunks) {
+        const { rows } = await fetchAllPaged((from, to) => build(cids, from, to));
+        merged.push(...rows);
+      }
+      return merged;
+    };
+
+    const [openRows, closedRows, tradeHistoryRows] = await Promise.all([
+      pagedByChunk((cids, from, to) =>
         supabase
           .from("wallet_positions")
           .select("address, condition_id, outcome_index, avg_price, cur_price, current_value, cash_pnl, size")
           .in("address", feedAddresses)
+          .in("condition_id", cids)
           .range(from, to)
       ),
-      fetchAllPaged((from, to) =>
+      pagedByChunk((cids, from, to) =>
         supabase
           .from("wallet_closed_positions")
           .select("address, condition_id, outcome_index, avg_price, realized_pnl, size")
           .in("address", feedAddresses)
+          .in("condition_id", cids)
           .range(from, to)
       ),
       // Pre-window BUY fills from wallet_trades (the per-wallet fill history from the last full ingest,
       // up to PROFILE_TRADES_LIMIT fills). Filtered to traded_at < cutoff so they don't overlap with
       // the in-window recent_trades fills; blended in buildPosition to give a complete cost basis.
       // Zero new Polymarket API calls — all data is already in the DB.
-      fetchAllPaged((from, to) =>
+      pagedByChunk((cids, from, to) =>
         supabase
           .from("wallet_trades")
           .select("address, condition_id, outcome_index, price, size")
           .in("address", feedAddresses)
+          .in("condition_id", cids)
           .eq("side", "BUY")
           .lt("traded_at", cutoff)
           .range(from, to)
       )
     ]);
 
-    (openRes.rows as unknown as FeedOpenPositionRow[]).forEach((row) => {
+    (openRows as unknown as FeedOpenPositionRow[]).forEach((row) => {
       openByKey.set(positionKey(row.address, row.condition_id, row.outcome_index), {
         avgEntry: row.avg_price,
         curPrice: row.cur_price,
@@ -341,7 +373,7 @@ export async function getRecentLeaderboardTrades(
         size: row.size
       });
     });
-    (closedRes.rows as unknown as FeedClosedPositionRow[]).forEach((row) => {
+    (closedRows as unknown as FeedClosedPositionRow[]).forEach((row) => {
       closedByKey.set(positionKey(row.address, row.condition_id, row.outcome_index), {
         avgEntry: row.avg_price,
         realizedPnl: row.realized_pnl,
@@ -356,7 +388,7 @@ export async function getRecentLeaderboardTrades(
       price: number | null;
       size: number | null;
     };
-    (tradeRes.rows as unknown as FeedTradeHistoryRow[]).forEach((row) => {
+    (tradeHistoryRows as unknown as FeedTradeHistoryRow[]).forEach((row) => {
       if (row.price === null || row.size === null) return;
       const key = positionKey(row.address, row.condition_id, row.outcome_index);
       const current = tradeByKey.get(key) ?? { preWindowWeighted: 0, preWindowSize: 0 };
