@@ -168,20 +168,24 @@ export const CONFIG = {
   // regardless of leaderboard standing. Each source runs independently — a failure in
   // one is logged and skipped without aborting the rest.
   // timePeriod values are Polymarket's leaderboard enum: ALL / MONTH / WEEK / DAY (the short
-  // forms 1m/1w return 400 Bad Request).
+  // forms 1m/1w return 400 Bad Request). VOL-sorted slices are intentionally excluded: the
+  // highest-volume traders are overwhelmingly bots (market-makers/scalpers), which waste the
+  // candidate scoring budget (they score null and can never promote). PNL slices + the live
+  // /trades stream surface genuine forecasting edge instead. Existing VOL-sourced candidate
+  // rows stay in the table and still get scored; this only stops discovering more.
   CANDIDATE_SOURCES: [
     { timePeriod: "ALL",   orderBy: "PNL" }, // all-time top earners (different from VOL-sorted)
-    { timePeriod: "MONTH", orderBy: "VOL" }, // highest monthly volume
     { timePeriod: "MONTH", orderBy: "PNL" }, // highest monthly profit
-    { timePeriod: "WEEK",  orderBy: "VOL" }, // highest weekly volume
     { timePeriod: "WEEK",  orderBy: "PNL" }, // highest weekly profit
   ] as Array<{ timePeriod: string; orderBy: string }>,
 
   // Candidates scored per full ingest run. Each costs the same restricted-lane API
   // budget as a main leaderboard wallet. At 500/day with ~20k first-pass candidates
   // the full initial universe is covered in ~40 days; on steady state (new /trades stream
-  // candidates only) the batch clears in minutes.
-  CANDIDATE_BATCH_PER_RUN: 500,
+  // candidates only) the batch clears in minutes. Env-overridable so a one-time backlog
+  // drain can score the whole candidate table in a single run (e.g.
+  // CANDIDATE_BATCH_PER_RUN=15000 pnpm ingest) without hardcoding a high steady-state value.
+  CANDIDATE_BATCH_PER_RUN: Number(process.env.CANDIDATE_BATCH_PER_RUN) || 500,
 
   // Minimum skill_score on any horizon to promote a candidate to 'tracked'. Set to
   // SCORE_FLOOR (4.0) — any wallet with proven positive forecasting edge qualifies. The

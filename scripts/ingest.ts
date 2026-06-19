@@ -1789,11 +1789,20 @@ async function scoreCandidateBatch(
   const rescoringIntervalMs = CONFIG.CANDIDATE_RESCORE_DAYS * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
 
   // Load unscored/stale candidates (status='candidate' only — tracked wallets are handled
-  // by the main worker pool; retired wallets are never scored again).
+  // by the main worker pool; retired wallets are never scored again). Order + filter + limit
+  // server-side: PostgREST caps an unordered select at 1000 rows, so without this the newest
+  // never-scored candidates (the bulk of a large backlog) sit past row 1000 and never get
+  // fetched — the batch silently starves (scored ~25/run despite thousands eligible). Never-
+  // scored (null) first, then least-recently scored; the cooldown filter mirrors
+  // selectCandidateBatch so the DB hands back only eligible rows, already in priority order.
+  const cooldownCutoffIso = new Date(Date.now() - rescoringIntervalMs).toISOString();
   const { data: candidateRows, error: loadError } = await supabase
     .from("candidate_wallets")
     .select("address, discovery_source, status, first_seen_at, last_scored_at, skill_score, times_scored, consecutive_below_threshold, promoted_at, retired_at")
-    .eq("status", "candidate");
+    .eq("status", "candidate")
+    .or(`last_scored_at.is.null,last_scored_at.lte.${cooldownCutoffIso}`)
+    .order("last_scored_at", { ascending: true, nullsFirst: true })
+    .limit(CONFIG.CANDIDATE_BATCH_PER_RUN);
   if (loadError) {
     throw loadError;
   }
