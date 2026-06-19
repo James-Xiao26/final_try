@@ -51,7 +51,18 @@ export const CONFIG = {
     // returned trades actually occupy (max - min timestamp), not a fixed horizon. This floor
     // stops a handful of quick trades in a single session from dividing by a near-zero window
     // and looking automated, while a genuine burst (>MAX_TRADES_PER_DAY within a day) still trips.
-    MIN_RATE_WINDOW_DAYS: 1
+    MIN_RATE_WINDOW_DAYS: 1,
+    // Fast-flipper / scalper exclusion. A position opened and closed within FAST_FLIP_MAX_HOURS isn't
+    // a copyable forecasting bet — it's arb/hedge/scalp churn (e.g. BTC 15-min up/down markets), whose
+    // edge a follower can't replicate. We flag a wallet whose *completed round-trips* are dominated by
+    // such flips, given enough round-trips to judge. This catches bots that evade the rate/size/breadth
+    // signals (moderate rate, few simultaneous markets) and legitimate human scalpers alike — both are
+    // intentionally out of scope, since Skill Score measures copyable forecasting edge, not speed.
+    // Holding time is derived from the /activity fills already pulled (no extra API). Retune from the
+    // per-signal breakdown log if exclusions look off.
+    FAST_FLIP_MAX_HOURS: 1, // open→close within 1h counts as a non-copyable flip
+    FAST_FLIP_FRACTION: 0.7, // ≥70% of completed round-trips being flips → excluded
+    FAST_FLIP_MIN_ROUNDTRIPS: 10 // need this many completed round-trips before judging
   },
   POLYMARKET_API_BASE: process.env.POLYMARKET_API_BASE ?? "https://data-api.polymarket.com",
   // The Gamma API (a different host than the Data API above) is the only Polymarket source that

@@ -77,12 +77,13 @@ test("isSuspectedBot flags too many simultaneous open markets", () => {
 });
 
 test("isSuspectedBot does not flag markets opened and fully closed sequentially", () => {
-  // Each market is bought then fully sold, so only one is ever open at a time. Spaced a day apart
-  // so the trade rate stays well under the limit and we isolate the simultaneous-markets check.
+  // Each market is bought then fully sold, so only one is ever open at a time. Spaced two days apart
+  // with a one-day hold (over the flip window) so the trade rate stays low and neither the
+  // simultaneous-markets nor the fast-flipper check fires — isolating the simultaneous-markets logic.
   const activity: TradeActivity[] = [];
   for (let index = 0; index < CONFIG.BOT.MAX_SIMULTANEOUS_MARKETS + 10; index += 1) {
     activity.push(trade({ conditionId: `cond-${index}`, side: "BUY", size: 100, timestamp: 1_700_000_000 + index * 2 * DAY }));
-    activity.push(trade({ conditionId: `cond-${index}`, side: "SELL", size: 100, timestamp: 1_700_000_000 + index * 2 * DAY + 1 }));
+    activity.push(trade({ conditionId: `cond-${index}`, side: "SELL", size: 100, timestamp: 1_700_000_000 + index * 2 * DAY + DAY }));
   }
   assert.equal(isSuspectedBot(activity, CONFIG), false);
 });
@@ -101,14 +102,15 @@ test("isSuspectedBot keeps partially-sold positions open", () => {
 });
 
 test("isSuspectedBot closes a position sold off across multiple partial sells", () => {
-  // Buy 100, then sell 60 + 40 = fully closed, for many markets in sequence. Never more than one
-  // open at a time, so the simultaneous-markets check stays low. Spaced out to keep the rate low.
+  // Buy 100, then sell 60 + 40 = fully closed, for many markets in sequence. Never more than one open
+  // at a time, so the simultaneous-markets check stays low. Spaced out (and held over the flip window
+  // before closing) to keep both the trade rate and the fast-flipper signal from firing.
   const activity: TradeActivity[] = [];
   for (let index = 0; index < CONFIG.BOT.MAX_SIMULTANEOUS_MARKETS + 10; index += 1) {
     const base = 1_700_000_000 + index * 3 * DAY;
     activity.push(trade({ conditionId: `cond-${index}`, side: "BUY", size: 100, timestamp: base }));
-    activity.push(trade({ conditionId: `cond-${index}`, side: "SELL", size: 60, timestamp: base + 1 }));
-    activity.push(trade({ conditionId: `cond-${index}`, side: "SELL", size: 40, timestamp: base + 2 }));
+    activity.push(trade({ conditionId: `cond-${index}`, side: "SELL", size: 60, timestamp: base + DAY }));
+    activity.push(trade({ conditionId: `cond-${index}`, side: "SELL", size: 40, timestamp: base + DAY + 1 }));
   }
   assert.equal(isSuspectedBot(activity, CONFIG), false);
 });
@@ -116,6 +118,64 @@ test("isSuspectedBot closes a position sold off across multiple partial sells", 
 test("isSuspectedBot is false for a normal trader", () => {
   const activity = build(10, (index) => ({ conditionId: `cond-${index % 3}`, usdcSize: 250 }));
   assert.equal(isSuspectedBot(activity, CONFIG), false);
+});
+
+test("isSuspectedBot flags fast-flippers whose round-trips are short holds", () => {
+  // FAST_FLIP_MIN_ROUNDTRIPS+2 markets, each bought then sold 30 min later (under the 1h flip cutoff).
+  // Spaced a day apart so only one is ever open (simultaneous stays at 1) and the trade rate stays low,
+  // isolating the fast-flipper check. Every round-trip is a flip -> 100% >= FAST_FLIP_FRACTION.
+  const activity: TradeActivity[] = [];
+  for (let index = 0; index < CONFIG.BOT.FAST_FLIP_MIN_ROUNDTRIPS + 2; index += 1) {
+    const base = 1_700_000_000 + index * DAY;
+    activity.push(trade({ conditionId: `cond-${index}`, side: "BUY", size: 100, timestamp: base }));
+    activity.push(trade({ conditionId: `cond-${index}`, side: "SELL", size: 100, timestamp: base + 30 * 60 }));
+  }
+  assert.equal(botSignal(activity, CONFIG), "fast_flipper");
+});
+
+test("isSuspectedBot does not flag positions held longer than the flip window", () => {
+  // Same structure, but each position is held 2 days -> well over the 1h cutoff, so zero flips.
+  const activity: TradeActivity[] = [];
+  for (let index = 0; index < CONFIG.BOT.FAST_FLIP_MIN_ROUNDTRIPS + 2; index += 1) {
+    const base = 1_700_000_000 + index * 5 * DAY;
+    activity.push(trade({ conditionId: `cond-${index}`, side: "BUY", size: 100, timestamp: base }));
+    activity.push(trade({ conditionId: `cond-${index}`, side: "SELL", size: 100, timestamp: base + 2 * DAY }));
+  }
+  assert.equal(botSignal(activity, CONFIG), null);
+});
+
+test("isSuspectedBot does not judge fast flips below the round-trip minimum", () => {
+  // One fewer completed round-trip than the gate -> the fast-flipper check is skipped entirely.
+  const activity: TradeActivity[] = [];
+  for (let index = 0; index < CONFIG.BOT.FAST_FLIP_MIN_ROUNDTRIPS - 1; index += 1) {
+    const base = 1_700_000_000 + index * DAY;
+    activity.push(trade({ conditionId: `cond-${index}`, side: "BUY", size: 100, timestamp: base }));
+    activity.push(trade({ conditionId: `cond-${index}`, side: "SELL", size: 100, timestamp: base + 30 * 60 }));
+  }
+  assert.equal(botSignal(activity, CONFIG), null);
+});
+
+test("isSuspectedBot does not count still-open positions as fast flips", () => {
+  // Buy-only across a handful of markets, never sold -> no completed round-trips to judge, and under
+  // the simultaneous-markets limit so nothing else fires either.
+  const activity = build(CONFIG.BOT.FAST_FLIP_MIN_ROUNDTRIPS + 2, (index) => ({
+    conditionId: `cond-${index}`,
+    side: "BUY",
+    timestamp: 1_700_000_000 + index * DAY
+  }));
+  assert.equal(botSignal(activity, CONFIG), null);
+});
+
+test("isSuspectedBot does not flag a wallet with only a minority of fast flips", () => {
+  // 3 quick flips (30 min) + the rest held 2 days -> below FAST_FLIP_FRACTION, so not flagged.
+  const activity: TradeActivity[] = [];
+  for (let index = 0; index < CONFIG.BOT.FAST_FLIP_MIN_ROUNDTRIPS + 2; index += 1) {
+    const base = 1_700_000_000 + index * 5 * DAY;
+    const heldSeconds = index < 3 ? 30 * 60 : 2 * DAY;
+    activity.push(trade({ conditionId: `cond-${index}`, side: "BUY", size: 100, timestamp: base }));
+    activity.push(trade({ conditionId: `cond-${index}`, side: "SELL", size: 100, timestamp: base + heldSeconds }));
+  }
+  assert.equal(botSignal(activity, CONFIG), null);
 });
 
 test("botSignal reports which heuristic flagged the wallet", () => {

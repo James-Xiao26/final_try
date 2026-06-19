@@ -2084,7 +2084,7 @@ async function main(): Promise<void> {
   let processed = 0;
   let bots = 0;
   let insufficient = 0;
-  const botBreakdown: Record<BotSignal, number> = { trade_rate: 0, dust_trades: 0, simultaneous_markets: 0 };
+  const botBreakdown: Record<BotSignal, number> = { trade_rate: 0, dust_trades: 0, simultaneous_markets: 0, fast_flipper: 0 };
 
   console.log(`Discovered ${discoveredWallets.length} wallets + ${newTracked.length} tracked candidates = ${wallets.length} total`);
 
@@ -2226,7 +2226,7 @@ async function main(): Promise<void> {
 
   const elapsedSeconds = (Date.now() - startedAt) / CONFIG.MS_PER_SECOND;
   console.log(`Processed ${processed} wallets (${newTracked.length} tracked candidates); excluded bots=${bots}, insufficient=${insufficient}; ingested ${marketCount} markets, ${recentTradeCount} recent trades, ${walletTradeCount} profile fills, ${walletPositionCount} open positions, ${closedPositionCount} closed positions, ${crowdedMarketCount} crowded markets; price-history ${priceHistory.upserted} rows across ${priceHistory.fetched} markets (deferred=${priceHistory.deferred}, pruned=${priceHistory.pruned}); equity-curve ${equityCurveCount} daily rows; elapsed=${elapsedSeconds.toFixed(1)}s`);
-  console.log(`Bot breakdown: trade_rate=${botBreakdown.trade_rate}, dust_trades=${botBreakdown.dust_trades}, simultaneous_markets=${botBreakdown.simultaneous_markets}`);
+  console.log(`Bot breakdown: trade_rate=${botBreakdown.trade_rate}, dust_trades=${botBreakdown.dust_trades}, simultaneous_markets=${botBreakdown.simultaneous_markets}, fast_flipper=${botBreakdown.fast_flipper}`);
   console.log(`Candidate pipeline: discovered=${candidatesDiscovered} new, registered=${candidatesRegistered}; scored=${candidateScored}, promoted=${candidatePromoted}, retired=${candidateRetired}`);
 
   // Diagnostic: the restricted lane (closed-positions) is the dominant cost. Its theoretical floor

@@ -15,7 +15,7 @@ const CLOSED_SIZE_EPSILON = 1e-9;
 // Which heuristic flagged a wallet. Returned (instead of a bare boolean) so ingest can report a
 // per-signal breakdown — essential for tuning, since the thresholds interact and a spike in
 // exclusions is otherwise opaque.
-export type BotSignal = "trade_rate" | "dust_trades" | "simultaneous_markets";
+export type BotSignal = "trade_rate" | "dust_trades" | "simultaneous_markets" | "fast_flipper";
 
 export function isSuspectedBot(activity: TradeActivity[], config: typeof CONFIG): boolean {
   return botSignal(activity, config) !== null;
@@ -60,6 +60,11 @@ export function botSignal(activity: TradeActivity[], config: typeof CONFIG): Bot
   const netSizeByPosition = new Map<string, number>();
   const openPositionsByMarket = new Map<string, number>();
   let maxSimultaneousMarkets = 0;
+  // Holding-time tracking: when a position first opens, stamp the timestamp; when it fully closes,
+  // record how long it was held. Positions still open at the end of the window have no completed
+  // round-trip and don't count. timestamps are unix seconds (same units as the trades/day window).
+  const openedAt = new Map<string, number>();
+  const holdingSeconds: number[] = [];
   const chronological = [...activity].sort((left, right) => left.timestamp - right.timestamp);
 
   for (const trade of chronological) {
@@ -83,12 +88,34 @@ export function botSignal(activity: TradeActivity[], config: typeof CONFIG): Bot
       } else {
         openPositionsByMarket.set(trade.conditionId, remaining);
       }
+      const opened = openedAt.get(positionKey);
+      if (opened !== undefined) {
+        holdingSeconds.push(trade.timestamp - opened);
+        openedAt.delete(positionKey);
+      }
     } else if (!wasOpen && isOpen) {
       openPositionsByMarket.set(trade.conditionId, (openPositionsByMarket.get(trade.conditionId) ?? 0) + 1);
+      openedAt.set(positionKey, trade.timestamp);
     }
 
     maxSimultaneousMarkets = Math.max(maxSimultaneousMarkets, openPositionsByMarket.size);
   }
 
-  return maxSimultaneousMarkets > config.BOT.MAX_SIMULTANEOUS_MARKETS ? "simultaneous_markets" : null;
+  if (maxSimultaneousMarkets > config.BOT.MAX_SIMULTANEOUS_MARKETS) {
+    return "simultaneous_markets";
+  }
+
+  // Fast-flipper / scalper: completed round-trips dominated by sub-FAST_FLIP_MAX_HOURS holds are
+  // non-copyable churn (arb/hedge/scalp), not forecasting bets. Catches wallets the rate/size/breadth
+  // signals miss. Gated on FAST_FLIP_MIN_ROUNDTRIPS so a wallet with only a couple quick trades isn't
+  // judged on noise.
+  if (holdingSeconds.length >= config.BOT.FAST_FLIP_MIN_ROUNDTRIPS) {
+    const flipCutoffSeconds = config.BOT.FAST_FLIP_MAX_HOURS * 60 * 60;
+    const flips = holdingSeconds.filter((seconds) => seconds <= flipCutoffSeconds).length;
+    if (flips / holdingSeconds.length >= config.BOT.FAST_FLIP_FRACTION) {
+      return "fast_flipper";
+    }
+  }
+
+  return null;
 }
