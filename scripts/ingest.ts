@@ -2164,10 +2164,17 @@ async function main(): Promise<void> {
   // Persist the activity feed from fills collected during processing. Done after the leaderboard
   // rebuild so the read-time membership join has fresh ranks to filter against.
   const recentTradeCount = await replaceRecentTrades(supabase, collectedTrades);
+  // Free the recent-trades buffer immediately — it's write-once and the tail steps below (the heavy
+  // closed-position write, the crowded-markets aggregation, the price-history cache) are where peak
+  // memory blows past the 512MB dyno. Holding it costs nothing useful here.
+  collectedTrades.length = 0;
 
   // Wallet-profile detail: open positions + raw fill history, both from payloads already fetched
   // during processing. Global wipe-and-replace, same as the feed.
   const walletTradeCount = await replaceWalletTrades(supabase, collectedFills);
+  // Free the profile-fills buffer (the single largest collection — one row per fill across all
+  // eligible wallets, ~150k objects) before the memory-heavy tail. Write-once, not read again.
+  collectedFills.length = 0;
   const walletPositionCount = await replaceWalletPositions(supabase, collectedPositions);
   // Closed-position basis cache, scoped to the wallets just written into leaderboard_cache (the only
   // wallets the feed shows). Sourced from the /closed-positions payload already fetched — no new API.
@@ -2194,6 +2201,9 @@ async function main(): Promise<void> {
   // daily price. Reads the price cache just written above, so it must run after it. Overwrites the
   // sparse realized curve in equity_curve for board wallets.
   const equityCurveCount = await writeDailyEquityCurves(supabase, boardAddresses, collectedPositions, collectedClosed, entryDatesByAddress);
+  // Last consumer of the position buffers — free them before the markets pass.
+  collectedPositions.length = 0;
+  collectedClosed.length = 0;
 
   // Markets are global and independent of wallet processing; refresh them in the same run.
   const marketCount = await ingestMarkets(supabase, polymarket);
