@@ -1448,7 +1448,10 @@ input:focus { border-color: var(--green) !important; }
    viewport overlay shown for every route while MAINTENANCE_MODE is
    on; sits above the topnav/ocean scene. Namespaced `wm-`.
    ============================================================ */
-.wm {
+/* Maintenance-page full-viewport wrapper. Named `.wm-page` (not `.wm`) on purpose: BrandMark's
+   wordmark <div> uses `.wm`, and a bare `.wm` here collided with it — the global fixed/z-index:100
+   rule hijacked the topnav wordmark into a full-screen overlay that covered the nav links. */
+.wm-page {
   position: fixed; inset: 0; z-index: 100;
   display: flex; align-items: center; justify-content: center;
   padding: 24px;

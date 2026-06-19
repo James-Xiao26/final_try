@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 // covers the shared topnav + ocean scene from app/layout.tsx without needing its own layout.
 export default function MaintenancePage() {
   return (
-    <div className="wm">
+    <div className="wm-page">
       <div className="wm-card">
         <span className="wm-status">
           <span className="wm-dot" /> System offline · Scheduled maintenance
