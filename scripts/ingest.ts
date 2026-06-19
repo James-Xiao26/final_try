@@ -2136,6 +2136,32 @@ async function main(): Promise<void> {
 
   await rebuildLeaderboardCache(supabase);
 
+  // Board-scope every collected detail buffer before the candidate batch and the memory-heavy tail.
+  // The pass accumulates detail for every *eligible* wallet (hundreds), but only the ~TOP_N leaderboard
+  // wallets are ever persisted or read back — the feed, positions, and Convergence read paths all filter
+  // on leaderboard membership, so non-board rows are dead weight. Dropping them here keeps peak memory
+  // (the persisted inserts, the crowded-markets position read-back, the equity curve) proportional to
+  // TOP_N instead of the full eligible set — which is what pushed the 512MB dyno past its R15/SIGKILL line.
+  const boardAddresses = await getLeaderboardAddresses(supabase);
+  const boardTrades = collectedTrades.filter((trade) => boardAddresses.has(trade.address));
+  collectedTrades.length = 0;
+  const boardFills = collectedFills.filter((fill) => boardAddresses.has(fill.address));
+  collectedFills.length = 0;
+  const boardPositions = collectedPositions.filter((position) => boardAddresses.has(position.address));
+  collectedPositions.length = 0;
+  const boardClosed = collectedClosed.filter((record) => boardAddresses.has(record.address));
+  collectedClosed.length = 0;
+  for (const address of [...assetsByAddress.keys()]) {
+    if (!boardAddresses.has(address)) {
+      assetsByAddress.delete(address);
+    }
+  }
+  for (const address of [...entryDatesByAddress.keys()]) {
+    if (!boardAddresses.has(address)) {
+      entryDatesByAddress.delete(address);
+    }
+  }
+
   // ── Candidate pipeline: score batch + update tracked statuses ────────────────────────
   // Score a batch of unscored/stale candidates. Runs after the main worker pool so the
   // restricted-lane budget has already been spent on leaderboard wallets — candidates get
@@ -2161,25 +2187,15 @@ async function main(): Promise<void> {
     console.warn(`Tracked candidate status update failed (non-fatal): ${describeError(reason)}`);
   }
 
-  // Persist the activity feed from fills collected during processing. Done after the leaderboard
-  // rebuild so the read-time membership join has fresh ranks to filter against.
-  const recentTradeCount = await replaceRecentTrades(supabase, collectedTrades);
-  // Free the recent-trades buffer immediately — it's write-once and the tail steps below (the heavy
-  // closed-position write, the crowded-markets aggregation, the price-history cache) are where peak
-  // memory blows past the 512MB dyno. Holding it costs nothing useful here.
-  collectedTrades.length = 0;
-
-  // Wallet-profile detail: open positions + raw fill history, both from payloads already fetched
-  // during processing. Global wipe-and-replace, same as the feed.
-  const walletTradeCount = await replaceWalletTrades(supabase, collectedFills);
-  // Free the profile-fills buffer (the single largest collection — one row per fill across all
-  // eligible wallets, ~150k objects) before the memory-heavy tail. Write-once, not read again.
-  collectedFills.length = 0;
-  const walletPositionCount = await replaceWalletPositions(supabase, collectedPositions);
-  // Closed-position basis cache, scoped to the wallets just written into leaderboard_cache (the only
-  // wallets the feed shows). Sourced from the /closed-positions payload already fetched — no new API.
-  const boardAddresses = await getLeaderboardAddresses(supabase);
-  const closedPositionCount = await replaceWalletClosedPositions(supabase, collectedClosed, boardAddresses);
+  // Persist the board-scoped detail collected during processing (filtered above, right after the
+  // rebuild). All four tables are read only for leaderboard wallets, so this is the full set the
+  // web app can surface.
+  const recentTradeCount = await replaceRecentTrades(supabase, boardTrades);
+  const walletTradeCount = await replaceWalletTrades(supabase, boardFills);
+  const walletPositionCount = await replaceWalletPositions(supabase, boardPositions);
+  // Closed-position basis cache. Already board-scoped above; replaceWalletClosedPositions re-applies
+  // the boardAddresses filter defensively. Sourced from the /closed-positions payload already fetched.
+  const closedPositionCount = await replaceWalletClosedPositions(supabase, boardClosed, boardAddresses);
 
   // Precompute the Convergence ("crowded markets") ranked list so the web app reads a tiny cache
   // instead of scanning the whole position table per request (Fix C). Must run after the position
@@ -2200,10 +2216,10 @@ async function main(): Promise<void> {
   // Daily mark-to-market equity curve for board wallets: marks each in-window position at the cached
   // daily price. Reads the price cache just written above, so it must run after it. Overwrites the
   // sparse realized curve in equity_curve for board wallets.
-  const equityCurveCount = await writeDailyEquityCurves(supabase, boardAddresses, collectedPositions, collectedClosed, entryDatesByAddress);
+  const equityCurveCount = await writeDailyEquityCurves(supabase, boardAddresses, boardPositions, boardClosed, entryDatesByAddress);
   // Last consumer of the position buffers — free them before the markets pass.
-  collectedPositions.length = 0;
-  collectedClosed.length = 0;
+  boardPositions.length = 0;
+  boardClosed.length = 0;
 
   // Markets are global and independent of wallet processing; refresh them in the same run.
   const marketCount = await ingestMarkets(supabase, polymarket);
