@@ -3,7 +3,7 @@
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { formatCompactUsd, formatPrice, shortenAddress } from "@/lib/format";
+import { formatCompactUsd, formatPrice, isValidAddress, shortenAddress } from "@/lib/format";
 import type {
   ConfidenceLevel,
   DecisionEngineResult,
@@ -148,8 +148,19 @@ function SignalChecklist({ signals }: { signals: DecisionSignalResult[] }) {
 }
 
 // ── Top holders strip ─────────────────────────────────────────────────────────
+// A handle counts as a real username only if it isn't just the wallet address
+// (Polymarket defaults unnamed wallets' handle to their 0x… address) and isn't
+// excessively long. Otherwise we fall back to the compact 0x1234…abcd form.
+function holderLabel(h: SmartMoneyHolder): string {
+  const handle = h.handle?.trim();
+  if (handle && handle.toLowerCase() !== h.address.toLowerCase() && !isValidAddress(handle)) {
+    return `@${handle.length > 18 ? `${handle.slice(0, 17)}…` : handle}`;
+  }
+  return shortenAddress(h.address);
+}
+
 function HolderChip({ h }: { h: SmartMoneyHolder }) {
-  const label = h.handle ? `@${h.handle}` : shortenAddress(h.address);
+  const label = holderLabel(h);
   return (
     <Link href={`/wallet/${h.address}`} className="de-holder-chip" title={`${label} · Rank #${h.rank ?? "?"} · ${h.skillScore.toFixed(1)}/10`}>
       <span className="de-holder-rank">#{h.rank ?? "?"}</span>
