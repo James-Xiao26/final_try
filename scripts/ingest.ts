@@ -1427,8 +1427,8 @@ async function loadPricesForAssets(
   assets: string[]
 ): Promise<Map<string, { ts: string; price: number }[]>> {
   const byAsset = new Map<string, { ts: string; price: number }[]>();
-  for (let offset = 0; offset < assets.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
-    const slice = assets.slice(offset, offset + CONFIG.LEADERBOARD_FILTER_CHUNK);
+  for (let offset = 0; offset < assets.length; offset += CONFIG.ASSET_FILTER_CHUNK) {
+    const slice = assets.slice(offset, offset + CONFIG.ASSET_FILTER_CHUNK);
     const { data, error } = await supabase
       .from("market_price_history")
       .select("asset, ts, price")

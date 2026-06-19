@@ -135,6 +135,10 @@ export const CONFIG = {
   // Max addresses per `.in(...)` filter when rebuilding the leaderboard cache. Each address adds
   // ~45 chars to the request URL, so this bounds URL length below the server's limit at any scale.
   LEADERBOARD_FILTER_CHUNK: 200,
+  // Max asset/token ids per `.in(...)` filter. CLOB outcome-token ids are ~77-char decimal strings
+  // (~2x a wallet address), so 200 of them overflow Postgrest's 16KB request-URL limit
+  // (HeadersOverflowError). Keep this well below that: 100 ids ≈ 8KB.
+  ASSET_FILTER_CHUNK: 100,
   TRADES_DISCOVERY_LIMIT: 10000,
   SECONDS_PER_DAY: 86400,
   MS_PER_SECOND: 1000,
