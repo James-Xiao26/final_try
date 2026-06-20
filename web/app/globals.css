@@ -1376,6 +1376,20 @@ input:focus { border-color: var(--green) !important; }
 .ma-tooltip .d { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .ma-tooltip .p { font-size: 13px; font-weight: 700; color: var(--green); font-family: var(--font-display); }
 
+/* Whale-marker hover tooltip: anchored above the marker, identity + position detail */
+.ma-whale-tip { position: absolute; pointer-events: none; z-index: 5; min-width: 150px; background: rgba(3,16,26,0.95);
+  border: 1px solid var(--line-2); border-radius: 8px; padding: 7px 10px; display: flex; flex-direction: column; gap: 3px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+.ma-whale-tip .wt-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ma-whale-tip .wt-who { font-size: 12px; font-weight: 700; color: var(--text); }
+.ma-whale-tip .wt-rank { font-size: 9.5px; color: var(--muted-d); }
+.ma-whale-tip .wt-side { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+.ma-whale-tip .wt-side.buy { color: var(--green); }
+.ma-whale-tip .wt-side.sell { color: var(--red); }
+.ma-whale-tip .wt-row { display: flex; justify-content: space-between; gap: 14px; font-size: 10.5px; }
+.ma-whale-tip .wt-row > span:first-child { color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-size: 9px; }
+.ma-whale-tip .wt-row > span:last-child { color: var(--text); font-weight: 600; }
+
 .ma-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .ma-grid > .ma-section { margin: 0; }
 
