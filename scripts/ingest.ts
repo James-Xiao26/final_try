@@ -11,6 +11,7 @@ import { dailyPointsFromHistory, planPriceFetches, type CacheState } from "./pri
 import { earliestEntryDates, latestFillDates, openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
 import { bestSkillScore, computeScoringOutcome, selectCandidateBatch, type CandidateWallet, type CandidateStatus } from "./candidateDiscovery.js";
 import { summarizeCrowdedMarkets, type CrowdClosedPosition, type CrowdOpenPosition } from "./marketCrowd.js";
+import { newEntriesFromActivity, summarizeFreshEntries, type NewEntry } from "./freshEntries.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -178,6 +179,41 @@ interface Database {
           top_rank?: number | null;
           cur_price?: number | null;
           last_traded_at?: string | null;
+          cached_at?: string;
+        };
+        Update: {
+          rank?: number;
+          cached_at?: string;
+        };
+        Relationships: [];
+      };
+      fresh_entries_cache: {
+        Row: {
+          condition_id: string;
+          rank: number;
+          market: string | null;
+          entrant_count: number;
+          skill_weight: number;
+          top_skill: number | null;
+          yes_entrants: number;
+          no_entrants: number;
+          committed_usd: number;
+          top_rank: number | null;
+          last_entry_at: string | null;
+          cached_at: string;
+        };
+        Insert: {
+          condition_id: string;
+          rank: number;
+          market?: string | null;
+          entrant_count: number;
+          skill_weight: number;
+          top_skill?: number | null;
+          yes_entrants: number;
+          no_entrants: number;
+          committed_usd: number;
+          top_rank?: number | null;
+          last_entry_at?: string | null;
           cached_at?: string;
         };
         Update: {
@@ -1163,6 +1199,9 @@ async function replaceWalletClosedPositions(
 // bit more leaves headroom without bloating the table.
 const CROWDED_MARKETS_CACHE_LIMIT = 100;
 
+// Same headroom for the Fresh Entries ("flow") cache.
+const FRESH_ENTRIES_CACHE_LIMIT = 100;
+
 // Page through a leaderboard-scoped table (PostgREST caps one response at 1000 rows). The factory
 // rebuilds the query per page (a query builder is single-use).
 async function fetchAllRows<T>(
@@ -1290,6 +1329,49 @@ async function cacheCrowdedMarkets(supabase: SupabaseClient): Promise<number> {
     cached_at: cachedAt
   }));
   const { error: insertError } = await supabase.from("crowded_markets_cache").insert(rows);
+  if (insertError) {
+    throw insertError;
+  }
+  return rows.length;
+}
+
+// Signal #2 — precompute the "Fresh Entries" (flow) ranked list into fresh_entries_cache. Mirrors
+// cacheCrowdedMarkets but runs in the ~10-min feed pass: the new entries are derived from the same
+// /activity the feed already pulled (newEntriesFromActivity), so this adds no Polymarket API calls.
+// skill/rank come from the leaderboard_cache maps the feed read up front. Wipe-and-replace a tiny
+// table; empty input still clears stale rows.
+async function cacheFreshEntries(
+  supabase: SupabaseClient,
+  entries: NewEntry[],
+  skillByAddress: Map<string, number>,
+  rankByAddress: Map<string, number>
+): Promise<number> {
+  const summaries = summarizeFreshEntries(entries, skillByAddress, rankByAddress, FRESH_ENTRIES_CACHE_LIMIT);
+
+  const { error: deleteError } = await supabase.from("fresh_entries_cache").delete().gte("rank", 0);
+  if (deleteError) {
+    throw deleteError;
+  }
+  if (summaries.length === 0) {
+    return 0;
+  }
+
+  const cachedAt = new Date().toISOString();
+  const rows = summaries.map((s, index) => ({
+    condition_id: s.conditionId,
+    rank: index + 1,
+    market: s.market,
+    entrant_count: s.entrantCount,
+    skill_weight: s.skillWeight,
+    top_skill: s.topSkill,
+    yes_entrants: s.yesEntrants,
+    no_entrants: s.noEntrants,
+    committed_usd: s.committedUsd,
+    top_rank: s.topRank,
+    last_entry_at: s.lastEntryAt,
+    cached_at: cachedAt
+  }));
+  const { error: insertError } = await supabase.from("fresh_entries_cache").insert(rows);
   if (insertError) {
     throw insertError;
   }
@@ -1530,16 +1612,28 @@ async function writeDailyEquityCurves(
 async function refreshLeaderboardFeed(
   supabase: SupabaseClient,
   client: PolymarketClient
-): Promise<{ wallets: number; trades: number; walletTrades: number }> {
+): Promise<{ wallets: number; trades: number; walletTrades: number; freshEntries: number }> {
   const cutoffMs = Date.now() - CONFIG.RECENT_TRADE_WINDOW_HOURS * 60 * 60 * CONFIG.MS_PER_SECOND;
 
-  const { data, error } = await supabase.from("leaderboard_cache").select("address");
+  // Pull skill + rank alongside the address: the Fresh Entries cache weights each new entrant by skill
+  // and overlays the best leaderboard rank. leaderboard_cache has one row per (address, horizon), so
+  // keep the max skill / min rank per address.
+  const { data, error } = await supabase.from("leaderboard_cache").select("address, skill_score, rank");
   if (error) {
     throw error;
   }
   const addresses = [...new Set((data ?? []).map((row) => row.address))];
   if (addresses.length === 0) {
-    return { wallets: 0, trades: 0, walletTrades: 0 };
+    return { wallets: 0, trades: 0, walletTrades: 0, freshEntries: 0 };
+  }
+  const skillByAddress = new Map<string, number>();
+  const rankByAddress = new Map<string, number>();
+  for (const row of data ?? []) {
+    const skill = row.skill_score ?? 0;
+    const prevSkill = skillByAddress.get(row.address);
+    if (prevSkill === undefined || skill > prevSkill) skillByAddress.set(row.address, skill);
+    const prevRank = rankByAddress.get(row.address);
+    if (prevRank === undefined || row.rank < prevRank) rankByAddress.set(row.address, row.rank);
   }
 
   // Worker pool over the (small) leaderboard set; /activity rides the general lane, so this is a few
@@ -1548,6 +1642,7 @@ async function refreshLeaderboardFeed(
   // API calls for the second.
   const collected: RecentTrade[] = [];
   const collectedFills: ProfileFill[] = [];
+  const collectedEntries: NewEntry[] = [];
   let cursor = 0;
   const worker = async (): Promise<void> => {
     while (cursor < addresses.length) {
@@ -1561,6 +1656,7 @@ async function refreshLeaderboardFeed(
         // pushing between awaits can't interleave mid-operation, so concurrent workers are safe here.
         collected.push(...recentTradesFromActivity(activity, address, cutoffMs));
         collectedFills.push(...profileFillsFromActivity(activity, address, CONFIG.PROFILE_TRADES_LIMIT));
+        collectedEntries.push(...newEntriesFromActivity(activity, address, cutoffMs));
       } catch (reason) {
         console.warn(`Feed refresh failed for ${address}: ${describeError(reason)}`);
       }
@@ -1588,7 +1684,8 @@ async function refreshLeaderboardFeed(
 
   await insertRecentTrades(supabase, collected);
   await insertWalletTrades(supabase, collectedFills);
-  return { wallets: addresses.length, trades: collected.length, walletTrades: collectedFills.length };
+  const freshEntries = await cacheFreshEntries(supabase, collectedEntries, skillByAddress, rankByAddress);
+  return { wallets: addresses.length, trades: collected.length, walletTrades: collectedFills.length, freshEntries };
 }
 
 // ── Hourly leaderboard rescore ─────────────────────────────────────────────────────────
@@ -2018,10 +2115,10 @@ async function main(): Promise<void> {
   // rewrite their recent_trades rows. Cheap (general lane only) and decoupled from scoring, so it can
   // run every few minutes between full ingests. Requires leaderboard_cache from a prior full ingest.
   if (process.argv.includes("--feed-only")) {
-    const { wallets, trades, walletTrades } = await refreshLeaderboardFeed(supabase, new PolymarketClient());
+    const { wallets, trades, walletTrades, freshEntries } = await refreshLeaderboardFeed(supabase, new PolymarketClient());
     console.log(
-      `Refreshed feed: ${trades} recent trades + ${walletTrades} profile fills across ${wallets} leaderboard wallets; ` +
-        `elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`
+      `Refreshed feed: ${trades} recent trades + ${walletTrades} profile fills + ${freshEntries} fresh-entry markets ` +
+        `across ${wallets} leaderboard wallets; elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`
     );
     return;
   }

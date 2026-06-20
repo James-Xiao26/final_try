@@ -21,6 +21,14 @@ function tickLabel(ms: number): string {
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 }
 
+// Full date + time for the whale tooltip (hover-only, so no SSR; UTC to match the axis).
+function whenLabel(ms: number): string {
+  const d = new Date(ms);
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${hh}:${mm} UTC`;
+}
+
 function tms(ts: string): number {
   return Date.parse(ts);
 }
@@ -44,6 +52,7 @@ export default function PriceChart({ series, whales, extraLines = [] }: PriceCha
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(920);
   const [hoverX, setHoverX] = useState<number | null>(null);
+  const [hoverWhale, setHoverWhale] = useState<number | null>(null);
   const [drawn, setDrawn] = useState(false);
   const [horizon, setHorizon] = useState<Horizon>(null); // default: full history since creation
 
@@ -269,22 +278,22 @@ export default function PriceChart({ series, whales, extraLines = [] }: PriceCha
 
         {/* Whale markers: BUY filled aqua, SELL hollow coral; radius ∝ √USDC; placed at YES-equiv price */}
         {model.markers.map((m, i) => {
-          const priceTxt = m.w.price !== null ? ` @ ${Math.round(m.w.price * 100)}¢` : "";
-          const rankTxt = m.w.rank !== null ? ` (#${m.w.rank})` : "";
           const who = m.w.handle ?? shortenAddress(m.w.address);
-          const tip = `${m.w.side} ${m.w.outcome} · ${formatCompactUsd(m.w.usdc)}${priceTxt} · ${who}${rankTxt}`;
+          const active = hoverWhale === i;
           return (
             <circle
               key={`wm${i}`}
               cx={m.x}
               cy={m.y}
-              r={m.r}
+              r={active ? m.r + 2 : m.r}
               fill={m.w.side === "BUY" ? "rgba(54,236,208,0.5)" : "none"}
               stroke={m.w.side === "BUY" ? "#36ecd0" : "#ff7a59"}
-              strokeWidth="1.5"
-              style={{ opacity: drawn ? 0.95 : 0, transition: `opacity .6s ease ${0.3 + (i % 8) * 0.04}s` }}
+              strokeWidth={active ? 2.5 : 1.5}
+              style={{ cursor: "pointer", opacity: drawn ? 0.95 : 0, transition: `opacity .6s ease ${0.3 + (i % 8) * 0.04}s` }}
+              onMouseEnter={() => setHoverWhale(i)}
+              onMouseLeave={() => setHoverWhale((h) => (h === i ? null : h))}
             >
-              <title>{tip}</title>
+              <title>{`${m.w.side} ${m.w.outcome} · ${who}`}</title>
             </circle>
           );
         })}
@@ -306,6 +315,28 @@ export default function PriceChart({ series, whales, extraLines = [] }: PriceCha
           <span className="p">{Math.round(hover.price * 100)}¢ YES</span>
         </div>
       ) : null}
+
+      {hoverWhale !== null && model.markers[hoverWhale] ? (() => {
+        const m = model.markers[hoverWhale];
+        const w = m.w;
+        const who = w.handle ?? shortenAddress(w.address);
+        const right = m.x > width * 0.7;
+        return (
+          <div
+            className="ma-whale-tip"
+            style={{ left: `${(m.x / width) * 100}%`, top: m.y, transform: `translate(${right ? "-100%" : "0"}, calc(-100% - 12px))` }}
+          >
+            <div className="wt-head">
+              <span className="wt-who">{who}</span>
+              {w.rank !== null ? <span className="wt-rank">#{w.rank}</span> : null}
+            </div>
+            <div className={`wt-side ${w.side === "BUY" ? "buy" : "sell"}`}>{w.side} {w.outcome}</div>
+            <div className="wt-row"><span>Size</span><span>{formatCompactUsd(w.usdc)}{w.price !== null ? ` @ ${Math.round(w.price * 100)}¢` : ""}</span></div>
+            {w.skillScore !== null ? <div className="wt-row"><span>Skill</span><span>{w.skillScore.toFixed(1)}</span></div> : null}
+            <div className="wt-row"><span>When</span><span>{whenLabel(w.ts)}</span></div>
+          </div>
+        );
+      })() : null}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import type { CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, ResolvedMarket, WalletMetrics, WalletPosition, WalletProfile } from "./types";
+import type { CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, FreshEntrySummary, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, ResolvedMarket, WalletMetrics, WalletPosition, WalletProfile } from "./types";
 import type { DECategoryWin, DELeaderboardEntry, DEMarket, DEPosition, DecisionEngineInputs } from "./decisionEngine";
 import { HORIZONS } from "./types";
 import { groupWalletTrades } from "./walletTrades";
@@ -767,6 +767,55 @@ export async function getCrowdedMarkets(limit = 40): Promise<CrowdedMarketSummar
     topRank: row.top_rank,
     curPrice: row.cur_price,
     lastTradedAt: row.last_traded_at
+  }));
+}
+
+// The ranked "Fresh Entries" list: markets the most leaderboard wallets *just opened a new position*
+// in (flow), the counterpart to getCrowdedMarkets' holdings (stock). Served from fresh_entries_cache,
+// precomputed by the ~10-min feed run (cacheFreshEntries) — a tiny "ORDER BY rank LIMIT n" indexed
+// read. Empty until the next feed run populates it (and on a missing table, pre-migration).
+interface FreshEntriesSelectRow {
+  condition_id: string;
+  market: string | null;
+  entrant_count: number;
+  skill_weight: number | null;
+  top_skill: number | null;
+  yes_entrants: number;
+  no_entrants: number;
+  committed_usd: number | null;
+  top_rank: number | null;
+  last_entry_at: string | null;
+}
+
+export async function getFreshEntries(limit = 40): Promise<FreshEntrySummary[]> {
+  const supabase = createSupabaseReadClient();
+
+  const { data, error } = await supabase
+    .from("fresh_entries_cache")
+    .select(
+      "condition_id, market, entrant_count, skill_weight, top_skill, yes_entrants, no_entrants, committed_usd, top_rank, last_entry_at"
+    )
+    .order("rank", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    if (isMissingSchemaError(error)) {
+      return [];
+    }
+    throw error;
+  }
+
+  return ((data ?? []) as unknown as FreshEntriesSelectRow[]).map((row) => ({
+    conditionId: row.condition_id,
+    market: row.market,
+    entrantCount: row.entrant_count,
+    skillWeight: toNumber(row.skill_weight),
+    topSkill: row.top_skill,
+    yesEntrants: row.yes_entrants,
+    noEntrants: row.no_entrants,
+    committedUsd: toNumber(row.committed_usd),
+    topRank: row.top_rank,
+    lastEntryAt: row.last_entry_at
   }));
 }
 

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
-import ConvergenceChart from "@/components/ConvergenceChart";
 import CrowdParticipants from "@/components/CrowdParticipants";
 import PriceChart from "@/components/PriceChart";
 import WhaleFeed from "@/components/WhaleFeed";
@@ -270,17 +269,6 @@ export default async function MarketPage({ params }: MarketPageProps) {
           </p>
         </section>
 
-        <section className="panel ma-section">
-          <div className="ma-section-head">
-            <h2>Position <span className="g">Flow</span></h2>
-            <div className="ma-legend">
-              <span className="ma-leg buy">YES committed</span>
-              <span className="ma-leg sell">NO committed</span>
-            </div>
-          </div>
-          <ConvergenceChart timeline={detail?.timeline ?? []} />
-          <p className="ma-caption">Cumulative net leaderboard cost basis on each side, reconstructed from tracked fills.</p>
-        </section>
       </div>
 
       {/* ── Participants ledger ───────────────────────────────── */}
