@@ -204,6 +204,22 @@ export interface CrowdedMarketSummary {
   lastTradedAt: string | null;  // most recent tracked leaderboard fill in this market
 }
 
+// One row of the "Fresh Entries" signal: a market the most leaderboard wallets *just opened a new
+// position* in (flow), the counterpart to CrowdedMarketSummary's holdings (stock). Served from
+// fresh_entries_cache, precomputed by the ~10-min feed run.
+export interface FreshEntrySummary {
+  conditionId: string;
+  market: string | null;        // question text
+  entrantCount: number;         // distinct leaderboard wallets newly entering in-window (headline)
+  skillWeight: number;          // sum of entrants' skill scores (sort tiebreak)
+  topSkill: number | null;      // best single entrant skill score
+  yesEntrants: number;          // entrants who entered on YES (outcome 0)
+  noEntrants: number;           // entrants who entered on NO (outcome 1)
+  committedUsd: number;         // total in-window buy USDC from the new entrants
+  topRank: number | null;       // best (lowest-number) leaderboard rank among entrants
+  lastEntryAt: string | null;   // most recent new-entry fill
+}
+
 // One tracked fill in a participant's per-market ledger.
 export interface CrowdFill {
   outcomeIndex: number | null;
@@ -523,6 +539,41 @@ export interface Database {
           top_rank?: number | null;
           cur_price?: number | null;
           last_traded_at?: string | null;
+          cached_at?: string;
+        };
+        Update: {
+          rank?: number;
+          cached_at?: string;
+        };
+        Relationships: [];
+      };
+      fresh_entries_cache: {
+        Row: {
+          condition_id: string;
+          rank: number;
+          market: string | null;
+          entrant_count: number;
+          skill_weight: number;
+          top_skill: number | null;
+          yes_entrants: number;
+          no_entrants: number;
+          committed_usd: number;
+          top_rank: number | null;
+          last_entry_at: string | null;
+          cached_at: string;
+        };
+        Insert: {
+          condition_id: string;
+          rank: number;
+          market?: string | null;
+          entrant_count: number;
+          skill_weight: number;
+          top_skill?: number | null;
+          yes_entrants: number;
+          no_entrants: number;
+          committed_usd: number;
+          top_rank?: number | null;
+          last_entry_at?: string | null;
           cached_at?: string;
         };
         Update: {
