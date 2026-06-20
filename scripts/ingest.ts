@@ -1796,18 +1796,27 @@ async function scoreCandidateBatch(
   // scored (null) first, then least-recently scored; the cooldown filter mirrors
   // selectCandidateBatch so the DB hands back only eligible rows, already in priority order.
   const cooldownCutoffIso = new Date(Date.now() - rescoringIntervalMs).toISOString();
-  const { data: candidateRows, error: loadError } = await supabase
-    .from("candidate_wallets")
-    .select("address, discovery_source, status, first_seen_at, last_scored_at, skill_score, times_scored, consecutive_below_threshold, promoted_at, retired_at")
-    .eq("status", "candidate")
-    .or(`last_scored_at.is.null,last_scored_at.lte.${cooldownCutoffIso}`)
-    .order("last_scored_at", { ascending: true, nullsFirst: true })
-    .limit(CONFIG.CANDIDATE_BATCH_PER_RUN);
-  if (loadError) {
-    throw loadError;
+  // PostgREST caps a single response at 1000 rows regardless of .limit(), so page with .range()
+  // to actually honor a CANDIDATE_BATCH_PER_RUN above 1000 (the one-off backlog-drain run). The
+  // .order() still puts never-scored first, so each page is the next-highest-priority slice.
+  const loadCandidatePage = (from: number) =>
+    supabase
+      .from("candidate_wallets")
+      .select("address, discovery_source, status, first_seen_at, last_scored_at, skill_score, times_scored, consecutive_below_threshold, promoted_at, retired_at")
+      .eq("status", "candidate")
+      .or(`last_scored_at.is.null,last_scored_at.lte.${cooldownCutoffIso}`)
+      .order("last_scored_at", { ascending: true, nullsFirst: true })
+      .range(from, from + 999);
+  const candidateRows: NonNullable<Awaited<ReturnType<typeof loadCandidatePage>>["data"]> = [];
+  for (let from = 0; from < CONFIG.CANDIDATE_BATCH_PER_RUN; from += 1000) {
+    const { data, error } = await loadCandidatePage(from);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    candidateRows.push(...data);
+    if (data.length < 1000) break;
   }
 
-  const allCandidates: CandidateWallet[] = (candidateRows ?? []).map((row) => ({
+  const allCandidates: CandidateWallet[] = candidateRows.map((row) => ({
     address: row.address,
     discoverySource: row.discovery_source,
     status: row.status as CandidateStatus,
