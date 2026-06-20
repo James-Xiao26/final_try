@@ -48,6 +48,22 @@ test("windowedCurve does not prepend when the first point is at/before the windo
   assert.deepEqual(out, points);
 });
 
+test("windowedCurve drops future-dated points so they can't become the right edge", () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - MS_PER_DAY).toISOString().slice(0, 10);
+  const future = new Date(Date.now() + 30 * MS_PER_DAY).toISOString().slice(0, 10);
+  const points: EquityPoint[] = [
+    { ts: yesterday, cumulativePnl: 300 },
+    { ts: today, cumulativePnl: 100 },
+    { ts: future, cumulativePnl: 999999 } // ghost point from a future market close date
+  ];
+  const { points: out, endMs } = windowedCurve(points, 30);
+  // Right edge is today, not the future ghost.
+  assert.equal(endMs, Date.parse(today));
+  assert.ok(out.every((p) => p.ts <= today));
+  assert.equal(out[out.length - 1]?.cumulativePnl, 100);
+});
+
 test("windowedCurve endMs equals the last point's parsed ts", () => {
   const points: EquityPoint[] = [
     { ts: "2026-06-01", cumulativePnl: 10 },

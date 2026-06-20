@@ -29,6 +29,31 @@ function round(value: number, decimals: number): number {
   return Math.round(value * factor) / factor;
 }
 
+// ponytail: 3-point median filter that drops isolated single-day price outliers. Thinly-traded
+// longshot tokens occasionally print a lone near-zero last-trade for one day; multiplied by a
+// multi-million-share position that lurches the mark-to-market by six figures for that one day and
+// snaps back the next — the visible "sawtooth". A median of each point against its two neighbors
+// removes a one-day spike/dip while leaving any genuine multi-day move intact. Endpoints are kept
+// as-is so the current ("today") mark is never altered. Upgrade path: a volume-weighted daily VWAP
+// from the CLOB if single-print noise still leaks through.
+function medianFilterSeries(series: { ts: string; price: number }[]): { ts: string; price: number }[] {
+  if (series.length < 3) {
+    return series;
+  }
+  return series.map((point, i) => {
+    const prev = series[i - 1];
+    const next = series[i + 1];
+    if (!prev || !next) {
+      return point; // first/last point: no smoothing
+    }
+    const a = prev.price;
+    const b = point.price;
+    const c = next.price;
+    const median = a + b + c - Math.min(a, b, c) - Math.max(a, b, c);
+    return median === b ? point : { ts: point.ts, price: median };
+  });
+}
+
 function dayList(startUtc: string, endUtc: string): string[] {
   const startMs = Date.parse(startUtc);
   const endMs = Date.parse(endUtc);
@@ -53,6 +78,13 @@ export function buildMarkToMarketCurve(params: DailyCurveParams): EquityPoint[] 
   }
   const windowStartMs = Date.parse(windowStartUtc);
 
+  // Smooth each asset's price series once (shared across positions on the same asset) to strip the
+  // single-day last-trade outliers that otherwise sawtooth the mark-to-market.
+  const smoothedByAsset = new Map<string, { ts: string; price: number }[]>();
+  for (const [asset, series] of pricesByAsset) {
+    smoothedByAsset.set(asset, medianFilterSeries(series));
+  }
+
   // Per-position derived bounds + a forward-fill cursor into its asset's price series.
   const tracked = positions.map((position) => {
     const rawEntry = entryByAsset.get(position.asset);
@@ -63,7 +95,7 @@ export function buildMarkToMarketCurve(params: DailyCurveParams): EquityPoint[] 
       position,
       entryMs: entryMsClamped,
       closeMs,
-      series: pricesByAsset.get(position.asset) ?? [],
+      series: smoothedByAsset.get(position.asset) ?? [],
       cursor: 0,
       price: position.avgCost // forward-filled mark; avgCost until the first cached point ≤ t
     };

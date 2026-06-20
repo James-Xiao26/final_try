@@ -45,11 +45,15 @@ function toMillis(closeTime: string): number {
 function buildDailyCurve(sortedPositions: ClosedPosition[], unrealizedPnlUsd: number): EquityPoint[] {
   const byDate = new Map<string, number>();
   let cumulative = 0;
+  const today = new Date().toISOString().slice(0, "YYYY-MM-DD".length);
 
   sortedPositions.forEach((position) => {
     cumulative += position.realizedPnl;
     const date = new Date(toMillis(position.closeTime)).toISOString().slice(0, "YYYY-MM-DD".length);
-    byDate.set(date, cumulative);
+    // Polymarket sometimes reports a sold position's closeTime as the market's *future* end date
+    // (e.g. a World Cup market settling months out), which would plot a realized point past today
+    // and become a bogus right edge. Clamp any future close into today's total.
+    byDate.set(date > today ? today : date, cumulative);
   });
 
   // Final marked-to-market point. Keyed by today's date, so a position that closed today is
@@ -57,7 +61,6 @@ function buildDailyCurve(sortedPositions: ClosedPosition[], unrealizedPnlUsd: nu
   // when there's nothing to plot (no closed positions and no open exposure), to preserve the empty
   // curve for inactive wallets.
   if (sortedPositions.length > 0 || unrealizedPnlUsd !== 0) {
-    const today = new Date().toISOString().slice(0, "YYYY-MM-DD".length);
     byDate.set(today, cumulative + unrealizedPnlUsd);
   }
 

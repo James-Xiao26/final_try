@@ -140,6 +140,21 @@ test("computeMetrics lets a negative unrealized (open loser) drag the total belo
   assert.equal(m.equityCurve[m.equityCurve.length - 1]?.cumulativePnl, -60);
 });
 
+test("computeMetrics clamps a future close date into today (no future-dated curve point)", () => {
+  const today = new Date().toISOString().slice(0, 10);
+  // A sold position whose closeTime is reported as the market's future end date.
+  const future = new Date(Date.now() + 30 * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND).toISOString();
+  const positions = [
+    position({ realizedPnl: 100, closeTime: recentIso(2) }),
+    position({ realizedPnl: 40, closeTime: future })
+  ];
+  const m = computeMetrics(positions, 90, CONFIG, 0);
+  // No curve point lands beyond today, and the right edge holds the full realized total.
+  assert.ok(m.equityCurve.every((p) => p.ts <= today), "no future-dated curve point");
+  assert.equal(m.equityCurve[m.equityCurve.length - 1]?.ts, today);
+  assert.equal(m.equityCurve[m.equityCurve.length - 1]?.cumulativePnl, 140);
+});
+
 test("computeMetrics with only open exposure emits a single today point", () => {
   const m = computeMetrics([], 30, CONFIG, 40);
   assert.equal(m.nTrades, 0);

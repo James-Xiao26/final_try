@@ -66,6 +66,50 @@ test("buildMarkToMarketCurve endpoint equals realized-in-window + current unreal
   assert.equal(curve[curve.length - 1]?.cumulativePnl, 30); // 20 realized + 10 unrealized
 });
 
+test("buildMarkToMarketCurve smooths a single-day price outlier so the mark doesn't sawtooth", () => {
+  // A thinly-traded longshot held flat at 0.40, with one bogus near-zero last-trade on the 8th.
+  // ×1000 shares that would dip the mark by ~$400 for one day; the median filter removes it.
+  const positions: CurvePosition[] = [{ asset: "A", size: 1000, avgCost: 0.4, realizedPnl: null, closeTs: null }];
+  const curve = buildMarkToMarketCurve({
+    positions,
+    pricesByAsset: new Map([[
+      "A",
+      [
+        { ts: "2026-06-06", price: 0.4 },
+        { ts: "2026-06-07", price: 0.4 },
+        { ts: "2026-06-08", price: 0.0005 }, // lone outlier
+        { ts: "2026-06-09", price: 0.4 },
+        { ts: "2026-06-10", price: 0.4 }
+      ]
+    ]]),
+    entryByAsset: new Map([["A", "2026-06-06"]]),
+    windowStartUtc: WINDOW_START,
+    todayUtc: TODAY
+  });
+  // Without smoothing the 8th would crash to ~ -$400; smoothed it stays flat at $0.
+  assert.deepEqual(pnls(curve), [0, 0, 0, 0, 0]);
+});
+
+test("buildMarkToMarketCurve preserves a genuine multi-day move (not treated as an outlier)", () => {
+  const positions: CurvePosition[] = [{ asset: "A", size: 100, avgCost: 0.4, realizedPnl: null, closeTs: null }];
+  const curve = buildMarkToMarketCurve({
+    positions,
+    pricesByAsset: new Map([[
+      "A",
+      [
+        { ts: "2026-06-06", price: 0.4 },
+        { ts: "2026-06-08", price: 0.9 }, // real step up, held for 2 days
+        { ts: "2026-06-09", price: 0.9 }
+      ]
+    ]]),
+    entryByAsset: new Map([["A", "2026-06-06"]]),
+    windowStartUtc: WINDOW_START,
+    todayUtc: TODAY
+  });
+  // The 0.90 level survives the filter (neighbors agree it's not a one-day blip): +$50 from the 8th on.
+  assert.deepEqual(pnls(curve), [0, 0, 50, 50, 50]);
+});
+
 test("buildMarkToMarketCurve clamps an entry that predates the window to the window start", () => {
   const positions: CurvePosition[] = [{ asset: "A", size: 100, avgCost: 0.4, realizedPnl: null, closeTs: null }];
   const curve = buildMarkToMarketCurve({

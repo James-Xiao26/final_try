@@ -100,7 +100,9 @@ function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: Hori
             <text className="wl-axis" x={padL + 2} y={g.y - 4}>{formatCompactUsd(g.val)}</text>
           </g>
         ))}
-        <line x1={padL} y1={zeroY} x2={W - padR} y2={zeroY} stroke="rgba(255,122,89,0.35)" strokeDasharray="4 4" />
+        {/* Zero-P/L baseline — always drawn (min/max bracket 0) and kept clearly visible above the grid. */}
+        <line x1={padL} y1={zeroY} x2={W - padR} y2={zeroY} stroke="rgba(255,122,89,0.6)" strokeWidth="1.25" />
+        <text className="wl-axis" x={W - padR - 2} y={zeroY - 4} textAnchor="end" style={{ fill: "rgba(255,122,89,0.75)" }}>$0</text>
         {xticks.map((t, i) => (
           <text key={i} className="wl-axis" x={t.x} y={H - 6} textAnchor={t.anchor}>{t.label}</text>
         ))}

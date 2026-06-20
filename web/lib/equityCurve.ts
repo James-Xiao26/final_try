@@ -15,6 +15,14 @@ export interface WindowedCurve {
 // so the render is deterministic across SSR/client (no hydration drift) and the last point lands
 // exactly on the right edge.
 export function windowedCurve(points: EquityPoint[], horizonDays: HorizonDays): WindowedCurve {
+  // Drop future-dated points before anything else. Polymarket can report a position's closeTime as
+  // the market's future end date, which leaks a point dated after today; since the right edge is the
+  // last point, that ghost would otherwise become "today" and slope the line up to a stale value.
+  // Compare on the UTC date string (stored ts are "YYYY-MM-DD") so SSR and client agree.
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const inRange = points.filter((p) => p.ts.slice(0, 10) <= todayUtc);
+  points = inRange.length > 0 ? inRange : points;
+
   const last = points[points.length - 1];
   const first = points[0];
   if (!last || !first) {
