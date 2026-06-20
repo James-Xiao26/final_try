@@ -17,6 +17,7 @@ type EquityCurveRow = Database["public"]["Tables"]["equity_curve"]["Row"];
 type LeaderboardCacheRow = Database["public"]["Tables"]["leaderboard_cache"]["Row"];
 type LeaderboardSelectRow = Pick<LeaderboardCacheRow, "rank" | "address" | "skill_score" | "avg_edge_per_share" | "win_rate" | "n_trades">;
 type WalletHandleRow = Pick<WalletRow, "address" | "handle">;
+type WalletHandleSpecialtyRow = Pick<WalletRow, "address" | "handle" | "specialty">;
 type WalletProfileRow = Pick<WalletRow, "address" | "handle" | "bio" | "is_claimed" | "is_bot_suspected">;
 type CurveSelectRow = Pick<EquityCurveRow, "horizon_days" | "ts" | "cumulative_pnl">;
 type RankSelectRow = Pick<LeaderboardCacheRow, "rank" | "horizon_days">;
@@ -162,10 +163,13 @@ export async function getLeaderboard(horizonDays: number): Promise<LeaderboardRo
   const leaderboardRows = (data ?? []) as unknown as LeaderboardSelectRow[];
   const addresses = leaderboardRows.map((row) => row.address);
   const handles = new Map<string, string | null>();
+  const specialties = new Map<string, string | null>();
   if (addresses.length > 0) {
+    // Specialty rides this existing handle join (no extra round-trip): both are columns on `wallets`,
+    // already scoped to the leaderboard address set.
     const { data: wallets, error: walletError } = await supabase
       .from("wallets")
-      .select("address, handle")
+      .select("address, handle, specialty")
       .in("address", addresses);
 
     if (walletError) {
@@ -176,8 +180,11 @@ export async function getLeaderboard(horizonDays: number): Promise<LeaderboardRo
       throw walletError;
     }
 
-    const walletRows = (wallets ?? []) as unknown as WalletHandleRow[];
-    walletRows.forEach((wallet) => handles.set(wallet.address, wallet.handle));
+    const walletRows = (wallets ?? []) as unknown as WalletHandleSpecialtyRow[];
+    walletRows.forEach((wallet) => {
+      handles.set(wallet.address, wallet.handle);
+      specialties.set(wallet.address, wallet.specialty);
+    });
   }
 
   return leaderboardRows.map((row) => ({
@@ -187,7 +194,8 @@ export async function getLeaderboard(horizonDays: number): Promise<LeaderboardRo
     avgEdgePerShare: toNumber(row.avg_edge_per_share),
     winRate: toNumber(row.win_rate),
     nTrades: row.n_trades ?? 0,
-    handle: handles.get(row.address) ?? null
+    handle: handles.get(row.address) ?? null,
+    specialty: specialties.get(row.address) ?? null
   }));
 }
 

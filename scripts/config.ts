@@ -35,6 +35,11 @@ export const CONFIG = {
   // SCORE_FLOOR=4 band. Changing this (or EDGE_SHRINKAGE_K / SCORE_FLOOR) requires updating the exact
   // score constants in metrics.test.ts.
   EDGE_FOR_TEN: 0.13,
+  // Min resolved bets in a single market category before that category can be a wallet's displayed
+  // "specialty" (see scripts/specialty.ts). The per-category edge is shrunk by EDGE_SHRINKAGE_K like
+  // the Skill Score, so this is a hard sample floor on top of that: a wallet needs a real track
+  // record in a category — not one lucky cluster — before it earns a specialty chip.
+  MIN_SPECIALTY_TRADES: 8,
   BOT: {
     // Calibrated against a working trades/day denominator (see MIN_RATE_WINDOW_DAYS). The old 50
     // was a dead constant: activity is capped at ACTIVITY_LIMIT and the rate used to be divided by

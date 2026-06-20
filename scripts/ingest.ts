@@ -6,6 +6,7 @@ import { CONFIG } from "./config.js";
 import { computeMetrics, type WalletMetrics } from "./metrics.js";
 import { apiStats, discoverTopWallets, discoverCandidateAddresses, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet, type EventSummary } from "./polymarket.js";
 import { recentTradesFromActivity, type RecentTrade } from "./recentTrades.js";
+import { walletSpecialty } from "./specialty.js";
 import { buildMarkToMarketCurve, type CurvePosition } from "./equityCurve.js";
 import { dailyPointsFromHistory, planPriceFetches, type CacheState } from "./priceHistory.js";
 import { earliestEntryDates, latestFillDates, openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
@@ -28,6 +29,7 @@ interface Database {
           bio: string | null;
           links: Record<string, unknown> | null;
           lifetime_pnl: number | null;
+          specialty: string | null;
           first_seen_at: string;
           updated_at: string;
         };
@@ -39,6 +41,7 @@ interface Database {
           bio?: string | null;
           links?: Record<string, unknown> | null;
           lifetime_pnl?: number | null;
+          specialty?: string | null;
         };
         Update: {
           is_bot_suspected?: boolean;
@@ -47,6 +50,7 @@ interface Database {
           bio?: string | null;
           links?: Record<string, unknown> | null;
           lifetime_pnl?: number | null;
+          specialty?: string | null;
         };
         Relationships: [];
       };
@@ -694,13 +698,16 @@ export async function processWallet(
     ...(handle ? { handle } : {}),
     ...(wallet.lifetimePnl !== null ? { lifetime_pnl: wallet.lifetimePnl } : {})
   };
-  const { error: walletError } = await supabase.from("wallets").upsert(walletRow, { onConflict: "address" });
 
-  if (walletError) {
-    throw walletError;
-  }
-
+  // Persist the wallet row once. Bots short-circuit here (no positions fetched, no specialty);
+  // non-bots fall through, compute their specialty from the fetched positions, and persist it in the
+  // same single upsert below — so this is one wallet write per wallet, specialty included for the
+  // wallets that can reach the leaderboard.
   if (bot) {
+    const { error: botWalletError } = await supabase.from("wallets").upsert(walletRow, { onConflict: "address" });
+    if (botWalletError) {
+      throw botWalletError;
+    }
     return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})`, recentTrades: [], openPositions: [], fills: [], closedPositions: [], assets: [], entryDates: new Map() };
   }
 
@@ -717,6 +724,15 @@ export async function processWallet(
   const resolvedPositions = resolvedToClosed(currentPositions);
   const unrealizedPnlUsd = openUnrealizedPnl(currentPositions);
   const positions = [...closedPositions, ...resolvedPositions];
+
+  // The wallet's best market category (or null), computed over all resolved positions — the same
+  // forecasting edge the Skill Score uses, sliced per category. Folded into the single wallet upsert.
+  walletRow.specialty = walletSpecialty(positions, CONFIG);
+  const { error: walletError } = await supabase.from("wallets").upsert(walletRow, { onConflict: "address" });
+  if (walletError) {
+    throw walletError;
+  }
+
   const metrics = CONFIG.HORIZONS.map((horizon) => computeMetrics(positions, horizon, CONFIG, unrealizedPnlUsd));
 
   await Promise.all(metrics.map((metric) => upsertMetrics(supabase, normalized, metric, writeEquityCurve)));

@@ -9,6 +9,8 @@ export interface LeaderboardRow {
   winRate: number;
   nTrades: number;
   handle: string | null;
+  // Market category the wallet is demonstrably best at, or null if it has no standout specialty.
+  specialty: string | null;
 }
 
 export interface WalletMetrics {
@@ -391,6 +393,7 @@ export interface Database {
           bio: string | null;
           links: Record<string, unknown> | null;
           lifetime_pnl: number | null;
+          specialty: string | null;
           first_seen_at: string;
           updated_at: string;
         };
@@ -402,6 +405,7 @@ export interface Database {
           bio?: string | null;
           links?: Record<string, unknown> | null;
           lifetime_pnl?: number | null;
+          specialty?: string | null;
         };
         Update: {
           is_bot_suspected?: boolean;
@@ -410,6 +414,7 @@ export interface Database {
           bio?: string | null;
           links?: Record<string, unknown> | null;
           lifetime_pnl?: number | null;
+          specialty?: string | null;
         };
         Relationships: [];
       };

@@ -219,6 +219,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
                   </div>
                   <div className="cls">
                     {whaleClass(apex.skillScore)}
+                    {apex.specialty ? <span className="lb-spec" title={`Strongest forecasting edge in ${apex.specialty} markets`}>{apex.specialty}</span> : null}
                     <Link href={`/wallet/${apex.address}?horizon=${horizon}`} className="full">View dossier →</Link>
                   </div>
                 </div>
@@ -304,6 +305,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
                         <Link href={`/wallet/${row.address}?horizon=${horizon}`} className="name">
                           {row.handle ? <><span className="at">@</span>{row.handle}</> : shortenAddress(row.address)}
                         </Link>
+                        {row.specialty ? <span className="lb-spec" title={`Strongest forecasting edge in ${row.specialty} markets`}>{row.specialty}</span> : null}
                         <div className="meta">
                           {shortenAddress(row.address)}
                           <button type="button" aria-label={`Copy ${row.address}`} onClick={() => void navigator.clipboard.writeText(row.address)}>
