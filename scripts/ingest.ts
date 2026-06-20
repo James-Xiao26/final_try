@@ -2040,6 +2040,22 @@ async function main(): Promise<void> {
     return;
   }
 
+  // One-off backlog drain: score the discovered candidate_wallets backlog (scoreCandidateBatch)
+  // and nothing else — no 5k main pass, markets, or price-history. For draining a large unscored
+  // backlog in a single run via CANDIDATE_BATCH_PER_RUN (e.g. =15000); the full pass would just
+  // burn API budget re-scoring the board. Promotions land in candidate_wallets; the next full run
+  // picks promoted wallets into the leaderboard. Already-scored candidates stay skipped for
+  // CANDIDATE_RESCORE_DAYS, so re-running is safe and never double-scores.
+  if (process.argv.includes("--candidates-only")) {
+    const recentTradeCutoffMs = Date.now() - CONFIG.RECENT_TRADE_WINDOW_HOURS * 60 * 60 * CONFIG.MS_PER_SECOND;
+    const result = await scoreCandidateBatch(supabase, new PolymarketClient(), recentTradeCutoffMs);
+    console.log(
+      `Candidate-only batch: scored=${result.scored}, promoted=${result.promoted}; ` +
+        `elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`
+    );
+    return;
+  }
+
   // Cadence gate for the FULL pass only (the partial modes above already returned). Heroku Scheduler
   // can't express "every N hours", so we schedule the full ingest hourly and no-op unless the current
   // UTC hour is a multiple of FULL_INGEST_EVERY_HOURS (e.g. 4 → runs at 00/04/08/12/16/20 UTC). The
