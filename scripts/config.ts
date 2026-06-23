@@ -76,7 +76,7 @@ export const CONFIG = {
   GAMMA_API_BASE: process.env.GAMMA_API_BASE ?? "https://gamma-api.polymarket.com",
   // The CLOB API (a third host) is the only Polymarket source for historical price series.
   // We hit /prices-history?market={tokenId}&interval=max&fidelity=1440 to cache each held
-  // token's daily price for the mark-to-market equity curve. Runs on its own "clob" rate lane.
+  // token's daily price for the web price charts (Convergence + Market Analytics). Runs on its own "clob" rate lane.
   CLOB_API_BASE: process.env.CLOB_API_BASE ?? "https://clob.polymarket.com",
   // Daily fidelity (minutes/point) for prices-history; we window/dedupe to one point per UTC day.
   PRICE_HISTORY_FIDELITY_MIN: 1440,

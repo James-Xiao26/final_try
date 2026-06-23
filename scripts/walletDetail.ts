@@ -78,10 +78,10 @@ export function profileFillsFromActivity(
 }
 
 // Earliest fill date (UTC "YYYY-MM-DD") per outcome token, from a wallet's already-fetched
-// /activity. Used as each position's entry date for the mark-to-market equity curve — a position is
-// only marked from the day it was first opened. /activity timestamps are unix seconds; it's capped at
-// ACTIVITY_LIMIT, so a token whose opening fill predates that window is simply absent (the curve
-// builder then clamps its entry to the window start).
+// /activity. Stamps each position's "first buy" date onto the position caches (the Convergence
+// read path falls back to it when the capped fill cache lacks a market's fills). /activity timestamps
+// are unix seconds; it's capped at ACTIVITY_LIMIT, so a token whose opening fill predates that window
+// is simply absent.
 export function earliestEntryDates(activity: TradeActivity[]): Map<string, string> {
   const earliest = new Map<string, number>();
   for (const trade of activity) {

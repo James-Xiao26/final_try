@@ -1,27 +1,29 @@
 import type { EquityPoint } from "./metrics.js";
 
-const MS_PER_DAY = 86_400_000;
-
-// One position as a single block for the mark-to-market curve: its final size + avg cost, held from
-// entry to close (or to now if still open). closeTs null = still open. realizedPnl null = open (no
-// realized contribution yet). Exact for single-entry positions; approximates mid-life adds/partial
-// sells (the per-position-block fidelity choice).
-export interface CurvePosition {
-  asset: string;
-  size: number;
-  avgCost: number;
-  realizedPnl: number | null;
-  closeTs: string | null; // ISO timestamp or null when still open
+// Copy-trade simulation: "what if I started with $100 and staked BET_FRACTION of my running balance
+// on every trade this wallet made, buying the whole number of shares closest to that stake?" One sim
+// per horizon window (the $100 stake resets at each window start). Closed trades step the balance at
+// their close date; still-open positions add a single mark-to-market at today's price.
+export interface CopyTrade {
+  avgPrice: number; // entry price (0..1) — what one share cost
+  size: number; // trader's share count (used to scale their realized result when outcome is unknown)
+  outcome: number | null; // 1 if the market settled YES, 0 if NO, null if we never learned the outcome
+  realizedPnl: number; // trader's actual realized P/L (fallback sizing when outcome is null)
+  closeTime: string; // ISO timestamp the position closed
 }
 
-export interface DailyCurveParams {
-  positions: CurvePosition[];
-  // Cached daily prices per asset, ascending by ts ("YYYY-MM-DD"), as stored in market_price_history.
-  pricesByAsset: Map<string, { ts: string; price: number }[]>;
-  // Earliest fill date per asset ("YYYY-MM-DD"); missing → entry clamped to the window start.
-  entryByAsset: Map<string, string>;
-  windowStartUtc: string; // "YYYY-MM-DD"
-  todayUtc: string; // "YYYY-MM-DD"
+export interface CopyOpen {
+  avgPrice: number;
+  curPrice: number; // current YES price — marks the still-open copied shares to today
+}
+
+export interface CopySimParams {
+  closed: CopyTrade[];
+  open: CopyOpen[];
+  windowStartUtc: string; // "YYYY-MM-DD" — left edge; balance starts at startStake here
+  todayUtc: string; // "YYYY-MM-DD" — right edge; folds in open-position mark-to-market
+  startStake?: number; // default 100
+  betFraction?: number; // default 0.01 (1%)
 }
 
 function round(value: number, decimals: number): number {
@@ -29,110 +31,57 @@ function round(value: number, decimals: number): number {
   return Math.round(value * factor) / factor;
 }
 
-// ponytail: 3-point median filter that drops isolated single-day price outliers. Thinly-traded
-// longshot tokens occasionally print a lone near-zero last-trade for one day; multiplied by a
-// multi-million-share position that lurches the mark-to-market by six figures for that one day and
-// snaps back the next — the visible "sawtooth". A median of each point against its two neighbors
-// removes a one-day spike/dip while leaving any genuine multi-day move intact. Endpoints are kept
-// as-is so the current ("today") mark is never altered. Upgrade path: a volume-weighted daily VWAP
-// from the CLOB if single-print noise still leaks through.
-function medianFilterSeries(series: { ts: string; price: number }[]): { ts: string; price: number }[] {
-  if (series.length < 3) {
-    return series;
-  }
-  return series.map((point, i) => {
-    const prev = series[i - 1];
-    const next = series[i + 1];
-    if (!prev || !next) {
-      return point; // first/last point: no smoothing
-    }
-    const a = prev.price;
-    const b = point.price;
-    const c = next.price;
-    const median = a + b + c - Math.min(a, b, c) - Math.max(a, b, c);
-    return median === b ? point : { ts: point.ts, price: median };
-  });
+// Whole number of shares closest to staking `bet` dollars at `price`/share.
+function sharesFor(bet: number, price: number): number {
+  return price > 0 ? Math.round(bet / price) : 0;
 }
 
-function dayList(startUtc: string, endUtc: string): string[] {
-  const startMs = Date.parse(startUtc);
-  const endMs = Date.parse(endUtc);
-  const days: string[] = [];
-  for (let ms = startMs; ms <= endMs; ms += MS_PER_DAY) {
-    days.push(new Date(ms).toISOString().slice(0, "YYYY-MM-DD".length));
-  }
-  return days;
-}
-
-// Builds the daily mark-to-market curve for one wallet + horizon. For each UTC day in the window:
-//   cumulative_pnl(t) = Σ realizedPnl[closed positions with windowStart < closeTs ≤ t]
-//                     + Σ size·(price_asset(t) − avgCost)  [positions open at day t]
-// price_asset(t) is forward-filled to the latest cached day ≤ t; before a token's first cached point
-// it falls back to avgCost (zero unrealized). At t = today this equals realized_in_window + current
-// unrealized — the displayed Total P/L — so the curve endpoint stays continuous with the old one.
-export function buildMarkToMarketCurve(params: DailyCurveParams): EquityPoint[] {
-  const { positions, pricesByAsset, entryByAsset, windowStartUtc, todayUtc } = params;
-  const days = dayList(windowStartUtc, todayUtc);
-  if (days.length === 0) {
-    return [];
-  }
+export function simulateCopyCurve(params: CopySimParams): EquityPoint[] {
+  const startStake = params.startStake ?? 100;
+  const betFraction = params.betFraction ?? 0.01;
+  const { windowStartUtc, todayUtc } = params;
   const windowStartMs = Date.parse(windowStartUtc);
 
-  // Smooth each asset's price series once (shared across positions on the same asset) to strip the
-  // single-day last-trade outliers that otherwise sawtooth the mark-to-market.
-  const smoothedByAsset = new Map<string, { ts: string; price: number }[]>();
-  for (const [asset, series] of pricesByAsset) {
-    smoothedByAsset.set(asset, medianFilterSeries(series));
+  const inWindow = params.closed
+    .filter((t) => {
+      const ms = Date.parse(t.closeTime);
+      return Number.isFinite(ms) && ms > windowStartMs && t.closeTime.slice(0, 10) <= todayUtc;
+    })
+    .sort((a, b) => Date.parse(a.closeTime) - Date.parse(b.closeTime));
+
+  // One point per UTC day, last-write-wins so multiple same-day closes collapse to the day's balance.
+  const byDate = new Map<string, number>();
+  let balance = startStake;
+  byDate.set(windowStartUtc, balance);
+
+  for (const t of inWindow) {
+    const shares = sharesFor(betFraction * balance, t.avgPrice);
+    if (shares > 0) {
+      const cost = shares * t.avgPrice;
+      // Ride to final resolution when we know it ($1/share win, $0 loss); otherwise scale the trader's
+      // own realized result down to our share count.
+      const profit = t.outcome !== null
+        ? shares * t.outcome - cost
+        : t.size > 0
+          ? shares * (t.realizedPnl / t.size)
+          : 0;
+      balance = Math.max(0, balance + profit); // a binary can't lose more than its cost; clamp bad data
+    }
+    const date = new Date(Date.parse(t.closeTime)).toISOString().slice(0, 10);
+    byDate.set(date, balance);
   }
 
-  // Per-position derived bounds + a forward-fill cursor into its asset's price series.
-  const tracked = positions.map((position) => {
-    const rawEntry = entryByAsset.get(position.asset);
-    const entryMs = rawEntry ? Date.parse(rawEntry) : NaN;
-    const entryMsClamped = Number.isFinite(entryMs) ? Math.max(entryMs, windowStartMs) : windowStartMs;
-    const closeMs = position.closeTs ? Date.parse(position.closeTs) : Number.POSITIVE_INFINITY;
-    return {
-      position,
-      entryMs: entryMsClamped,
-      closeMs,
-      series: smoothedByAsset.get(position.asset) ?? [],
-      cursor: 0,
-      price: position.avgCost // forward-filled mark; avgCost until the first cached point ≤ t
-    };
-  });
-
-  let realizedCumulative = 0;
-  let closedIdx = 0;
-  // Closed positions sorted by closeTs so we can fold realized in chronologically as days advance.
-  const closes = positions
-    .filter((p) => p.closeTs !== null && p.realizedPnl !== null && Date.parse(p.closeTs) > windowStartMs)
-    .map((p) => ({ closeMs: Date.parse(p.closeTs as string), realizedPnl: p.realizedPnl as number }))
-    .sort((a, b) => a.closeMs - b.closeMs);
-
-  const out: EquityPoint[] = [];
-  for (const day of days) {
-    const dayMs = Date.parse(day);
-
-    // Fold in any positions that closed on/before this day (realized step).
-    while (closedIdx < closes.length && (closes[closedIdx] as { closeMs: number }).closeMs <= dayMs) {
-      realizedCumulative += (closes[closedIdx] as { realizedPnl: number }).realizedPnl;
-      closedIdx += 1;
-    }
-
-    let unrealized = 0;
-    for (const t of tracked) {
-      // Advance the forward-fill cursor to the latest cached point with ts ≤ day.
-      while (t.cursor < t.series.length && Date.parse((t.series[t.cursor] as { ts: string }).ts) <= dayMs) {
-        t.price = (t.series[t.cursor] as { price: number }).price;
-        t.cursor += 1;
-      }
-      // Marked only while open at this day: entry ≤ day < close.
-      if (t.entryMs <= dayMs && dayMs < t.closeMs) {
-        unrealized += t.position.size * (t.price - t.position.avgCost);
-      }
-    }
-
-    out.push({ ts: day, cumulativePnl: round(realizedCumulative + unrealized, 2) });
+  // Today's mark-to-market on still-open copied positions. ponytail: each open position is sized off
+  // the same final balance rather than replaying its true entry-time balance — an illustrative tail,
+  // not an exact backtest. Upgrade path: thread open-position entry dates and size at each.
+  let unrealized = 0;
+  for (const o of params.open) {
+    const shares = sharesFor(betFraction * balance, o.avgPrice);
+    unrealized += shares * (o.curPrice - o.avgPrice);
   }
-  return out;
+  byDate.set(todayUtc, Math.max(0, balance + unrealized));
+
+  return [...byDate.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([ts, value]) => ({ ts, cumulativePnl: round(value, 2) }));
 }

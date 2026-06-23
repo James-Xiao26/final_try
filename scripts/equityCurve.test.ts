@@ -1,124 +1,83 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildMarkToMarketCurve, type CurvePosition } from "./equityCurve.js";
+import { simulateCopyCurve, type CopyTrade } from "./equityCurve.js";
 
 const WINDOW_START = "2026-06-06";
-const TODAY = "2026-06-10"; // 5 days: 06,07,08,09,10
+const TODAY = "2026-06-10";
 
-function pnls(points: { cumulativePnl: number }[]): number[] {
+function values(points: { cumulativePnl: number }[]): number[] {
   return points.map((p) => p.cumulativePnl);
 }
 
-test("buildMarkToMarketCurve marks an open position daily as its price moves", () => {
-  const positions: CurvePosition[] = [{ asset: "A", size: 100, avgCost: 0.4, realizedPnl: null, closeTs: null }];
-  const curve = buildMarkToMarketCurve({
-    positions,
-    pricesByAsset: new Map([["A", [{ ts: "2026-06-07", price: 0.4 }, { ts: "2026-06-09", price: 0.5 }]]]),
-    entryByAsset: new Map([["A", "2026-06-07"]]),
-    windowStartUtc: WINDOW_START,
-    todayUtc: TODAY
-  });
-  // Not held on the 6th (entry 7th); flat at cost through the 8th; +$10 once price hits 0.50 on the 9th.
-  assert.deepEqual(pnls(curve), [0, 0, 0, 10, 10]);
+test("starts at $100 and stays flat with no trades or open positions", () => {
+  const curve = simulateCopyCurve({ closed: [], open: [], windowStartUtc: WINDOW_START, todayUtc: TODAY });
+  // Baseline at window start + a today point, both at the starting stake.
+  assert.deepEqual(values(curve), [100, 100]);
 });
 
-test("buildMarkToMarketCurve shows a closed-in-window position's swing then its realized step", () => {
-  // Bought 100 @ 0.30, peaks at 0.55 (unrealized +25), sold for realized +20 (i.e. ~0.50) midday on the 9th.
-  const positions: CurvePosition[] = [
-    { asset: "B", size: 100, avgCost: 0.3, realizedPnl: 20, closeTs: "2026-06-09T12:00:00.000Z" }
+test("a winning resolved trade grows the balance; sizing is 1% of running balance", () => {
+  // 1% of $100 = $1; at 0.50/share → round(1/0.5)=2 shares, cost $1, wins $2 → +$1 profit.
+  const closed: CopyTrade[] = [
+    { avgPrice: 0.5, size: 100, outcome: 1, realizedPnl: 999, closeTime: "2026-06-08T00:00:00.000Z" }
   ];
-  const curve = buildMarkToMarketCurve({
-    positions,
-    pricesByAsset: new Map([["B", [{ ts: "2026-06-06", price: 0.3 }, { ts: "2026-06-08", price: 0.55 }]]]),
-    entryByAsset: new Map([["B", "2026-06-06"]]),
-    windowStartUtc: WINDOW_START,
-    todayUtc: TODAY
-  });
-  // 6th/7th flat at cost; +25 unrealized on the 8th, still open (held) at 00:00 on the 9th;
-  // on the 10th it's closed → unrealized drops out, realized +20 folds in.
-  assert.deepEqual(pnls(curve), [0, 0, 25, 25, 20]);
+  const curve = simulateCopyCurve({ closed, open: [], windowStartUtc: WINDOW_START, todayUtc: TODAY });
+  assert.deepEqual(values(curve), [100, 101, 101]); // start, step on the 8th, flat to today
 });
 
-test("buildMarkToMarketCurve falls back to zero unrealized when a token has no cached price", () => {
-  const positions: CurvePosition[] = [{ asset: "C", size: 50, avgCost: 0.2, realizedPnl: null, closeTs: null }];
-  const curve = buildMarkToMarketCurve({
-    positions,
-    pricesByAsset: new Map(),
-    entryByAsset: new Map([["C", "2026-06-06"]]),
-    windowStartUtc: WINDOW_START,
-    todayUtc: TODAY
-  });
-  assert.deepEqual(pnls(curve), [0, 0, 0, 0, 0]);
-});
-
-test("buildMarkToMarketCurve endpoint equals realized-in-window + current unrealized", () => {
-  const positions: CurvePosition[] = [
-    { asset: "A", size: 100, avgCost: 0.4, realizedPnl: null, closeTs: null }, // open, +10 at today
-    { asset: "B", size: 100, avgCost: 0.3, realizedPnl: 20, closeTs: "2026-06-08T00:00:00.000Z" } // realized +20
+test("a losing resolved trade only risks the staked cost", () => {
+  // 1% of $100 = $1; 0.50/share → 2 shares, cost $1, outcome 0 → lose $1.
+  const closed: CopyTrade[] = [
+    { avgPrice: 0.5, size: 100, outcome: 0, realizedPnl: -999, closeTime: "2026-06-08T00:00:00.000Z" }
   ];
-  const curve = buildMarkToMarketCurve({
-    positions,
-    pricesByAsset: new Map([["A", [{ ts: "2026-06-06", price: 0.4 }, { ts: "2026-06-10", price: 0.5 }]]]),
-    entryByAsset: new Map([["A", "2026-06-06"], ["B", "2026-06-06"]]),
-    windowStartUtc: WINDOW_START,
-    todayUtc: TODAY
-  });
-  assert.equal(curve[curve.length - 1]?.cumulativePnl, 30); // 20 realized + 10 unrealized
+  const curve = simulateCopyCurve({ closed, open: [], windowStartUtc: WINDOW_START, todayUtc: TODAY });
+  assert.deepEqual(values(curve), [100, 99, 99]);
 });
 
-test("buildMarkToMarketCurve smooths a single-day price outlier so the mark doesn't sawtooth", () => {
-  // A thinly-traded longshot held flat at 0.40, with one bogus near-zero last-trade on the 8th.
-  // ×1000 shares that would dip the mark by ~$400 for one day; the median filter removes it.
-  const positions: CurvePosition[] = [{ asset: "A", size: 1000, avgCost: 0.4, realizedPnl: null, closeTs: null }];
-  const curve = buildMarkToMarketCurve({
-    positions,
-    pricesByAsset: new Map([[
-      "A",
-      [
-        { ts: "2026-06-06", price: 0.4 },
-        { ts: "2026-06-07", price: 0.4 },
-        { ts: "2026-06-08", price: 0.0005 }, // lone outlier
-        { ts: "2026-06-09", price: 0.4 },
-        { ts: "2026-06-10", price: 0.4 }
-      ]
-    ]]),
-    entryByAsset: new Map([["A", "2026-06-06"]]),
-    windowStartUtc: WINDOW_START,
-    todayUtc: TODAY
-  });
-  // Without smoothing the 8th would crash to ~ -$400; smoothed it stays flat at $0.
-  assert.deepEqual(pnls(curve), [0, 0, 0, 0, 0]);
+test("unknown outcome falls back to the trader's realized result, scaled to our shares", () => {
+  // outcome null. Trader made +$50 on 100 shares → +$0.50/share realized. We buy 2 shares → +$1.
+  const closed: CopyTrade[] = [
+    { avgPrice: 0.5, size: 100, outcome: null, realizedPnl: 50, closeTime: "2026-06-08T00:00:00.000Z" }
+  ];
+  const curve = simulateCopyCurve({ closed, open: [], windowStartUtc: WINDOW_START, todayUtc: TODAY });
+  assert.deepEqual(values(curve), [100, 101, 101]);
 });
 
-test("buildMarkToMarketCurve preserves a genuine multi-day move (not treated as an outlier)", () => {
-  const positions: CurvePosition[] = [{ asset: "A", size: 100, avgCost: 0.4, realizedPnl: null, closeTs: null }];
-  const curve = buildMarkToMarketCurve({
-    positions,
-    pricesByAsset: new Map([[
-      "A",
-      [
-        { ts: "2026-06-06", price: 0.4 },
-        { ts: "2026-06-08", price: 0.9 }, // real step up, held for 2 days
-        { ts: "2026-06-09", price: 0.9 }
-      ]
-    ]]),
-    entryByAsset: new Map([["A", "2026-06-06"]]),
-    windowStartUtc: WINDOW_START,
-    todayUtc: TODAY
-  });
-  // The 0.90 level survives the filter (neighbors agree it's not a one-day blip): +$50 from the 8th on.
-  assert.deepEqual(pnls(curve), [0, 0, 50, 50, 50]);
+test("balance compounds across trades, sizing off the running balance", () => {
+  // Cheap shares so the grown balance buys strictly more on the second trade (compounding visible).
+  // T1: 1% of $100 = $1 → round(1/0.1)=10 shares @0.10, win → +$9 → $109.
+  // T2: 1% of $109 = $1.09 → round(1.09/0.1)=11 shares @0.10, cost $1.10, win → +$9.90 → $118.90.
+  const closed: CopyTrade[] = [
+    { avgPrice: 0.1, size: 100, outcome: 1, realizedPnl: 0, closeTime: "2026-06-07T00:00:00.000Z" },
+    { avgPrice: 0.1, size: 100, outcome: 1, realizedPnl: 0, closeTime: "2026-06-08T00:00:00.000Z" }
+  ];
+  const curve = simulateCopyCurve({ closed, open: [], windowStartUtc: WINDOW_START, todayUtc: TODAY });
+  assert.deepEqual(values(curve), [100, 109, 118.9, 118.9]);
 });
 
-test("buildMarkToMarketCurve clamps an entry that predates the window to the window start", () => {
-  const positions: CurvePosition[] = [{ asset: "A", size: 100, avgCost: 0.4, realizedPnl: null, closeTs: null }];
-  const curve = buildMarkToMarketCurve({
-    positions,
-    pricesByAsset: new Map([["A", [{ ts: "2026-06-06", price: 0.5 }]]]),
-    entryByAsset: new Map([["A", "2026-01-01"]]), // long before the window
+test("open position adds a today mark-to-market at its current price", () => {
+  // No closed trades; one open position bought at 0.40, now 0.50. 1% of $100 = $1 → round(1/0.4)=3 shares,
+  // unrealized = 3 × (0.50 − 0.40) = +$0.30.
+  const curve = simulateCopyCurve({
+    closed: [],
+    open: [{ avgPrice: 0.4, curPrice: 0.5 }],
     windowStartUtc: WINDOW_START,
     todayUtc: TODAY
   });
-  // Held from the very first window day at price 0.50 → +$10 throughout.
-  assert.deepEqual(pnls(curve), [10, 10, 10, 10, 10]);
+  assert.deepEqual(values(curve), [100, 100.3]);
+});
+
+test("trades outside the window are ignored", () => {
+  const closed: CopyTrade[] = [
+    { avgPrice: 0.5, size: 100, outcome: 1, realizedPnl: 0, closeTime: "2026-05-01T00:00:00.000Z" } // before window
+  ];
+  const curve = simulateCopyCurve({ closed, open: [], windowStartUtc: WINDOW_START, todayUtc: TODAY });
+  assert.deepEqual(values(curve), [100, 100]);
+});
+
+test("balance is clamped at zero on absurd loss data", () => {
+  const closed: CopyTrade[] = [
+    { avgPrice: 0.5, size: 1, outcome: null, realizedPnl: -1e9, closeTime: "2026-06-08T00:00:00.000Z" }
+  ];
+  const curve = simulateCopyCurve({ closed, open: [], windowStartUtc: WINDOW_START, todayUtc: TODAY });
+  assert.ok(curve.every((p) => p.cumulativePnl >= 0));
 });

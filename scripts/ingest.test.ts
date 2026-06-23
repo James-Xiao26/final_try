@@ -498,7 +498,7 @@ test("rescoreTopWallets dedupes across horizons and processes each wallet once, 
   assert.equal(lbInserts.length, CONFIG.HORIZONS.length);
 
   // Scores are refreshed (wallet_stats upserts) but the equity curve is NOT — the daily full ingest
-  // owns the mark-to-market series, so the rescore must not overwrite it with the sparse realized one.
+  // owns the copy-trade series, so the rescore must not overwrite it with the sparse realized one.
   assert.ok(log.some((o) => o.table === "wallet_stats" && o.op === "upsert"));
   assert.equal(log.filter((o) => o.table === "equity_curve").length, 0);
 });

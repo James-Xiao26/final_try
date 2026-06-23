@@ -42,12 +42,16 @@ function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: Hori
   const padT = 18;
   const padB = 24;
 
-  // Anchor to a fixed [today - horizon, today] window and prepend a $0 baseline at the window start,
-  // so x reflects real elapsed time and the line begins at $0 on the left edge.
+  // Anchor to a fixed [today - horizon, today] window so x reflects real elapsed time. The copy-trade
+  // curve already carries its own window-start baseline (the $100 stake), so no $0 prepend happens.
   const { points: pts, startMs, endMs } = windowedCurve(points, horizon);
   const values = pts.map((p) => p.cumulativePnl);
-  const min = Math.min(...values, 0);
-  const max = Math.max(...values, 0);
+  // The curve is a $100-stake copy-trade balance (cumulativePnl now stores a dollar balance, not a
+  // P/L delta). The first point is the window-start baseline = the starting stake; anchor the chart's
+  // reference line and value range to it so the line begins at "$100" on the left edge.
+  const baseline = pts[0]?.cumulativePnl ?? 100;
+  const min = Math.min(...values, baseline);
+  const max = Math.max(...values, baseline);
   const span = max - min || 1;
   const tspan = endMs - startMs || 1;
   const nx = (tsMs: number): number => {
@@ -55,12 +59,12 @@ function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: Hori
     return Math.min(W - padR, Math.max(padL, x)); // clamp for boundary rounding
   };
   const ny = (v: number): number => padT + (1 - (v - min) / span) * (H - padT - padB);
-  const zeroY = ny(0);
+  const baseY = ny(baseline);
   const xs = pts.map((p) => nx(Date.parse(p.ts)));
   const lastIdx = pts.length - 1;
 
-  // Stepped interior (realized P/L holds flat between closes, then jumps on a close date) with a
-  // diagonal final leg to the "today" point (which folds in continuously-moving unrealized P/L).
+  // Stepped interior (balance holds flat between trades, then jumps on a trade's close date) with a
+  // diagonal final leg to the "today" point (which folds in open positions' mark-to-market).
   let line = `M${xs[0]?.toFixed(1)} ${ny(pts[0]?.cumulativePnl ?? 0).toFixed(1)}`;
   for (let i = 1; i < pts.length; i++) {
     const x = (xs[i] ?? 0).toFixed(1);
@@ -100,9 +104,9 @@ function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: Hori
             <text className="wl-axis" x={padL + 2} y={g.y - 4}>{formatCompactUsd(g.val)}</text>
           </g>
         ))}
-        {/* Zero-P/L baseline — always drawn (min/max bracket 0) and kept clearly visible above the grid. */}
-        <line x1={padL} y1={zeroY} x2={W - padR} y2={zeroY} stroke="rgba(255,122,89,0.6)" strokeWidth="1.25" />
-        <text className="wl-axis" x={W - padR - 2} y={zeroY - 4} textAnchor="end" style={{ fill: "rgba(255,122,89,0.75)" }}>$0</text>
+        {/* Starting-stake baseline — always drawn (min/max bracket it) and kept clearly visible above the grid. */}
+        <line x1={padL} y1={baseY} x2={W - padR} y2={baseY} stroke="rgba(255,122,89,0.6)" strokeWidth="1.25" />
+        <text className="wl-axis" x={W - padR - 2} y={baseY - 4} textAnchor="end" style={{ fill: "rgba(255,122,89,0.75)" }}>{formatCompactUsd(baseline)}</text>
         {xticks.map((t, i) => (
           <text key={i} className="wl-axis" x={t.x} y={H - 6} textAnchor={t.anchor}>{t.label}</text>
         ))}
@@ -129,7 +133,8 @@ function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: Hori
 export default function WalletTelemetry({ metrics, equityCurves, initialHorizon }: WalletTelemetryProps) {
   const [horizon, setHorizon] = useState<HorizonDays>(initialHorizon);
   const points = equityCurves[horizon] ?? [];
-  const netCatch = points[points.length - 1]?.cumulativePnl ?? 0;
+  // Final balance of the $100-stake copy-trade simulation (empty curve → untouched $100 stake).
+  const finalBalance = points[points.length - 1]?.cumulativePnl ?? 100;
 
   return (
     <>
@@ -172,12 +177,12 @@ export default function WalletTelemetry({ metrics, equityCurves, initialHorizon 
         <div className="dive-head">
           <h2>Dive <span className="g">Profile</span></h2>
           <div className="now">
-            <div className="k">Net Catch · {horizon}D</div>
-            <div className="v" style={{ color: netCatch >= 0 ? "var(--green)" : "var(--red)" }}>{netCatch >= 0 ? "+" : ""}{formatUsd(netCatch)}</div>
+            <div className="k">Balance · {horizon}D</div>
+            <div className="v" style={{ color: finalBalance >= 100 ? "var(--green)" : "var(--red)" }}>{formatUsd(finalBalance)}</div>
           </div>
         </div>
         <DiveProfile points={points} horizon={horizon} />
-        <div className="dive-foot"><span>Depth = mark-to-market P/L</span><span>{horizon}-day trace</span></div>
+        <div className="dive-foot"><span>$100 start · 1% per trade</span><span>{horizon}-day trace</span></div>
       </section>
     </>
   );
