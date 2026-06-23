@@ -81,3 +81,18 @@ test("balance is clamped at zero on absurd loss data", () => {
   const curve = simulateCopyCurve({ closed, open: [], windowStartUtc: WINDOW_START, todayUtc: TODAY });
   assert.ok(curve.every((p) => p.cumulativePnl >= 0));
 });
+
+test("balance stays under the NUMERIC(14,2) ceiling on explosive longshot compounding", () => {
+  // Sub-penny winners: each $stake buys ~200x in shares and pays ~200x — compounds past $1T without a cap.
+  const closed: CopyTrade[] = Array.from({ length: 30 }, (_, i) => ({
+    avgPrice: 0.005,
+    size: 1000,
+    outcome: 1,
+    realizedPnl: 0,
+    closeTime: `2026-06-${String(7 + (i % 3)).padStart(2, "0")}T0${i % 9}:00:00.000Z`
+  }));
+  const curve = simulateCopyCurve({ closed, open: [], windowStartUtc: WINDOW_START, todayUtc: TODAY });
+  // Must fit numeric(14,2): |value| < 10^12. The cap (1e11) keeps it safely under.
+  assert.ok(curve.every((p) => p.cumulativePnl < 1e12), "every point fits the column");
+  assert.equal(curve[curve.length - 1]?.cumulativePnl, 1e11, "pegs at the ceiling, not beyond");
+});

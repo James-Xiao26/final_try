@@ -26,6 +26,17 @@ export interface CopySimParams {
   betFraction?: number; // default 0.01 (1%)
 }
 
+// equity_curve.cumulative_pnl is NUMERIC(14,2) — its absolute value must stay below 10^12. Compounding
+// 1% stakes on sub-penny longshot winners can otherwise blow a $100 stake past a trillion and overflow
+// the insert (it crashed a full ingest). ponytail: clamp the balance to a column-safe ceiling; the DB
+// column is the hard limit and a wallet pinned here already reads as "off the charts". Upgrade path:
+// a log-scale chart y-axis so explosive curves stay readable instead of being clipped.
+const MAX_BALANCE = 1e11;
+
+function clampBalance(value: number): number {
+  return Math.min(MAX_BALANCE, Math.max(0, value));
+}
+
 function round(value: number, decimals: number): number {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
@@ -65,7 +76,7 @@ export function simulateCopyCurve(params: CopySimParams): EquityPoint[] {
         : t.size > 0
           ? shares * (t.realizedPnl / t.size)
           : 0;
-      balance = Math.max(0, balance + profit); // a binary can't lose more than its cost; clamp bad data
+      balance = clampBalance(balance + profit); // floor at 0, ceiling at the column limit
     }
     const date = new Date(Date.parse(t.closeTime)).toISOString().slice(0, 10);
     byDate.set(date, balance);
@@ -79,7 +90,7 @@ export function simulateCopyCurve(params: CopySimParams): EquityPoint[] {
     const shares = sharesFor(betFraction * balance, o.avgPrice);
     unrealized += shares * (o.curPrice - o.avgPrice);
   }
-  byDate.set(todayUtc, Math.max(0, balance + unrealized));
+  byDate.set(todayUtc, clampBalance(balance + unrealized));
 
   return [...byDate.entries()]
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
