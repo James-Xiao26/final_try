@@ -627,13 +627,7 @@ function requiredEnv(name: string): string {
 async function upsertMetrics(
   supabase: SupabaseClient,
   address: string,
-  metrics: WalletMetrics,
-  // The realized-PnL equity curve computeMetrics produces is sparse (a point per close-day + today).
-  // The full ingest later overwrites board wallets' curves with the copy-trade simulation curve
-  // (writeDailyEquityCurves). The hourly rescore touches only scores, so it skips this write: upserting
-  // the sparse realized points over an existing copy-trade curve would leave a sawtooth until the next
-  // full ingest. Defaults true so every other caller (full ingest, candidate batch) is unchanged.
-  writeEquityCurve = true
+  metrics: WalletMetrics
 ): Promise<void> {
   const { error: statsError } = await supabase.from("wallet_stats").upsert({
     address,
@@ -655,31 +649,13 @@ async function upsertMetrics(
     throw statsError;
   }
 
-  if (writeEquityCurve && metrics.equityCurve.length > 0) {
-    const { error: curveError } = await supabase.from("equity_curve").upsert(
-      metrics.equityCurve.map((point) => ({
-        address,
-        horizon_days: metrics.horizonDays,
-        ts: point.ts,
-        cumulative_pnl: point.cumulativePnl
-      })),
-      { onConflict: "address,horizon_days,ts" }
-    );
-
-    if (curveError) {
-      throw curveError;
-    }
-  }
 }
 
 export async function processWallet(
   supabase: SupabaseClient,
   client: PolymarketClient,
   wallet: DiscoveredWallet,
-  recentTradeCutoffMs: number,
-  // When false, skips the realized equity-curve write (the hourly rescore owns only scores; the full
-  // ingest owns the copy-trade curve — see upsertMetrics). Defaults true for all other callers.
-  writeEquityCurve = true
+  recentTradeCutoffMs: number
 ): Promise<ProcessResult> {
   const normalized = wallet.address.toLowerCase();
   const activity = await client.getActivity(normalized);
@@ -732,7 +708,7 @@ export async function processWallet(
 
   const metrics = CONFIG.HORIZONS.map((horizon) => computeMetrics(positions, horizon, CONFIG, unrealizedPnlUsd));
 
-  await Promise.all(metrics.map((metric) => upsertMetrics(supabase, normalized, metric, writeEquityCurve)));
+  await Promise.all(metrics.map((metric) => upsertMetrics(supabase, normalized, metric)));
 
   // Only persist recent fills for wallets that can actually reach the leaderboard (some horizon has a
   // skill score). The feed's read path further restricts to wallets currently in leaderboard_cache.
@@ -1519,7 +1495,8 @@ async function cacheMarketPriceHistory(
 // $100 and staked 1% of my running balance to copy every trade this wallet made, what would my
 // balance be?" (simulateCopyCurve) — closed trades ride to resolution, open positions add a today
 // mark-to-market at their current price. Note: cumulative_pnl now stores a dollar BALANCE (starts at
-// $100), not a P/L delta. Non-board wallets keep their realized curve (nothing links to them).
+// $100), not a P/L delta. This is the ONLY writer of equity_curve, and only for board wallets —
+// non-board wallets get no curve (nothing links to them), which keeps equity_curve ~board-sized.
 async function writeDailyEquityCurves(
   supabase: SupabaseClient,
   boardAddresses: Set<string>,
@@ -1769,14 +1746,13 @@ export async function rescoreTopWallets(
         continue;
       }
       try {
-        // writeEquityCurve=false: the rescore refreshes only scores; the equity_curve copy-trade
-        // series is owned by the daily full ingest (see upsertMetrics).
+        // The rescore refreshes only scores; equity_curve is owned by the daily full ingest's
+        // writeDailyEquityCurves (board wallets only). processWallet no longer writes any curve.
         const result = await processWallet(
           supabase,
           client,
           { address, userName: null, lifetimePnl: null },
-          recentTradeCutoffMs,
-          false
+          recentTradeCutoffMs
         );
         scored += 1;
         bots += result.bot ? 1 : 0;
