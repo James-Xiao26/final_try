@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import HorizonToggle from "@/components/HorizonToggle";
 import { windowedCurve } from "@/lib/equityCurve";
-import { formatCompactPercent, formatCompactUsd, formatEdge, formatNumber, formatPercent } from "@/lib/format";
+import { formatCompactPercent, formatCompactUsd, formatEdge, formatNumber, formatPercent, formatUsd } from "@/lib/format";
 import { HORIZONS } from "@/lib/types";
 import type { EquityPoint, HorizonDays, WalletMetrics } from "@/lib/types";
 
@@ -24,9 +24,11 @@ function tickLabel(ms: number): string {
 
 function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: HorizonDays }) {
   const [drawn, setDrawn] = useState(false);
+  const [hover, setHover] = useState<number | null>(null);
 
   useEffect(() => {
     setDrawn(false);
+    setHover(null);
     const id = requestAnimationFrame(() => requestAnimationFrame(() => setDrawn(true)));
     return () => cancelAnimationFrame(id);
   }, [horizon, points]);
@@ -96,8 +98,38 @@ function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: Hori
     return { x: nx(ms), label: tickLabel(ms), anchor };
   });
 
+  // Map the pointer (anywhere over the chart) to the nearest data point by x. The SVG stretches with
+  // preserveAspectRatio="none", so work in viewBox units off the container's pixel width.
+  const onMove = (e: MouseEvent<HTMLDivElement>): void => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (rect.width === 0) return;
+    const viewX = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) * W;
+    let best = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < xs.length; i++) {
+      const d = Math.abs((xs[i] ?? 0) - viewX);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    }
+    setHover(best);
+  };
+
+  const hx = hover !== null ? xs[hover] ?? 0 : 0;
+  const hy = hover !== null ? ys[hover] ?? 0 : 0;
+  const hoverPoint = hover !== null ? pts[hover] : undefined;
+  const hoverPct = hover !== null ? pcts[hover] ?? 0 : 0;
+  // Keep the tooltip box inside the chart horizontally (it's centered on the point otherwise).
+  const tipLeft = Math.min(88, Math.max(12, (hx / W) * 100));
+
   return (
-    <div className="wl-chartbox">
+    <div
+      className="wl-chartbox"
+      style={{ position: "relative" }}
+      onMouseMove={onMove}
+      onMouseLeave={() => setHover(null)}
+    >
       <svg viewBox="0 0 920 300" preserveAspectRatio="none" aria-hidden>
         <defs>
           <linearGradient id="wlDive" x1="0" y1="0" x2="0" y2="1">
@@ -136,7 +168,39 @@ function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: Hori
           <animate attributeName="r" from="5" to="16" dur="2.2s" repeatCount="indefinite" />
           <animate attributeName="opacity" from="0.6" to="0" dur="2.2s" repeatCount="indefinite" />
         </circle>
+        {hover !== null && (
+          <>
+            <line x1={hx} y1={padT} x2={hx} y2={H - padB} stroke="rgba(54,236,208,0.45)" strokeWidth="1" strokeDasharray="4 4" />
+            <circle cx={hx} cy={hy} r="4.5" fill="#0b1a20" stroke="#36ecd0" strokeWidth="2" />
+          </>
+        )}
       </svg>
+      {hoverPoint && (
+        <div
+          style={{
+            position: "absolute",
+            left: `${tipLeft}%`,
+            top: `${(hy / H) * 100}%`,
+            transform: "translate(-50%, calc(-100% - 12px))",
+            pointerEvents: "none",
+            background: "rgba(6,20,28,0.96)",
+            border: "1px solid rgba(54,236,208,0.4)",
+            borderRadius: 6,
+            padding: "5px 9px",
+            fontSize: 11.5,
+            lineHeight: 1.4,
+            whiteSpace: "nowrap",
+            color: "#cfeee9",
+            zIndex: 5
+          }}
+        >
+          <div style={{ opacity: 0.65 }}>{tickLabel(Date.parse(hoverPoint.ts))}</div>
+          <div style={{ fontWeight: 600 }}>
+            {formatUsd(hoverPoint.cumulativePnl)}{" "}
+            <span style={{ color: hoverPct >= 0 ? "var(--green)" : "var(--red)" }}>{formatCompactPercent(hoverPct)}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
