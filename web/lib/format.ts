@@ -8,6 +8,16 @@ export function formatPercent(value: number, signed = false): string {
   return `${prefix}${percent.toFixed(1)}%`;
 }
 
+// Signed percent, compact for large magnitudes (e.g. "+50%", "+1.2K%", "-20%"). Used by the wallet
+// equity curve, where a copy-trade return can run from -100% to billions of percent.
+export function formatCompactPercent(value: number): string {
+  const abs = Math.abs(value);
+  const core = abs >= 1000
+    ? new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value)
+    : value.toFixed(abs < 10 ? 1 : 0);
+  return `${value > 0 ? "+" : ""}${core}%`;
+}
+
 // Per-position mean forecasting edge, shown in cents per share (e.g. "+4.2¢"). The value is in
 // dollars/share, so ×100 gives cents.
 export function formatEdge(value: number): string {
