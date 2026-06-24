@@ -198,28 +198,28 @@ test("computeSkillScore is null when a single win dominates PnL", () => {
 });
 
 // --- computeSkillScore: Bayesian-shrunk edge (0, then 4–10) -----------------
-// Constants below assume EDGE_SHRINKAGE_K = 20, EDGE_FOR_TEN = 0.13, SCORE_FLOOR = 4,
+// Constants below assume EDGE_SHRINKAGE_K = 50, EDGE_FOR_TEN = 0.13, SCORE_FLOOR = 4,
 // SCORE_MAX = 10. Any positive shrunk edge floors at 4: score = 4 + 6*shrunk/0.13.
 
 test("computeSkillScore maps a positive shrunk edge into the 4–10 band", () => {
-  // avgEdgePerShare 0.05 over 60 resolved: shrunk = 0.05*60/(60+20) = 0.0375;
-  // score = 4 + 6 * 0.0375 / 0.13 ≈ 5.73.
+  // avgEdgePerShare 0.05 over 60 resolved: shrunk = 0.05*60/(60+50) = 0.027273;
+  // score = 4 + 6 * 0.027273 / 0.13 ≈ 5.26.
   const score = computeSkillScore(metrics({ avgEdgePerShare: 0.05, nResolved: 60 }), CONFIG);
-  approx(score, 5.73);
+  approx(score, 5.26);
 });
 
 test("computeSkillScore shrinks a thin resolved sample toward the floor", () => {
   // Same edge, fewer resolved bets => lower score (toward SCORE_FLOOR, not 0). n=20:
-  // shrunk = 0.05*20/40 = 0.025; score = 4 + 6 * 0.025 / 0.13 ≈ 5.15.
+  // shrunk = 0.05*20/(20+50) = 0.014286; score = 4 + 6 * 0.014286 / 0.13 ≈ 4.66.
   const thin = computeSkillScore(metrics({ avgEdgePerShare: 0.05, nResolved: 20 }), CONFIG);
   const full = computeSkillScore(metrics({ avgEdgePerShare: 0.05, nResolved: 60 }), CONFIG);
-  approx(thin, 5.15);
+  approx(thin, 4.66);
   assert.ok(thin !== null && full !== null && thin < full);
 });
 
 test("computeSkillScore floors any positive shrunk edge at SCORE_FLOOR", () => {
   // A hair of positive edge jumps to SCORE_FLOOR (hard discontinuity at edge = 0).
-  // shrunk = 0.0001*20/40 = 0.00005; score = 4 + 6 * 0.00005 / 0.13 ≈ 4.00.
+  // shrunk = 0.0001*20/(20+50) ≈ 0.0000286; score = 4 + 6 * 0.0000286 / 0.13 ≈ 4.00.
   approx(computeSkillScore(metrics({ avgEdgePerShare: 0.0001, nResolved: 20 }), CONFIG), CONFIG.SCORE_FLOOR);
 });
 
@@ -228,7 +228,7 @@ test("computeSkillScore floors negative edge to 0", () => {
 });
 
 test("computeSkillScore clamps at SCORE_MAX", () => {
-  // avgEdgePerShare 0.2 over 200: shrunk = 0.2*200/220 = 0.1818; raw score >10 -> clamped to 10.
+  // avgEdgePerShare 0.2 over 200: shrunk = 0.2*200/(200+50) = 0.16; raw score >10 -> clamped to 10.
   assert.equal(computeSkillScore(metrics({ avgEdgePerShare: 0.2, nResolved: 200 }), CONFIG), CONFIG.SCORE_MAX);
 });
 

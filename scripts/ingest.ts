@@ -9,7 +9,7 @@ import { recentTradesFromActivity, type RecentTrade } from "./recentTrades.js";
 import { walletSpecialty } from "./specialty.js";
 import { simulateCopyCurve } from "./equityCurve.js";
 import { dailyPointsFromHistory, planPriceFetches, type CacheState } from "./priceHistory.js";
-import { earliestEntryDates, latestFillDates, openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
+import { earliestEntryDates, earliestTradeMs, latestFillDates, openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
 import { bestSkillScore, computeScoringOutcome, selectCandidateBatch, type CandidateWallet, type CandidateStatus } from "./candidateDiscovery.js";
 import { summarizeCrowdedMarkets, type CrowdClosedPosition, type CrowdOpenPosition } from "./marketCrowd.js";
 import { newEntriesFromActivity, summarizeFreshEntries, type NewEntry } from "./freshEntries.js";
@@ -706,7 +706,18 @@ export async function processWallet(
     throw walletError;
   }
 
-  const metrics = CONFIG.HORIZONS.map((horizon) => computeMetrics(positions, horizon, CONFIG, unrealizedPnlUsd));
+  // Recency gate: null every horizon's skill score for a wallet whose trading history spans less than
+  // MIN_ACCOUNT_AGE_DAYS, so a brand-new account can't rank on a few days of bets. Done here (not in
+  // computeSkillScore) because the age signal comes from /activity, which the pure metric functions
+  // don't receive; a null skill score keeps the wallet out of leaderboard_cache (see rebuildLeaderboardCache).
+  const firstTradeMs = earliestTradeMs(activity);
+  const tooNew =
+    firstTradeMs !== null &&
+    Date.now() - firstTradeMs < CONFIG.MIN_ACCOUNT_AGE_DAYS * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
+  const metrics = CONFIG.HORIZONS.map((horizon) => {
+    const metric = computeMetrics(positions, horizon, CONFIG, unrealizedPnlUsd);
+    return tooNew ? { ...metric, skillScore: null } : metric;
+  });
 
   await Promise.all(metrics.map((metric) => upsertMetrics(supabase, normalized, metric)));
 

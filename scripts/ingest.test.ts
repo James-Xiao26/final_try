@@ -366,8 +366,15 @@ test("processWallet short-circuits on a detected bot without fetching positions"
   assert.equal(row.is_bot_suspected, true);
 });
 
+const DAYS_30_AGO_SEC = Math.floor((Date.now() - 30 * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND) / 1000);
+
 test("processWallet scores an eligible wallet and upserts stats for every horizon", async () => {
-  const acts = [activity({ conditionId: "m1", asset: "a1" }), activity({ conditionId: "m2", asset: "a2" })];
+  // An old fill (30d ago) clears the recency gate; a fresh fill (now, default ts) feeds recentTrades.
+  const acts = [
+    activity({ conditionId: "m0", asset: "a0", timestamp: DAYS_30_AGO_SEC }),
+    activity({ conditionId: "m1", asset: "a1" }),
+    activity({ conditionId: "m2", asset: "a2" })
+  ];
   // 25 winning resolved positions (entry 0.5, outcome 1) clear MIN_TRADES/volume/edge gates, so the
   // wallet earns a skill score on both horizons -> insufficient=false -> recent trades are kept.
   const closed = Array.from({ length: 25 }, (_, i) => closedPosition({ conditionId: `k${i}`, asset: `t${i}` }));
@@ -397,6 +404,25 @@ test("processWallet scores an eligible wallet and upserts stats for every horizo
   const walletUpsert = log.find((o) => o.table === "wallets" && o.op === "upsert");
   assert.ok(walletUpsert);
   assert.equal((walletUpsert.payload as Record<string, unknown>).is_bot_suspected, false);
+});
+
+test("processWallet withholds a skill score from a too-new wallet (recency gate)", async () => {
+  // Same eligible profile (25 winners) but every fill is brand-new (now), so the wallet's history spans
+  // less than MIN_ACCOUNT_AGE_DAYS — it must score null on every horizon and stay off the board.
+  const acts = [activity({ conditionId: "m1", asset: "a1" }), activity({ conditionId: "m2", asset: "a2" })];
+  const closed = Array.from({ length: 25 }, (_, i) => closedPosition({ conditionId: `k${i}`, asset: `t${i}` }));
+  const client = fakeClient({ getActivity: async () => acts, getClosedPositions: async () => closed, getCurrentPositions: async () => [] });
+  const log: RecordedOp[] = [];
+  const supabase = asSupabase(makeSupabase(() => ({ data: null, error: null }), log));
+
+  const result = await processWallet(supabase, client, { address: "0xABC", userName: null, lifetimePnl: null }, Date.now());
+
+  assert.equal(result.insufficient, true); // no horizon earned a score
+  const statsUpserts = log.filter((o) => o.table === "wallet_stats" && o.op === "upsert");
+  assert.equal(statsUpserts.length, CONFIG.HORIZONS.length); // stats still written, just with no score
+  for (const u of statsUpserts) {
+    assert.equal((u.payload as Record<string, unknown>).skill_score, null);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -443,7 +469,8 @@ function rescoreClient(opts: {
       if (opts.failOn?.has(address)) {
         throw new Error(`boom ${address}`);
       }
-      return [activity({ conditionId: "m1", asset: "a1" })];
+      // 30d-old fill so the wallet clears the recency gate (rescored wallets are established board wallets).
+      return [activity({ conditionId: "m1", asset: "a1", timestamp: DAYS_30_AGO_SEC })];
     },
     getClosedPositions: async () => (opts.eligible === false ? [] : closed),
     getCurrentPositions: async () => []

@@ -3,6 +3,11 @@ export const CONFIG = {
   TOP_N: 100,
   MIN_TRADES: 20,
   MIN_VOLUME_USD: 100,
+  // Recency gate: a wallet's trading history (earliest /activity fill) must span at least this many
+  // days before it can be scored — so a brand-new account can't top the board on a few days of (likely
+  // lucky) bets. Applied in processWallet (the age signal needs /activity, which the pure metric
+  // functions don't see); too-new wallets get a null skill score and so never enter leaderboard_cache.
+  MIN_ACCOUNT_AGE_DAYS: 14,
   // Wallets with a known all-time P/L below this are excluded from the leaderboard (captured from
   // /v1/leaderboard `pnl`, timePeriod=ALL). Unknown (null) P/L is NOT excluded — only proven losers.
   MIN_LIFETIME_PNL: 0,
@@ -28,8 +33,10 @@ export const CONFIG = {
   // linearly toward SCORE_MAX. Changing this requires updating the score constants in metrics.test.ts.
   SCORE_FLOOR: 4,
   // Prior strength: everyone starts as if they had this many zero-edge resolved bets. Higher = more
-  // skeptical (slower to reward a short hot streak).
-  EDGE_SHRINKAGE_K: 20,
+  // skeptical (slower to reward a short hot streak). Raised 20 -> 50 so a small sample of high-edge
+  // bets can't pin a perfect score; pairs with MIN_ACCOUNT_AGE_DAYS (which blocks brand-new wallets
+  // outright). Changing this requires updating the exact score constants in metrics.test.ts.
+  EDGE_SHRINKAGE_K: 50,
   // The proven (shrunk) per-share edge that earns a perfect SCORE_MAX. 0.096 = a ~9.6-cents-per-share
   // edge over the market's implied price. Calibrated so a ~5-cent shrunk edge lands near 7 given the
   // SCORE_FLOOR=4 band. Changing this (or EDGE_SHRINKAGE_K / SCORE_FLOOR) requires updating the exact

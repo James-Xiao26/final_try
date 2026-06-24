@@ -82,6 +82,20 @@ export function profileFillsFromActivity(
 // read path falls back to it when the capped fill cache lacks a market's fills). /activity timestamps
 // are unix seconds; it's capped at ACTIVITY_LIMIT, so a token whose opening fill predates that window
 // is simply absent.
+// Earliest trade timestamp (ms) across a wallet's /activity, or null if it has none — an account-age
+// proxy for the recency gate (MIN_ACCOUNT_AGE_DAYS). The first event a wallet ever has is a buy, so the
+// min over all activity is its first trade. Same ACTIVITY_LIMIT-cap caveat as earliestEntryDates, but a
+// wallet with >ACTIVITY_LIMIT fills is far older than any sane gate, so the cap can't fake a "too new".
+export function earliestTradeMs(activity: TradeActivity[]): number | null {
+  let earliest: number | null = null;
+  for (const trade of activity) {
+    if (earliest === null || trade.timestamp < earliest) {
+      earliest = trade.timestamp;
+    }
+  }
+  return earliest === null ? null : earliest * CONFIG.MS_PER_SECOND;
+}
+
 export function earliestEntryDates(activity: TradeActivity[]): Map<string, string> {
   const earliest = new Map<string, number>();
   for (const trade of activity) {

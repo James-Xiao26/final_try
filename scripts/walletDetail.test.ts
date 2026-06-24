@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { earliestEntryDates, latestFillDates, openPositionRecords, profileFillsFromActivity } from "./walletDetail.js";
+import { earliestEntryDates, earliestTradeMs, latestFillDates, openPositionRecords, profileFillsFromActivity } from "./walletDetail.js";
 import type { Position, TradeActivity } from "./polymarket.js";
 
 function activity(partial: Partial<TradeActivity>): TradeActivity {
@@ -41,6 +41,19 @@ function position(partial: Partial<Position>): Position {
 }
 
 const NOW_SEC = 1_700_000_000;
+
+test("earliestTradeMs returns the oldest fill's timestamp in ms", () => {
+  const fills = [
+    activity({ timestamp: NOW_SEC }),
+    activity({ timestamp: NOW_SEC - 86_400 }), // a day earlier — the earliest
+    activity({ timestamp: NOW_SEC + 3_600 })
+  ];
+  assert.equal(earliestTradeMs(fills), (NOW_SEC - 86_400) * 1000);
+});
+
+test("earliestTradeMs is null for an empty activity list", () => {
+  assert.equal(earliestTradeMs([]), null);
+});
 
 test("profileFillsFromActivity returns most-recent fills first", () => {
   const fills = profileFillsFromActivity(
