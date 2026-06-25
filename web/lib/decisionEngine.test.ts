@@ -6,7 +6,6 @@ import {
   computeExpiryFactor,
   computeSignals,
   computeSmartMoneyPrice,
-  type DECategoryWin,
   type DELeaderboardEntry,
   type DEMarket,
   type DEPosition,
@@ -543,83 +542,6 @@ test("buildRecommendations: confidence level maps correctly from signalsFired", 
   assert.ok(rec);
   assert.equal(rec.signalsFired, 6, "All 6 signals should fire");
   assert.equal(rec.confidenceLevel, "very_high");
-});
-
-// ── buildRecommendations: personalization ─────────────────────────────────────
-
-test("buildRecommendations: personalizedBoost is set for matching strong categories", () => {
-  const categoryWins: DECategoryWin[] = [
-    { category: "Weather", wins: 8, total: 10, winRate: 0.80 },
-  ];
-  const inputs = mkInputs({
-    leaderboard: [
-      mkEntry({ address: "0xaaa", skillScore: 8.0, rank: 2 }),
-      mkEntry({ address: "0xbbb", skillScore: 7.0, rank: 5 }),
-      mkEntry({ address: "0xccc", skillScore: 6.5, rank: 9 }),
-    ],
-    positions: [
-      mkPos({ address: "0xaaa", avgPrice: 0.55, curPrice: 0.44 }),
-      mkPos({ address: "0xbbb", avgPrice: 0.54, curPrice: 0.44 }),
-      mkPos({ address: "0xccc", avgPrice: 0.52, curPrice: 0.44 }),
-    ],
-    categoryWins,
-  });
-  const result = buildRecommendations(inputs);
-  assert.equal(result.recommendations.length, 1);
-  assert.ok(result.recommendations[0]?.personalizedBoost);
-});
-
-test("buildRecommendations: personalizedBoost is false for weak category match (winRate < 0.55)", () => {
-  const categoryWins: DECategoryWin[] = [
-    { category: "Weather", wins: 5, total: 10, winRate: 0.50 },
-  ];
-  const inputs = mkInputs({
-    leaderboard: [
-      mkEntry({ address: "0xaaa", skillScore: 8.0, rank: 2 }),
-      mkEntry({ address: "0xbbb", skillScore: 7.0, rank: 5 }),
-      mkEntry({ address: "0xccc", skillScore: 6.5, rank: 9 }),
-    ],
-    positions: [
-      mkPos({ address: "0xaaa", avgPrice: 0.55, curPrice: 0.44 }),
-      mkPos({ address: "0xbbb", avgPrice: 0.54, curPrice: 0.44 }),
-      mkPos({ address: "0xccc", avgPrice: 0.52, curPrice: 0.44 }),
-    ],
-    categoryWins,
-  });
-  const result = buildRecommendations(inputs);
-  assert.ok(!result.recommendations[0]?.personalizedBoost);
-});
-
-test("buildRecommendations: personalizedBoost raises rankingScore by PERSONALIZATION_BOOST factor", () => {
-  const asOf = new Date("2026-06-01T00:00:00Z");
-  const expiry = new Date(asOf.getTime() + 45 * 24 * 60 * 60 * 1000).toISOString();
-
-  // condA: "Weather" (personalized), condB: "Politics" (not personalized), identical signals
-  const markets = new Map([
-    ["condA", mkMarket({ conditionId: "condA", question: "Will it rain?", category: "Weather", endDate: expiry })],
-    ["condB", mkMarket({ conditionId: "condB", question: "Will they win?", category: "Politics", endDate: expiry })],
-  ]);
-
-  const leaderboard: DELeaderboardEntry[] = [
-    ...["0xa1", "0xa2", "0xa3"].map((addr, i) => mkEntry({ address: addr, skillScore: 7.0, rank: i + 1 })),
-    ...["0xb1", "0xb2", "0xb3"].map((addr, i) => mkEntry({ address: addr, skillScore: 7.0, rank: i + 4 })),
-  ];
-  const positions: DEPosition[] = [
-    ...["0xa1", "0xa2", "0xa3"].map((addr) => mkPos({ address: addr, conditionId: "condA", avgPrice: 0.55, curPrice: 0.44 })),
-    ...["0xb1", "0xb2", "0xb3"].map((addr) => mkPos({ address: addr, conditionId: "condB", avgPrice: 0.55, curPrice: 0.44 })),
-  ];
-
-  const result = buildRecommendations(
-    {
-      leaderboard, positions, markets, handles: new Map(), asOf,
-      categoryWins: [{ category: "Weather", wins: 8, total: 10, winRate: 0.80 }],
-    }
-  );
-
-  // condA should rank first because of the personalization boost
-  assert.equal(result.recommendations[0]?.conditionId, "condA");
-  assert.ok(result.recommendations[0]?.personalizedBoost);
-  assert.ok(!result.recommendations[1]?.personalizedBoost);
 });
 
 // ── buildRecommendations: warnings ────────────────────────────────────────────

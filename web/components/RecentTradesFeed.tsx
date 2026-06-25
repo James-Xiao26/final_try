@@ -224,7 +224,7 @@ function PositionRow({ p }: { p: RecentTradePosition }) {
         <td className="af-market">
           {p.conditionId ? (
             <Link
-              href={`/market/${encodeURIComponent(p.conditionId)}`}
+              href={`/market/${encodeURIComponent(p.conditionId)}${p.market ? `?m=${encodeURIComponent(p.market)}` : ""}`}
               className="q"
               title={p.market ? `${p.market} — open market analytics` : "Open market analytics"}
               onClick={(e) => e.stopPropagation()}

@@ -1154,13 +1154,6 @@ input:focus { border-color: var(--green) !important; }
 }
 
 /* ── Personalized tag ── */
-.de-personalized {
-  font-family: var(--font-display); font-size: 9.5px; letter-spacing: 0.16em;
-  text-transform: uppercase; color: var(--yellow);
-  border: 1px solid rgba(255,210,122,0.28); background: rgba(255,210,122,0.06);
-  border-radius: 2px; padding: 4px 9px;
-}
-
 /* ── Category + expiry tags ── */
 .de-cat, .de-expiry {
   font-family: var(--font-plex-mono); font-size: 9.5px; letter-spacing: 0.12em;

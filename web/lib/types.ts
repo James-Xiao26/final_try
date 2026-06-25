@@ -364,7 +364,6 @@ export interface TradeRecommendation {
   image: string | null;
   explanation: string;
   warnings: string[];
-  personalizedBoost: boolean;
   rankingScore: number;
 }
 

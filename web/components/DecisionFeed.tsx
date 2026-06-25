@@ -195,11 +195,6 @@ function RecommendationCard({ rec, index }: { rec: TradeRecommendation; index: n
             {isYes ? "▲ BUY YES" : "▼ BUY NO"}
           </span>
           <ConfidenceBadge level={rec.confidenceLevel} range={rec.confidenceRange} />
-          {rec.personalizedBoost && (
-            <span className="de-personalized" title="Boosted: matches your historical strong categories">
-              ✦ PERSONALIZED
-            </span>
-          )}
         </div>
         <div className="de-card-head-right">
           {rec.category && <span className="de-cat">{rec.category}</span>}

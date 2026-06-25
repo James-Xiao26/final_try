@@ -56,19 +56,6 @@ export function formatPrice(value: number): string {
   return `${(value * 100).toFixed(1)}¢`;
 }
 
-// Local time of day a trade happened, e.g. "2:45 PM" (follows the viewer's locale and timezone).
-// Used by the activity feed's TIME column.
-export function formatDateTime(iso: string): string {
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) {
-    return "—";
-  }
-  return new Date(ms).toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit"
-  });
-}
-
 export function isValidAddress(address: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
 }

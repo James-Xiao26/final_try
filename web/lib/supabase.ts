@@ -1,8 +1,8 @@
-import { createBrowserClient, createServerClient } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, FreshEntrySummary, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, ResolvedMarket, WalletMetrics, WalletPosition, WalletProfile } from "./types";
-import type { DECategoryWin, DELeaderboardEntry, DEMarket, DEPosition, DecisionEngineInputs } from "./decisionEngine";
+import type { DELeaderboardEntry, DEMarket, DEPosition, DecisionEngineInputs } from "./decisionEngine";
 import { HORIZONS } from "./types";
 import { groupWalletTrades } from "./walletTrades";
 import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis, type TradeBasis } from "./recentTrades";
@@ -103,13 +103,6 @@ export function createSupabaseServerClient() {
         }
       }
     }
-  );
-}
-
-export function createSupabaseBrowserClient() {
-  return createBrowserClient<Database>(
-    env("NEXT_PUBLIC_SUPABASE_URL"),
-    env("NEXT_PUBLIC_SUPABASE_ANON_KEY")
   );
 }
 
@@ -827,90 +820,6 @@ export async function getFreshEntries(limit = 40): Promise<FreshEntrySummary[]> 
   }));
 }
 
-// Full detail for one market: per-wallet participants (sides, P/L, fill dates) + the convergence
-// timeline (cumulative net leaderboard holdings, with the YES price overlaid when known). Returns
-// null when no leaderboard wallet participates in the given condition.
-export async function getCrowdMarketDetail(conditionId: string): Promise<CrowdMarketDetail | null> {
-  const supabase = createSupabaseReadClient();
-
-  const [openRes, closedRes, fillsRes] = await Promise.all([
-    supabase.from("wallet_positions").select(OPEN_POSITION_COLUMNS).eq("condition_id", conditionId),
-    supabase.from("wallet_closed_positions").select(CLOSED_POSITION_COLUMNS).eq("condition_id", conditionId),
-    supabase.from("wallet_trades").select(CROWD_FILL_COLUMNS).eq("condition_id", conditionId).order("traded_at", { ascending: false })
-  ]);
-
-  for (const res of [openRes, closedRes, fillsRes]) {
-    if (res.error && !isMissingSchemaError(res.error)) {
-      throw res.error;
-    }
-  }
-
-  const positions = ((openRes.data ?? []) as unknown as OpenPositionRowDb[]).map(toOpenPosition);
-  const closed = ((closedRes.data ?? []) as unknown as ClosedPositionRowDb[]).map(toClosedPosition);
-  const fills = ((fillsRes.data ?? []) as unknown as CrowdFillRowDb[]).map(toCrowdFill);
-
-  const addresses = [
-    ...new Set([...positions.map((p) => p.address), ...closed.map((p) => p.address), ...fills.map((f) => f.address)])
-  ];
-  if (addresses.length === 0) {
-    return null;
-  }
-
-  // Handles + leaderboard rank/skill for the participating wallets.
-  const [walletsRes, cacheRes] = await Promise.all([
-    supabase.from("wallets").select("address, handle").in("address", addresses),
-    supabase.from("leaderboard_cache").select("address, rank, skill_score").in("address", addresses)
-  ]);
-  if (walletsRes.error && !isMissingSchemaError(walletsRes.error)) {
-    throw walletsRes.error;
-  }
-  if (cacheRes.error && !isMissingSchemaError(cacheRes.error)) {
-    throw cacheRes.error;
-  }
-
-  const handleByAddress = new Map<string, string | null>();
-  ((walletsRes.data ?? []) as unknown as { address: string; handle: string | null }[]).forEach((row) =>
-    handleByAddress.set(row.address, row.handle)
-  );
-  const rankByAddress = new Map<string, number>();
-  const skillByAddress = new Map<string, number | null>();
-  ((cacheRes.data ?? []) as unknown as { address: string; rank: number; skill_score: number | null }[]).forEach((row) => {
-    const prevRank = rankByAddress.get(row.address);
-    if (prevRank === undefined || row.rank < prevRank) {
-      rankByAddress.set(row.address, row.rank);
-    }
-    const prevSkill = skillByAddress.get(row.address);
-    if (prevSkill === undefined || (row.skill_score !== null && (prevSkill === null || row.skill_score > prevSkill))) {
-      skillByAddress.set(row.address, row.skill_score);
-    }
-  });
-
-  // Daily YES price overlay, best-effort: market_price_history is keyed by outcome token (asset). Use
-  // the YES token (outcome 0) directly; fall back to the NO token (outcome 1) inverted (1 − price).
-  const yesAsset = positions.find((p) => p.outcomeIndex === 0)?.asset ?? null;
-  const noAsset = yesAsset === null ? positions.find((p) => p.outcomeIndex === 1)?.asset ?? null : null;
-  const priceAsset = yesAsset ?? noAsset;
-  const pricesByDay = new Map<string, number>();
-  if (priceAsset) {
-    const { data: priceData, error: priceError } = await supabase
-      .from("market_price_history")
-      .select("ts, price")
-      .eq("asset", priceAsset)
-      .order("ts", { ascending: true });
-    if (priceError && !isMissingSchemaError(priceError)) {
-      throw priceError;
-    }
-    ((priceData ?? []) as unknown as { ts: string; price: number }[]).forEach((row) => {
-      const day = row.ts.slice(0, "YYYY-MM-DD".length);
-      const yesPrice = yesAsset !== null ? row.price : 1 - row.price;
-      pricesByDay.set(day, yesPrice);
-    });
-  }
-
-  const lookups: CrowdLookups = { rankByAddress, handleByAddress, skillByAddress };
-  return buildCrowdMarketDetail(conditionId, positions, closed, fills, lookups, pricesByDay);
-}
-
 interface MarketMetaSelectRow {
   question: string;
   slug: string | null;
@@ -1177,11 +1086,7 @@ interface DEMarketRow {
 }
 
 // Fetch everything the Decision Engine needs in parallel where possible.
-// Optional `walletAddress` enables personalization: the requesting wallet's
-// per-category win rate is computed from their closed positions.
-export async function getDecisionEngineData(
-  opts: { walletAddress?: string } = {}
-): Promise<DecisionEngineInputs> {
+export async function getDecisionEngineData(): Promise<DecisionEngineInputs> {
   const supabase = createSupabaseReadClient();
 
   // Wave 1: leaderboard only — need the address set before we can scope subsequent queries.
@@ -1292,68 +1197,11 @@ export async function getDecisionEngineData(
     handles.set(w.address, w.handle)
   );
 
-  // 6. Personalization: if a wallet address is provided, compute per-category win rate from
-  //    that wallet's closed positions joined to the markets table for categories.
-  let categoryWins: DECategoryWin[] | undefined;
-  if (opts.walletAddress) {
-    const normalized = opts.walletAddress.toLowerCase();
-    const { data: closedData, error: closedError } = await supabase
-      .from("wallet_closed_positions")
-      .select("condition_id, realized_pnl")
-      .eq("address", normalized);
-    if (closedError && !isMissingSchemaError(closedError)) throw closedError;
-
-    const closedRows = (closedData ?? []) as unknown as {
-      condition_id: string | null;
-      realized_pnl: number | null;
-    }[];
-
-    const closedConditionIds = [
-      ...new Set(closedRows.map((r) => r.condition_id).filter((id): id is string => id !== null)),
-    ];
-
-    if (closedConditionIds.length > 0) {
-      const { data: catData, error: catError } = await supabase
-        .from("markets")
-        .select("condition_id, category")
-        .in("condition_id", closedConditionIds.slice(0, 200));
-      if (catError && !isMissingSchemaError(catError)) throw catError;
-
-      const categoryByCondition = new Map<string, string | null>();
-      ((catData ?? []) as unknown as { condition_id: string | null; category: string | null }[]).forEach(
-        (r) => {
-          if (r.condition_id) categoryByCondition.set(r.condition_id, r.category);
-        }
-      );
-
-      const catStats = new Map<string, { wins: number; total: number }>();
-      for (const row of closedRows) {
-        if (!row.condition_id) continue;
-        const cat = categoryByCondition.get(row.condition_id) ?? "Unknown";
-        const existing = catStats.get(cat) ?? { wins: 0, total: 0 };
-        existing.total += 1;
-        if ((row.realized_pnl ?? 0) > 0) existing.wins += 1;
-        catStats.set(cat, existing);
-      }
-
-      categoryWins = [...catStats.entries()]
-        .filter(([, s]) => s.total >= 5)
-        .map(([category, { wins, total }]) => ({
-          category,
-          wins,
-          total,
-          winRate: wins / total,
-        }))
-        .sort((a, b) => b.winRate - a.winRate);
-    }
-  }
-
   return {
     leaderboard,
     positions,
     markets,
     handles,
-    ...(categoryWins !== undefined ? { categoryWins } : {}),
     asOf: new Date(),
   };
 }

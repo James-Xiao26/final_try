@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { ExternalLink } from "lucide-react";
+import PassedMarketName from "@/components/PassedMarketName";
 import CrowdParticipants from "@/components/CrowdParticipants";
 import PriceChart from "@/components/PriceChart";
 import WhaleFeed from "@/components/WhaleFeed";
@@ -73,20 +75,39 @@ export default async function MarketPage({ params }: MarketPageProps) {
   // getMarketAnalytics reads Supabase and falls back to the live Polymarket API; either can fail
   // (DB cold-start 57014, an upstream timeout). Catch it so the page degrades to a friendly panel
   // instead of throwing a server-side exception.
+  // Budget is 8s, not 3s: a market outside the cached index needs a live multi-call Polymarket fetch
+  // (Gamma meta + CLOB price history) that routinely exceeds 3s on the first hit, which surfaced the
+  // misleading "Market not tracked" panel on real markets. The result is cached (revalidate=300) so
+  // only the cold first view pays it. The DB path — the original reason for the cap — stays fast.
   let analytics: Awaited<ReturnType<typeof getMarketAnalytics>> | null = null;
   try {
-    analytics = await withTimeout(getMarketAnalytics(conditionId), 3000, null);
+    analytics = await withTimeout(getMarketAnalytics(conditionId), 8000, null);
   } catch {
     analytics = null;
   }
 
   if (!analytics || (!analytics.meta && !analytics.detail)) {
+    // analytics === null means the lookup hit the time budget (or errored) before finishing — the data
+    // very likely exists and a refresh will catch the now-cached result. A non-null analytics with no
+    // meta/detail means the live Polymarket lookup genuinely returned nothing. We can't tell these apart
+    // before the wait (the live lookup IS the slow step), only after — so the messaging splits here.
+    const timedOut = analytics === null;
     return (
       <main className="page">
         <Link href="/markets" className="wl-back">← Back to Markets</Link>
         <section className="panel" style={{ marginTop: 16, padding: 28 }}>
-          <h1 className="brand">Market not tracked</h1>
-          <p className="subtitle">We have no data on this market — it isn’t in the markets index and no tracked wallet holds a position in it.</p>
+          <h1 className="brand">{timedOut ? "Still loading this market…" : "Market analytics unavailable"}</h1>
+          <Suspense fallback={null}>
+            <PassedMarketName />
+          </Suspense>
+          <p className="subtitle">
+            {timedOut
+              ? "This market isn’t in our cache yet, so we’re fetching it live from Polymarket — give it a moment and refresh."
+              : "We couldn’t pull a snapshot for this market and no tracked wallet currently holds a position in it."}
+          </p>
+          <a className="ma-ext" href="https://polymarket.com" target="_blank" rel="noopener noreferrer">
+            View on Polymarket <ExternalLink size={12} />
+          </a>
         </section>
       </main>
     );

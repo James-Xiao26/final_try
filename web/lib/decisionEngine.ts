@@ -45,19 +45,11 @@ export interface DEMarket {
   spread: number | null;
 }
 
-export interface DECategoryWin {
-  category: string;
-  wins: number;
-  total: number;
-  winRate: number;
-}
-
 export interface DecisionEngineInputs {
   leaderboard: DELeaderboardEntry[];
   positions: DEPosition[];
   markets: Map<string, DEMarket>;
   handles: Map<string, string | null>;
-  categoryWins?: DECategoryWin[];
   asOf: Date;
 }
 
@@ -75,7 +67,6 @@ const MAX_RECOMMENDATIONS = 10;
 // Recommend entry at this fraction of the way from current price to smart money price.
 // 0.6 means "buy up to 60% of the gap" — conservative relative to smart money's conviction.
 const ENTRY_CAPTURE_RATIO = 0.6;
-const PERSONALIZATION_BOOST = 1.25;
 
 const CONFIDENCE_RANGES: Record<ConfidenceLevel, [number, number]> = {
   low:       [0.40, 0.52],
@@ -453,19 +444,7 @@ export function buildRecommendations(
       expiryFactor *
       confidenceFraction;
 
-    const personalizedBoost = !!(
-      market.category &&
-      inputs.categoryWins?.some(
-        (cw) =>
-          cw.category.toLowerCase() === market.category!.toLowerCase() &&
-          cw.winRate > 0.55 &&
-          cw.total >= 5
-      )
-    );
-
-    const rankingScore = personalizedBoost
-      ? baseRankingScore * PERSONALIZATION_BOOST
-      : baseRankingScore;
+    const rankingScore = baseRankingScore;
 
     recommendations.push({
       conditionId,
@@ -494,7 +473,6 @@ export function buildRecommendations(
       image: market.image,
       explanation,
       warnings,
-      personalizedBoost,
       rankingScore,
     });
   }

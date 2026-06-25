@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
 import { buildRecommendations } from "@/lib/decisionEngine";
 import { getDecisionEngineData } from "@/lib/supabase";
-import { isValidAddress } from "@/lib/format";
 
-export async function GET(request: Request) {
+// Reads no request data, so Next would statically prerender (freeze) this at build
+// time — force on-demand. The s-maxage header still CDN-caches it. See CLAUDE.md.
+export const dynamic = "force-dynamic";
+
+export async function GET() {
   try {
-    const url = new URL(request.url);
-    const rawWallet = url.searchParams.get("wallet");
-    const walletAddress =
-      rawWallet && isValidAddress(rawWallet) ? rawWallet.toLowerCase() : undefined;
-
-    const data = await getDecisionEngineData(walletAddress ? { walletAddress } : {});
+    const data = await getDecisionEngineData();
     const result = buildRecommendations(data);
 
     return NextResponse.json(result, {
