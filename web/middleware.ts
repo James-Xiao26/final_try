@@ -12,7 +12,8 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 const MAINTENANCE_ENABLED = ["on", "1", "true", "yes"];
 
 // Pages that require a signed-in user. Anonymous visitors are redirected to /signin.
-const GATED_PREFIXES = ["/decision"];
+// "/market/" (trailing slash) gates the per-market analytics pages but NOT the "/markets" listing.
+const GATED_PREFIXES = ["/decision", "/market/"];
 
 export async function middleware(request: NextRequest) {
   const flag = (process.env.MAINTENANCE_MODE ?? "").trim().toLowerCase();
