@@ -1,22 +1,24 @@
 import { NextResponse } from "next/server";
 import { buildRecommendations } from "@/lib/decisionEngine";
-import { getDecisionEngineData } from "@/lib/supabase";
+import { getDecisionEngineData, getRequestUser } from "@/lib/supabase";
 
-// Reads no request data, so Next would statically prerender (freeze) this at build
-// time — force on-demand. The s-maxage header still CDN-caches it. See CLAUDE.md.
+// Reads the auth cookie, so it must render per-request (also avoids the static-prerender freeze —
+// see CLAUDE.md).
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  // Gated: Signals is a signed-in feature. No shared CDN cache — the response depends on auth.
+  const user = await getRequestUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in required" }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
+  }
+
   try {
     const data = await getDecisionEngineData();
     const result = buildRecommendations(data);
 
     return NextResponse.json(result, {
-      headers: {
-        // 5-minute edge cache: positions refresh daily, markets hourly — stale-while-revalidate
-        // lets repeat renders share one computation without waiting for full revalidation.
-        "Cache-Control": "s-maxage=300, stale-while-revalidate=600",
-      },
+      headers: { "Cache-Control": "private, no-store" },
     });
   } catch (error) {
     console.error("[decision-engine] error:", error instanceof Error ? error.message : JSON.stringify(error));

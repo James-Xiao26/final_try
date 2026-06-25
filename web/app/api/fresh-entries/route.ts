@@ -1,23 +1,23 @@
 import { NextResponse } from "next/server";
-import { getFreshEntries, withTimeout } from "@/lib/supabase";
+import { getFreshEntries, getRequestUser, withTimeout } from "@/lib/supabase";
 
-// Same static-prerender trap as /api/crowded-markets: a no-arg GET gets baked at build time and the
-// list freezes until the next deploy. force-dynamic keeps it live; the Cache-Control header still
-// bounds origin/DB hits to ~once per s-maxage window. See CLAUDE.md "Stuck edge-cache gotcha".
+// Reads the auth cookie, so it must render per-request (not be statically baked, which would also
+// freeze the list — see CLAUDE.md "Stuck edge-cache gotcha").
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  // Gated: Fresh Contacts is a signed-in feature. No shared CDN cache — the response depends on auth.
+  const user = await getRequestUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in required" }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
+  }
+
   try {
     const markets = await withTimeout(getFreshEntries(), 8000, []);
 
     return NextResponse.json(
       { markets },
-      {
-        headers: {
-          // Fresh entries only change on the ~10-min feed run, so a minute of edge staleness is fine.
-          "Cache-Control": "s-maxage=60, stale-while-revalidate=120"
-        }
-      }
+      { headers: { "Cache-Control": "private, no-store" } }
     );
   } catch (error) {
     return NextResponse.json(

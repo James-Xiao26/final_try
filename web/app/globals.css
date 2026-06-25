@@ -127,6 +127,60 @@ button { cursor: pointer; }
   box-shadow: 0 0 16px rgba(54,236,208,0.45);
 }
 
+/* ── Auth (top nav) ── */
+.auth-slot { display: inline-block; width: 64px; height: 20px; }
+.auth-signin {
+  font-family: var(--font-display), system-ui, sans-serif; font-weight: 600;
+  font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 3px; padding: 8px 16px; transition: color .2s, border-color .2s;
+}
+.auth-signin:hover { color: var(--green); border-color: var(--line-2); }
+.auth-user { display: flex; align-items: center; gap: 10px; }
+.auth-avatar { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-2); object-fit: cover; }
+.auth-avatar-fallback {
+  display: flex; align-items: center; justify-content: center; background: var(--panel);
+  font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--green);
+}
+.auth-signout {
+  font-family: var(--font-plex-mono), monospace; font-size: 10.5px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--muted); border: none; background: none; cursor: pointer; padding: 4px;
+  transition: color .2s;
+}
+.auth-signout:hover { color: var(--red); }
+
+/* ── Google sign-in button ── */
+.gbtn {
+  display: inline-flex; align-items: center; gap: 10px; cursor: pointer;
+  font-family: var(--font-display), system-ui, sans-serif; font-weight: 600;
+  font-size: 14px; letter-spacing: 0.03em; color: #03141d; background: var(--green);
+  border: none; border-radius: 4px; padding: 12px 22px;
+  box-shadow: 0 0 18px rgba(54,236,208,0.35); transition: filter .2s, box-shadow .2s;
+}
+.gbtn:hover { filter: brightness(1.08); box-shadow: 0 0 24px rgba(54,236,208,0.5); }
+.gbtn svg { background: #fff; border-radius: 2px; padding: 2px; box-sizing: content-box; }
+
+/* ── Locked (signed-out) panel ── */
+.locked-panel {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 16px;
+  padding: 40px 28px;
+}
+.locked-icon {
+  display: flex; align-items: center; justify-content: center; width: 44px; height: 44px;
+  border-radius: 50%; color: var(--yellow); border: 1px solid rgba(255,210,122,0.32); background: rgba(255,210,122,0.06);
+}
+.locked-blurb { max-width: 440px; margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+
+/* ── Sign-in page ── */
+.signin-page { width: min(560px, calc(100% - 32px)); }
+.signin-card { padding: 36px 32px; display: flex; flex-direction: column; gap: 18px; margin-top: 16px; }
+.signin-feats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.signin-feats li {
+  display: flex; align-items: flex-start; gap: 12px; color: var(--muted); font-size: 13px; line-height: 1.55;
+}
+.signin-feats li svg { flex: none; margin-top: 2px; color: var(--green); }
+.signin-feats strong { color: var(--text); font-weight: 600; }
+.signin-card .gbtn { align-self: flex-start; margin-top: 6px; }
+
 .content { flex: 1; min-width: 0; }
 .page {
   width: min(1180px, calc(100% - 32px));

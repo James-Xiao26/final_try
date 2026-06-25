@@ -1,24 +1,23 @@
 import { NextResponse } from "next/server";
-import { getCrowdedMarkets, withTimeout } from "@/lib/supabase";
+import { getCrowdedMarkets, getRequestUser, withTimeout } from "@/lib/supabase";
 
-// Same static-prerender trap as /api/recent-trades: a no-arg GET gets baked at build time and the
-// Convergence list freezes until the next deploy. force-dynamic keeps it live; the Cache-Control
-// header still bounds origin/DB hits to ~once per s-maxage window. See CLAUDE.md "Stuck edge-cache gotcha".
+// Reads the auth cookie, so it must render per-request (not be statically baked, which would also
+// freeze the list — see CLAUDE.md "Stuck edge-cache gotcha").
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  // Gated: Convergence is a signed-in feature. No shared CDN cache — the response depends on auth.
+  const user = await getRequestUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in required" }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
+  }
+
   try {
     const markets = await withTimeout(getCrowdedMarkets(), 8000, []);
 
     return NextResponse.json(
       { markets },
-      {
-        headers: {
-          // Short edge cache: crowded markets only change when the full ingest repopulates the
-          // position caches, so a minute of staleness is fine.
-          "Cache-Control": "s-maxage=60, stale-while-revalidate=120"
-        }
-      }
+      { headers: { "Cache-Control": "private, no-store" } }
     );
   } catch (error) {
     return NextResponse.json(

@@ -106,6 +106,15 @@ export function createSupabaseServerClient() {
   );
 }
 
+// Auth gate for the protected API routes: returns the signed-in user from the request cookies, or
+// null. getUser() validates the token server-side (not just trusting the cookie), so it's the real
+// security boundary behind the gated features. No session cookie → null with no network call.
+export async function getRequestUser() {
+  const supabase = createSupabaseServerClient();
+  const { data } = await supabase.auth.getUser();
+  return data.user;
+}
+
 // Plain anon client for stateless server-side reads. Does NOT call cookies() so pages using it
 // can use ISR (revalidate) instead of force-dynamic. RLS is disabled on read tables so no session
 // is needed; the anon key governs access at the Postgres row level.

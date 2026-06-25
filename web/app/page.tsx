@@ -2,22 +2,23 @@ import ConvergencePanel from "@/components/ConvergencePanel";
 import FreshEntriesPanel from "@/components/FreshEntriesPanel";
 import RecentTradesFeed from "@/components/RecentTradesFeed";
 import ResolvedMarketsPanel from "@/components/ResolvedMarketsPanel";
-import { getCrowdedMarkets, getFreshEntries, getRecentLeaderboardTrades, getResolvedMarkets, withTimeout } from "@/lib/supabase";
+import { getRecentLeaderboardTrades, getResolvedMarkets, withTimeout } from "@/lib/supabase";
 
-// 10 min: the feed/convergence/resolved data only changes on the ~10-min feed cron and the daily
-// full ingest, and building the feed scans the position cache — regenerating more often just burns
-// Supabase egress for identical output.
+// 10 min: the feed/resolved data only changes on the ~10-min feed cron and the daily full ingest,
+// and building the feed scans the position cache — regenerating more often just burns Supabase
+// egress for identical output.
 export const revalidate = 600;
 
 export default async function HomePage() {
   // Each section degrades independently: a Supabase failure (e.g. free-tier cold-start 57014
   // timeout on the first hit) must never crash the whole page. The client components poll their
   // /api/* routes on mount, so empty initial data just renders the shell and then hydrates live.
-  const [{ positions, traderCount }, resolvedMarkets, crowdedMarkets, freshEntries] = await Promise.all([
+  // Fresh Contacts + Convergence are gated (signed-in only), so their data is NOT fetched here —
+  // it would otherwise be baked into the public cached HTML. Their panels fetch it client-side from
+  // the auth-gated API once the user is signed in.
+  const [{ positions, traderCount }, resolvedMarkets] = await Promise.all([
     withTimeout(getRecentLeaderboardTrades(), 1500, { positions: [], traderCount: 0 }).catch(() => ({ positions: [], traderCount: 0 })),
-    withTimeout(getResolvedMarkets(), 1500, []).catch(() => []),
-    withTimeout(getCrowdedMarkets(), 1500, []).catch(() => []),
-    withTimeout(getFreshEntries(), 1500, []).catch(() => [])
+    withTimeout(getResolvedMarkets(), 1500, []).catch(() => [])
   ]);
 
   return (
@@ -36,9 +37,9 @@ export default async function HomePage() {
 
       <ResolvedMarketsPanel rows={resolvedMarkets} />
 
-      <FreshEntriesPanel initialRows={freshEntries} />
+      <FreshEntriesPanel />
 
-      <ConvergencePanel initialRows={crowdedMarkets} />
+      <ConvergencePanel />
     </main>
   );
 }

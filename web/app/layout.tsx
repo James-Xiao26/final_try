@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Chakra_Petch, IBM_Plex_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 import { Analytics } from "@vercel/analytics/next";
+import AuthNav from "@/components/AuthNav";
 import BrandMark from "@/components/BrandMark";
 import OceanScene from "@/components/OceanScene";
 import SidebarNav from "@/components/SidebarNav";
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <div className="topnav-inner">
               <BrandMark />
               <SidebarNav />
+              <AuthNav />
             </div>
           </header>
           <main className="content">{children}</main>
