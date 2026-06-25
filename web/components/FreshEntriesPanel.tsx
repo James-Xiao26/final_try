@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatCompactUsd } from "@/lib/format";
 import type { FreshEntrySummary } from "@/lib/types";
+import { useUser } from "@/lib/supabaseBrowser";
+import LockedPanel from "./LockedPanel";
 import { useScrollLog } from "./useScrollLog";
 
 interface FreshEntriesPanelProps {
-  initialRows: FreshEntrySummary[];
+  initialRows?: FreshEntrySummary[];
 }
 
 const POLL_INTERVAL_MS = 60_000;
@@ -71,11 +73,13 @@ function FreshEntryRow({ row }: { row: FreshEntrySummary }) {
   );
 }
 
-export default function FreshEntriesPanel({ initialRows }: FreshEntriesPanelProps) {
+export default function FreshEntriesPanel({ initialRows = [] }: FreshEntriesPanelProps) {
+  const { loading, signedIn } = useUser();
   const [rows, setRows] = useState(initialRows);
   const { locked, shellRef, logRef, hoverProps } = useScrollLog(rows);
 
   useEffect(() => {
+    if (!signedIn) return; // gated: only signed-in users fetch the real data
     let active = true;
     const poll = (): void => {
       if (document.hidden) return;
@@ -94,7 +98,18 @@ export default function FreshEntriesPanel({ initialRows }: FreshEntriesPanelProp
       active = false;
       clearInterval(id);
     };
-  }, []);
+  }, [signedIn]);
+
+  if (loading) return <section className="cv-section" aria-busy="true" style={{ minHeight: 120 }} />;
+  if (!signedIn) {
+    return (
+      <LockedPanel
+        title="Fresh"
+        accent="Contacts"
+        blurb="See new wallets breaking onto the board — the fresh positions tracked contacts just opened. Sign in with Google to unlock."
+      />
+    );
+  }
 
   return (
     <section className="cv-section">

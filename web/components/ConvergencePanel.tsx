@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatCompactUsd } from "@/lib/format";
 import type { CrowdedMarketSummary } from "@/lib/types";
+import { useUser } from "@/lib/supabaseBrowser";
+import LockedPanel from "./LockedPanel";
 import { useScrollLog } from "./useScrollLog";
 
 interface ConvergencePanelProps {
-  initialRows: CrowdedMarketSummary[];
+  initialRows?: CrowdedMarketSummary[];
 }
 
 const POLL_INTERVAL_MS = 60_000;
@@ -71,11 +73,13 @@ function ConvergenceRow({ row }: { row: CrowdedMarketSummary }) {
   );
 }
 
-export default function ConvergencePanel({ initialRows }: ConvergencePanelProps) {
+export default function ConvergencePanel({ initialRows = [] }: ConvergencePanelProps) {
+  const { loading, signedIn } = useUser();
   const [rows, setRows] = useState(initialRows);
   const { locked, shellRef, logRef, hoverProps } = useScrollLog(rows);
 
   useEffect(() => {
+    if (!signedIn) return; // gated: only signed-in users fetch the real data
     let active = true;
     const poll = (): void => {
       if (document.hidden) return;
@@ -94,7 +98,18 @@ export default function ConvergencePanel({ initialRows }: ConvergencePanelProps)
       active = false;
       clearInterval(id);
     };
-  }, []);
+  }, [signedIn]);
+
+  if (loading) return <section className="cv-section" aria-busy="true" style={{ minHeight: 120 }} />;
+  if (!signedIn) {
+    return (
+      <LockedPanel
+        title="Convergence"
+        accent="Zones"
+        blurb="See which markets the most tracked contacts are converging on — the crowd's strongest positions. Sign in with Google to unlock."
+      />
+    );
+  }
 
   return (
     <section className="cv-section">

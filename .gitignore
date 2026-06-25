@@ -8,3 +8,6 @@ coverage
 .env.*.local
 *.bom-bak
 supabase/.temp/
+
+# Throwaway local DB-inspection scripts (use the service-role key; never commit)
+scripts/_*.mjs
