@@ -1,4 +1,4 @@
--- 021_world_cup_cache.sql
+-- 022_world_cup_cache.sql
 --
 -- Limited-time "World Cup" board: ranks traders purely by their forecasting edge on World Cup
 -- soccer markets (the same Bayesian-shrunk per-share edge the main Skill Score uses, sliced to
@@ -12,7 +12,7 @@
 --
 -- No RLS, like the other read caches: reads via the anon key under default public grants; only the
 -- service-role ingest writes it.
-CREATE TABLE world_cup_cache (
+CREATE TABLE IF NOT EXISTS world_cup_cache (
   address             TEXT PRIMARY KEY,
   rank                INT NOT NULL,              -- 1-based position in the ranked list
   handle              TEXT,                      -- @handle when known
@@ -28,4 +28,4 @@ CREATE TABLE world_cup_cache (
 );
 
 -- The reader orders by rank; back it with an index so the LIMIT read is an index scan.
-CREATE INDEX idx_world_cup_cache_rank ON world_cup_cache(rank);
+CREATE INDEX IF NOT EXISTS idx_world_cup_cache_rank ON world_cup_cache(rank);
