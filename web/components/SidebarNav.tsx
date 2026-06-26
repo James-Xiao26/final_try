@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/markets", label: "Markets" },
   { href: "/decision", label: "Signals" },
+  { href: "/world-cup", label: "World Cup", badge: "LIMITED" },
 ] as const;
 
 export default function SidebarNav() {
@@ -31,10 +32,11 @@ export default function SidebarNav() {
           <Link
             key={link.href}
             href={link.href}
-            className="nav-link mono"
+            className={`nav-link mono${"badge" in link ? " nav-link-event" : ""}`}
             aria-current={isActive ? "page" : undefined}
           >
             {link.label}
+            {"badge" in link ? <span className="nav-badge">{link.badge}</span> : null}
           </Link>
         );
       })}

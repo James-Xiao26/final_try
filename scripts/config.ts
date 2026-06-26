@@ -47,6 +47,18 @@ export const CONFIG = {
   // the Skill Score, so this is a hard sample floor on top of that: a wallet needs a real track
   // record in a category — not one lucky cluster — before it earns a specialty chip.
   MIN_SPECIALTY_TRADES: 8,
+
+  // ── World Cup board (limited-time event) ────────────────────────────────────────────────
+  // Ranks traders by forecasting edge on World Cup soccer markets only (scripts/worldCup.ts),
+  // reusing the Skill Score's edge→score mapping (SCORE_FLOOR/SCORE_MAX/EDGE_FOR_TEN).
+  WORLD_CUP_TOP_N: 100,
+  // Min resolved World Cup bets before a wallet appears on the board.
+  WORLD_CUP_MIN_BETS: 3,
+  // Gentler shrinkage than the main board's EDGE_SHRINKAGE_K (50): a single tournament yields far
+  // fewer bets per wallet, so a 50-bet prior would zero almost everyone out. 5 still pulls a 3-bet
+  // fluke toward 0 while letting a real WC track record score. ponytail: a flat per-event K, retune
+  // from the live board if early-tournament scores look too hot or too flat.
+  WORLD_CUP_SHRINKAGE_K: 5,
   BOT: {
     // Calibrated against a working trades/day denominator (see MIN_RATE_WINDOW_DAYS). The old 50
     // was a dead constant: activity is capped at ACTIVITY_LIMIT and the rate used to be divided by
