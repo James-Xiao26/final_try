@@ -22,6 +22,8 @@
   --red: #ff7a59;     /* coral — negatives, alerts */
   --yellow: #ffd27a;  /* amber — mid / apex highlights */
   --grid: rgba(54, 236, 208, 0.08);
+  /* house ease-out for press/hover micro-interactions (snappy, starts fast) */
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
 }
 * { box-sizing: border-box; }
 /* overflow-x clip + max-width keep a stray `100vw`/safe-area pixel from triggering iOS Safari's
@@ -87,6 +89,17 @@ button { cursor: pointer; }
   100% { transform: translateY(-105vh) translateX(20px); opacity: 0; }
 }
 
+/* Global reduced-motion off-switch for the always-on decorative motion. Keeps the static
+   look (gradients/dots stay visible) but stops sustained movement for motion-sensitive users.
+   Page-scoped animations (.ea-*, .wm-*, .wc-*) have their own reduced-motion blocks below. */
+@media (prefers-reduced-motion: reduce) {
+  .plankton span,
+  .lb-sweep,
+  .lb-blip::after,
+  .act-live .dot,
+  .skeleton { animation: none; }
+}
+
 /* ---- shell: console top-bar over full-width content ---- */
 .shell { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
 .topnav {
@@ -119,9 +132,10 @@ button { cursor: pointer; }
   display: block; padding: 8px 18px; border-radius: 2px;
   font-family: var(--font-display), system-ui, sans-serif; font-weight: 600;
   font-size: 13px; letter-spacing: 0.05em; color: var(--muted);
-  transition: color .2s, background .2s, box-shadow .2s;
+  transition: color .2s, background .2s, box-shadow .2s, transform .12s var(--ease-out);
 }
 .nav-link:hover { color: var(--text); }
+.nav-link:active { transform: scale(0.97); }
 .nav-link[aria-current=page] {
   color: #03141d; background: var(--green);
   box-shadow: 0 0 16px rgba(54,236,208,0.45);
@@ -132,9 +146,11 @@ button { cursor: pointer; }
 .auth-signin {
   font-family: var(--font-display), system-ui, sans-serif; font-weight: 600;
   font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
-  border: 1px solid var(--line); border-radius: 3px; padding: 8px 16px; transition: color .2s, border-color .2s;
+  border: 1px solid var(--line); border-radius: 3px; padding: 8px 16px;
+  transition: color .2s, border-color .2s, transform .12s var(--ease-out);
 }
 .auth-signin:hover { color: var(--green); border-color: var(--line-2); }
+.auth-signin:active { transform: scale(0.97); }
 .auth-user { display: flex; align-items: center; gap: 10px; }
 .auth-avatar { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-2); object-fit: cover; }
 .auth-avatar-fallback {
@@ -154,9 +170,11 @@ button { cursor: pointer; }
   font-family: var(--font-display), system-ui, sans-serif; font-weight: 600;
   font-size: 14px; letter-spacing: 0.03em; color: #03141d; background: var(--green);
   border: none; border-radius: 4px; padding: 12px 22px;
-  box-shadow: 0 0 18px rgba(54,236,208,0.35); transition: filter .2s, box-shadow .2s;
+  box-shadow: 0 0 18px rgba(54,236,208,0.35);
+  transition: filter .2s, box-shadow .2s, transform .14s var(--ease-out);
 }
 .gbtn:hover { filter: brightness(1.08); box-shadow: 0 0 24px rgba(54,236,208,0.5); }
+.gbtn:active { transform: scale(0.97); box-shadow: 0 0 12px rgba(54,236,208,0.3); }
 .gbtn svg { background: #fff; border-radius: 2px; padding: 2px; box-sizing: content-box; }
 
 /* ── Locked (signed-out) panel ── */
@@ -284,8 +302,9 @@ input:focus { border-color: var(--green) !important; }
 .lb-who .desig { font-family: var(--font-display); font-weight: 700; font-size: 38px; line-height: 1; letter-spacing: 0.01em; }
 .lb-who .desig .at { color: var(--green); font-weight: 400; }
 .lb-who .id { font-family: var(--font-plex-mono); font-size: 12px; color: var(--muted); margin-top: 10px; letter-spacing: 0.04em; display: flex; align-items: center; gap: 9px; }
-.lb-who .id button { border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; padding: 3px 9px; font-size: 10px; letter-spacing: 0.1em; border-radius: 2px; transition: all .2s; }
+.lb-who .id button { border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; padding: 3px 9px; font-size: 10px; letter-spacing: 0.1em; border-radius: 2px; transition: color .2s, border-color .2s, transform .12s var(--ease-out); }
 .lb-who .id button:hover { color: var(--green); border-color: var(--green); }
+.lb-who .id button:active { transform: scale(0.92); }
 .lb-who .cls { margin-top: 16px; font-family: var(--font-display); font-size: 15px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--green); text-shadow: 0 0 14px rgba(54,236,208,0.3); display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
 .lb-who .cls .full { font-family: var(--font-plex-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: none; color: var(--muted); }
 .lb-who .cls .full:hover { color: var(--green); }
@@ -321,8 +340,9 @@ input:focus { border-color: var(--green) !important; }
 .lb-desig .name:hover { color: var(--green); }
 .lb-desig .name .at { color: var(--green); font-weight: 400; }
 .lb-desig .meta { font-family: var(--font-plex-mono); font-size: 11px; color: var(--muted); margin-top: 4px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px; }
-.lb-desig .meta button { border: 1px solid var(--line); background: none; color: var(--muted-d); cursor: pointer; width: 22px; height: 22px; border-radius: 2px; display: inline-grid; place-items: center; transition: all .18s; }
+.lb-desig .meta button { border: 1px solid var(--line); background: none; color: var(--muted-d); cursor: pointer; width: 22px; height: 22px; border-radius: 2px; display: inline-grid; place-items: center; transition: color .18s, border-color .18s, transform .12s var(--ease-out); }
 .lb-desig .meta button:hover { color: var(--green); border-color: var(--green); }
+.lb-desig .meta button:active { transform: scale(0.92); }
 .lb-class .chip { display: inline-block; font-family: var(--font-display); font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 11px; border-radius: 2px; border: 1px solid rgba(54,236,208,0.3); color: var(--green); background: rgba(54,236,208,0.06); }
 .lb-class.apex .chip { color: var(--yellow); border-color: rgba(255,210,122,0.4); background: rgba(255,210,122,0.07); }
 /* Specialty chip: the market category a wallet forecasts best. Sits under the name in the contact
@@ -413,7 +433,7 @@ input:focus { border-color: var(--green) !important; }
 .af-scroll-state { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 9.5px;
   letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 2px;
   padding: 5px 11px; background: rgba(4,20,30,0.5); transition: color .2s, border-color .2s, background .2s, box-shadow .2s; }
-.af-scroll-state .pip { width: 6px; height: 6px; border-radius: 50%; background: var(--muted-d); transition: all .2s; }
+.af-scroll-state .pip { width: 6px; height: 6px; border-radius: 50%; background: var(--muted-d); transition: background .2s, box-shadow .2s; }
 .af-scroll-state.locked { color: var(--green); border-color: var(--line-2); background: rgba(54,236,208,0.07); box-shadow: 0 0 16px rgba(54,236,208,0.14); }
 .af-scroll-state.locked .pip { background: var(--green); box-shadow: 0 0 8px var(--green); }
 
@@ -660,8 +680,9 @@ input:focus { border-color: var(--green) !important; }
 .wl-dossier .desig { font-family: var(--font-display); font-weight: 700; font-size: 42px; line-height: 1; margin-top: 16px; letter-spacing: 0.01em; }
 .wl-dossier .desig .at { color: var(--green); font-weight: 400; }
 .wl-dossier .addr { font-family: var(--font-plex-mono); font-size: 12px; color: var(--muted); margin-top: 12px; letter-spacing: 0.04em; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; word-break: break-all; }
-.wl-dossier .addr button { border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; padding: 3px 9px; font-family: var(--font-plex-mono); font-size: 10px; letter-spacing: 0.1em; border-radius: 2px; transition: all .2s; flex: none; }
+.wl-dossier .addr button { border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; padding: 3px 9px; font-family: var(--font-plex-mono); font-size: 10px; letter-spacing: 0.1em; border-radius: 2px; transition: color .2s, border-color .2s, transform .12s var(--ease-out); flex: none; }
 .wl-dossier .addr button:hover { color: var(--green); border-color: var(--green); }
+.wl-dossier .addr button:active { transform: scale(0.92); }
 .wl-dossier .bio { font-family: var(--font-plex-mono); font-size: 13.5px; color: var(--muted); margin-top: 14px; max-width: 54ch; line-height: 1.6; font-style: italic; }
 .wl-dossier .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
 .wl-dossier .tag { font-family: var(--font-display); font-weight: 600; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 11px; border-radius: 2px; border: 1px solid rgba(54,236,208,0.3); color: var(--green); background: rgba(54,236,208,0.06); }
@@ -783,7 +804,7 @@ input:focus { border-color: var(--green) !important; }
   padding: 0 24px; height: 52px; box-shadow: 0 0 18px rgba(54,236,208,0.4);
   transition: box-shadow .2s, transform .15s, opacity .2s; display: inline-flex; align-items: center; gap: 9px; white-space: nowrap; }
 .ea-wait-btn:hover { box-shadow: 0 0 30px rgba(54,236,208,0.7); transform: translateY(-1px); }
-.ea-wait-btn:active { transform: translateY(0); }
+.ea-wait-btn:active { transform: scale(0.97); box-shadow: 0 0 14px rgba(54,236,208,0.45); }
 .ea-wait-btn:disabled { opacity: 0.6; cursor: progress; transform: none; box-shadow: 0 0 18px rgba(54,236,208,0.3); }
 .ea-wait-btn svg { width: 15px; height: 15px; }
 .ea-wait-foot { margin-top: 12px; font-size: 11px; color: var(--muted-d); letter-spacing: 0.04em; }
