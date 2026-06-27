@@ -278,9 +278,10 @@ async function fetchDataApi(path: string, params: Record<string, string>): Promi
 
 export async function fetchLiveWalletDetail(address: string): Promise<LiveWalletDetail> {
   const user = address.toLowerCase();
-  const [positionRows, activityRows] = await Promise.all([
+  const [positionRows, activityRows, closedRows] = await Promise.all([
     fetchDataApi("/positions", { user, sortBy: "CURRENT", sortDirection: "DESC", limit: "500" }),
-    fetchDataApi("/activity", { user, type: "TRADE", sortDirection: "DESC", limit: "200" })
+    fetchDataApi("/activity", { user, type: "TRADE", sortDirection: "DESC", limit: "200" }),
+    fetchDataApi("/closed-positions", { user, sortDirection: "DESC", limit: "500" })
   ]);
 
   const positions: WalletPosition[] = positionRows
@@ -317,5 +318,22 @@ export async function fetchLiveWalletDetail(address: string): Promise<LiveWallet
     };
   });
 
-  return { positions, tradeGroups: groupWalletTrades(fills) };
+  // Trade history is grouped from the last ~200 fills only, so a position bought before that window
+  // and sold inside it has SELL fills but no BUY fills — leaving avg entry blank. /closed-positions
+  // carries the true cost basis (avgPrice) per closed position, so backfill the entry by position key.
+  const entryByKey = new Map<string, number>();
+  for (const row of closedRows) {
+    const conditionId = readStr(row, ["conditionId", "market", "marketId"]);
+    const avgPrice = readNum(row, ["avgPrice", "averagePrice", "price"]);
+    if (conditionId && avgPrice > 0) {
+      entryByKey.set(`${conditionId}:${readNum(row, ["outcomeIndex"])}`, avgPrice);
+    }
+  }
+  const tradeGroups = groupWalletTrades(fills).map((group) =>
+    group.avgEntryPrice === null
+      ? { ...group, avgEntryPrice: entryByKey.get(`${group.conditionId}:${group.outcomeIndex}`) ?? null }
+      : group
+  );
+
+  return { positions, tradeGroups };
 }
