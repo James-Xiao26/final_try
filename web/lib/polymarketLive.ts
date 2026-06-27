@@ -1,5 +1,7 @@
 import type { EventCandidate, MarketMeta, PricePoint } from "./marketAnalytics";
 import { parseEventCandidates, parseJsonArray } from "./marketAnalytics";
+import type { WalletPosition, WalletTradeGroup } from "./types";
+import { groupWalletTrades, type WalletTradeRowInput } from "./walletTrades";
 
 // Server-side, on-demand enrichment from Polymarket's public APIs, used as a *fallback* by
 // getMarketAnalytics. The batch pipeline only caches the top-N listed markets (Gamma) and the outcome
@@ -14,11 +16,31 @@ import { parseEventCandidates, parseJsonArray } from "./marketAnalytics";
 
 const GAMMA_API_BASE = "https://gamma-api.polymarket.com";
 const CLOB_API_BASE = "https://clob.polymarket.com";
+const DATA_API_BASE = "https://data-api.polymarket.com";
 const REVALIDATE_SECONDS = 600; // 10 min
 
 function toNumber(value: unknown): number {
   const n = typeof value === "string" ? Number(value) : typeof value === "number" ? value : NaN;
   return Number.isFinite(n) ? n : 0;
+}
+
+// Defensive field reads for the Data API rows (Polymarket's field names are inconsistent — same
+// fallback-key approach as scripts/polymarket.ts's readString/readNumber).
+function readStr(row: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const v = row[key];
+    if (typeof v === "string" && v.length > 0) return v;
+    if (typeof v === "number") return String(v);
+  }
+  return "";
+}
+function readNum(row: Record<string, unknown>, keys: string[]): number {
+  for (const key of keys) {
+    const v = row[key];
+    const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : NaN;
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
 }
 
 function toOptionalNumber(value: unknown): number | null {
@@ -228,4 +250,72 @@ export async function fetchEventCandidates(conditionId: string): Promise<EventCa
   if (!event) return null;
   const candidates = parseEventCandidates(parseJsonArray(event.markets) as Parameters<typeof parseEventCandidates>[0]);
   return candidates.length > 0 ? candidates : null;
+}
+
+// Live wallet detail (open positions + recent trade history) from the Data API, for a wallet whose
+// detail the batch pipeline never cached. Ingest only persists positions/fills for the ~TOP_N
+// leaderboard wallets, so an eligible-but-non-board wallet — e.g. a World Cup specialist linked from
+// that board — has a score in wallet_stats but empty position/trade caches, rendering a blank profile.
+// Same fallback contract as the market enrichment above: read-only, cached in Next's Data Cache, and
+// degrades to empty on any failure rather than throwing.
+export interface LiveWalletDetail {
+  positions: WalletPosition[];
+  tradeGroups: WalletTradeGroup[];
+}
+
+async function fetchDataApi(path: string, params: Record<string, string>): Promise<Record<string, unknown>[]> {
+  try {
+    const res = await fetch(`${DATA_API_BASE}${path}?${new URLSearchParams(params).toString()}`, {
+      next: { revalidate: REVALIDATE_SECONDS }
+    });
+    if (!res.ok) return [];
+    const payload = await res.json();
+    return Array.isArray(payload) ? (payload as Record<string, unknown>[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchLiveWalletDetail(address: string): Promise<LiveWalletDetail> {
+  const user = address.toLowerCase();
+  const [positionRows, activityRows] = await Promise.all([
+    fetchDataApi("/positions", { user, sortBy: "CURRENT", sortDirection: "DESC", limit: "500" }),
+    fetchDataApi("/activity", { user, type: "TRADE", sortDirection: "DESC", limit: "200" })
+  ]);
+
+  const positions: WalletPosition[] = positionRows
+    .map((row) => ({
+      conditionId: readStr(row, ["conditionId", "market", "marketId"]) || null,
+      asset: readStr(row, ["asset", "tokenId"]),
+      market: readStr(row, ["market", "title", "question"]) || null,
+      outcomeIndex: readNum(row, ["outcomeIndex"]),
+      size: readNum(row, ["size", "totalBought", "tokens"]),
+      avgPrice: readNum(row, ["avgPrice", "averagePrice", "price"]),
+      curPrice: readNum(row, ["curPrice", "price"]),
+      initialValue: readNum(row, ["initialValue"]),
+      currentValue: readNum(row, ["currentValue"]),
+      cashPnl: readNum(row, ["cashPnl"]),
+      endDate: readStr(row, ["endDate"]) || null
+    }))
+    .filter((position) => position.size > 0);
+
+  const fills: WalletTradeRowInput[] = activityRows.map((row) => {
+    const size = readNum(row, ["size", "tokens"]);
+    const price = readNum(row, ["price", "avgPrice"]);
+    const side = readStr(row, ["side", "action", "type"]).toUpperCase();
+    const ts = readNum(row, ["timestamp", "createdAt"]);
+    return {
+      condition_id: readStr(row, ["conditionId", "market", "marketId"]) || null,
+      market: readStr(row, ["market", "title", "question"]) || null,
+      outcome_index: readNum(row, ["outcomeIndex"]),
+      side: side === "BUY" || side === "SELL" ? side : null,
+      price,
+      size,
+      usdc_size: readNum(row, ["usdcSize", "cash"]) || size * price,
+      traded_at: new Date(ts * 1000).toISOString(),
+      transaction_hash: readStr(row, ["transactionHash", "txHash"]) || null
+    };
+  });
+
+  return { positions, tradeGroups: groupWalletTrades(fills) };
 }

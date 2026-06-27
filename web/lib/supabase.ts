@@ -8,7 +8,7 @@ import { groupWalletTrades } from "./walletTrades";
 import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis, type TradeBasis } from "./recentTrades";
 import { buildCrowdMarketDetail, type CrowdClosedPosition, type CrowdLookups, type CrowdOpenPosition, type CrowdTradeFill } from "./marketCrowd";
 import type { MarketAnalytics, MarketMeta, PriceLine, PricePoint, WhaleFillInput } from "./marketAnalytics";
-import { fetchEventCandidates, fetchLiveMarket, fetchLivePriceSeries, type LiveMarket } from "./polymarketLive";
+import { fetchEventCandidates, fetchLiveMarket, fetchLivePriceSeries, fetchLiveWalletDetail, type LiveMarket } from "./polymarketLive";
 import { summarizeResolvedMarkets } from "./resolvedMarkets";
 
 type WalletRow = Database["public"]["Tables"]["wallets"]["Row"];
@@ -586,6 +586,19 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
     }
   });
 
+  let positions = ((positionsData ?? []) as unknown as WalletPositionSelectRow[]).map(mapWalletPosition);
+  let tradeGroups = groupWalletTrades((tradesData ?? []) as unknown as WalletTradeSelectRow[]);
+
+  // Board-scoping: ingest only persists position/trade detail for the ~TOP_N leaderboard wallets, so
+  // an eligible-but-non-board wallet (e.g. a World Cup specialist linked from that board) has a score
+  // but empty position/trade caches. Fall back to a live read from Polymarket so the profile isn't
+  // blank — cached in Next's Data Cache, degrades to empty on failure (see fetchLiveWalletDetail).
+  if (positions.length === 0 && tradeGroups.length === 0) {
+    const live = await fetchLiveWalletDetail(normalized);
+    positions = live.positions;
+    tradeGroups = live.tradeGroups;
+  }
+
   return {
     address: wallet.address,
     handle: wallet.handle,
@@ -599,8 +612,8 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
       label: `Top ${rank.rank} - ${rank.horizon_days}D`,
       horizonDays: rank.horizon_days
     })),
-    positions: ((positionsData ?? []) as unknown as WalletPositionSelectRow[]).map(mapWalletPosition),
-    tradeGroups: groupWalletTrades((tradesData ?? []) as unknown as WalletTradeSelectRow[])
+    positions,
+    tradeGroups
   };
 }
 

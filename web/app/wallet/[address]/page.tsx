@@ -37,7 +37,9 @@ export default async function WalletPage({ params, searchParams }: WalletPagePro
   // wallet) and let the visitor retry.
   let profile: Awaited<ReturnType<typeof getWalletProfile>>;
   try {
-    profile = await withTimeout(getWalletProfile(address), 3000, null);
+    // 6s (not 3s): a non-leaderboard wallet falls back to a live Polymarket read for its positions/
+    // trades (getWalletProfile → fetchLiveWalletDetail), which adds two API calls on a cold load.
+    profile = await withTimeout(getWalletProfile(address), 6000, null);
   } catch {
     return (
       <main className="page">
