@@ -7,6 +7,7 @@ import { computeMetrics, type WalletMetrics } from "./metrics.js";
 import { apiStats, discoverTopWallets, discoverCandidateAddresses, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet, type EventSummary } from "./polymarket.js";
 import { recentTradesFromActivity, type RecentTrade } from "./recentTrades.js";
 import { walletSpecialty } from "./specialty.js";
+import { worldCupStats } from "./worldCup.js";
 import { simulateCopyCurve } from "./equityCurve.js";
 import { dailyPointsFromHistory, planPriceFetches, type CacheState } from "./priceHistory.js";
 import { earliestEntryDates, earliestTradeMs, latestFillDates, openPositionRecords, profileFillsFromActivity, type OpenPositionRecord, type ProfileFill } from "./walletDetail.js";
@@ -183,6 +184,41 @@ interface Database {
           top_rank?: number | null;
           cur_price?: number | null;
           last_traded_at?: string | null;
+          cached_at?: string;
+        };
+        Update: {
+          rank?: number;
+          cached_at?: string;
+        };
+        Relationships: [];
+      };
+      world_cup_cache: {
+        Row: {
+          address: string;
+          rank: number;
+          handle: string | null;
+          score: number;
+          n_bets: number;
+          win_rate: number;
+          avg_edge_per_share: number;
+          pnl_usd: number;
+          open_bets: number;
+          top_market: string | null;
+          top_side: string | null;
+          cached_at: string;
+        };
+        Insert: {
+          address: string;
+          rank: number;
+          handle?: string | null;
+          score: number;
+          n_bets: number;
+          win_rate: number;
+          avg_edge_per_share: number;
+          pnl_usd: number;
+          open_bets: number;
+          top_market?: string | null;
+          top_side?: string | null;
           cached_at?: string;
         };
         Update: {
@@ -572,6 +608,24 @@ interface ProcessResult {
   // union of closed + current positions. Drives the market price-history cache (later scoped to the
   // leaderboard subset). Empty under the same eligibility gate.
   assets: string[];
+  // World Cup board stats (settled-bet edge + open-position conviction), or null when the wallet has
+  // too few resolved WC bets (or is a bot). NOT board-scoped — the board surfaces WC specialists who
+  // never reach the main leaderboard, so it's collected for every eligible wallet during the full pass.
+  worldCup: WorldCupEntry | null;
+}
+
+// A wallet's World Cup board row: worldCupStats plus the address/handle needed to persist it.
+interface WorldCupEntry {
+  address: string;
+  handle: string | null;
+  score: number;
+  nBets: number;
+  winRate: number;
+  avgEdgePerShare: number;
+  pnlUsd: number;
+  openBets: number;
+  topMarket: string | null;
+  topSide: "YES" | "NO" | null;
 }
 
 // A closed-position basis record bound to its wallet, ready to persist into wallet_closed_positions.
@@ -681,7 +735,7 @@ export async function processWallet(
     if (botWalletError) {
       throw botWalletError;
     }
-    return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})`, recentTrades: [], openPositions: [], fills: [], closedPositions: [], assets: [] };
+    return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})`, recentTrades: [], openPositions: [], fills: [], closedPositions: [], assets: [], worldCup: null };
   }
 
   // Merge actually-closed positions with resolved-but-unredeemed ones. /closed-positions holds only
@@ -701,6 +755,14 @@ export async function processWallet(
   // The wallet's best market category (or null), computed over all resolved positions — the same
   // forecasting edge the Skill Score uses, sliced per category. Folded into the single wallet upsert.
   walletRow.specialty = walletSpecialty(positions, CONFIG);
+
+  // World Cup board entry: forecasting edge on WC markets (settled bets) + open WC conviction.
+  // Computed for every non-bot wallet regardless of main-board eligibility, so a WC specialist who
+  // never reaches the leaderboard still appears. main() collects the non-null ones; the rescore /
+  // candidate paths discard it (same as recentTrades/positions).
+  const wcStats = worldCupStats(positions, currentPositions, CONFIG);
+  const worldCup: WorldCupEntry | null = wcStats ? { address: normalized, handle, ...wcStats } : null;
+
   const { error: walletError } = await supabase.from("wallets").upsert(walletRow, { onConflict: "address" });
   if (walletError) {
     throw walletError;
@@ -767,7 +829,8 @@ export async function processWallet(
     openPositions,
     fills,
     closedPositions: closedPositionRecords,
-    assets
+    assets,
+    worldCup
   };
 }
 
@@ -1231,6 +1294,44 @@ async function fetchAllRows<T>(
 // run the same summarizeCrowdedMarkets() aggregation here once and store the ranked rows; the web
 // read collapses to a tiny "ORDER BY rank LIMIT n". Must run after replaceWalletPositions /
 // replaceWalletClosedPositions (reads them back) and after rebuildLeaderboardCache (for the ranks).
+// Precompute the limited-time World Cup board from the WC entries collected during wallet processing
+// (worldCupStats per eligible wallet). Ranks by WC score, then per-share edge, then sample size, and
+// keeps the top N. Wipe-and-replace a tiny table; empty input still clears stale rows.
+async function cacheWorldCup(supabase: SupabaseClient, entries: WorldCupEntry[]): Promise<number> {
+  const ranked = [...entries]
+    .sort((a, b) => b.score - a.score || b.avgEdgePerShare - a.avgEdgePerShare || b.nBets - a.nBets)
+    .slice(0, CONFIG.WORLD_CUP_TOP_N);
+
+  const { error: deleteError } = await supabase.from("world_cup_cache").delete().gte("rank", 0);
+  if (deleteError) {
+    throw deleteError;
+  }
+  if (ranked.length === 0) {
+    return 0;
+  }
+
+  const cachedAt = new Date().toISOString();
+  const rows = ranked.map((entry, index) => ({
+    address: entry.address,
+    rank: index + 1,
+    handle: entry.handle,
+    score: entry.score,
+    n_bets: entry.nBets,
+    win_rate: entry.winRate,
+    avg_edge_per_share: entry.avgEdgePerShare,
+    pnl_usd: entry.pnlUsd,
+    open_bets: entry.openBets,
+    top_market: entry.topMarket,
+    top_side: entry.topSide,
+    cached_at: cachedAt
+  }));
+  const { error: insertError } = await supabase.from("world_cup_cache").insert(rows);
+  if (insertError) {
+    throw insertError;
+  }
+  return rows.length;
+}
+
 async function cacheCrowdedMarkets(supabase: SupabaseClient): Promise<number> {
   // Best (lowest-number) leaderboard rank per address, for the participant rank overlay.
   const { data: cacheData, error: cacheError } = await supabase.from("leaderboard_cache").select("address, rank");
@@ -2183,6 +2284,9 @@ async function main(): Promise<void> {
   // Per-wallet distinct token ids (CLOB assets), for the price-history cache. Scoped to the
   // leaderboard subset after the rebuild.
   const assetsByAddress = new Map<string, string[]>();
+  // World Cup board entries (one per eligible wallet with enough WC bets). NOT board-scoped — the
+  // board ranks WC specialists who may never reach the main leaderboard. Small subset, kept to the tail.
+  const collectedWorldCup: WorldCupEntry[] = [];
   let processed = 0;
   let bots = 0;
   let insufficient = 0;
@@ -2219,6 +2323,9 @@ async function main(): Promise<void> {
         collectedClosed.push(...result.closedPositions);
         if (result.assets.length > 0) {
           assetsByAddress.set(result.address, result.assets);
+        }
+        if (result.worldCup) {
+          collectedWorldCup.push(result.worldCup);
         }
         summary = result.summary;
       } catch (reason) {
@@ -2301,6 +2408,18 @@ async function main(): Promise<void> {
   } catch (reason) {
     console.warn(`Crowded-markets cache failed (non-fatal): ${describeError(reason)}`);
   }
+
+  // Limited-time World Cup board. Non-fatal: a failure leaves the previous board in place. Uses the
+  // in-memory entries collected during processing (not board-scoped — it surfaces WC specialists who
+  // never reach the main leaderboard), so it's independent of the position-table read-backs above.
+  let worldCupCount = 0;
+  try {
+    worldCupCount = await cacheWorldCup(supabase, collectedWorldCup);
+    console.log(`World Cup board: ${worldCupCount} ranked wallets (from ${collectedWorldCup.length} with WC bets)`);
+  } catch (reason) {
+    console.warn(`World Cup cache failed (non-fatal): ${describeError(reason)}`);
+  }
+  collectedWorldCup.length = 0;
 
   // Historical daily price series for the markets leaderboard wallets hold, feeding the web price
   // charts (Convergence YES-price overlay + Market Analytics). Append-only + immutable (resolved

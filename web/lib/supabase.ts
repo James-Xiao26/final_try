@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import type { CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, FreshEntrySummary, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, ResolvedMarket, WalletMetrics, WalletPosition, WalletProfile } from "./types";
+import type { CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, FreshEntrySummary, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, ResolvedMarket, WalletMetrics, WalletPosition, WalletProfile, WorldCupRow } from "./types";
 import type { DELeaderboardEntry, DEMarket, DEPosition, DecisionEngineInputs } from "./decisionEngine";
 import { HORIZONS } from "./types";
 import { groupWalletTrades } from "./walletTrades";
@@ -777,6 +777,53 @@ export async function getCrowdedMarkets(limit = 40): Promise<CrowdedMarketSummar
     topRank: row.top_rank,
     curPrice: row.cur_price,
     lastTradedAt: row.last_traded_at
+  }));
+}
+
+// The limited-time World Cup board: traders ranked purely by forecasting edge on World Cup soccer
+// markets. Served from world_cup_cache, precomputed by the daily full ingest — a tiny "ORDER BY rank
+// LIMIT n" indexed read. Empty until the next full ingest populates it (and on a missing table).
+interface WorldCupSelectRow {
+  rank: number;
+  address: string;
+  handle: string | null;
+  score: number;
+  n_bets: number;
+  win_rate: number;
+  avg_edge_per_share: number;
+  pnl_usd: number;
+  open_bets: number;
+  top_market: string | null;
+  top_side: string | null;
+}
+
+export async function getWorldCupBoard(limit = 100): Promise<WorldCupRow[]> {
+  const supabase = createSupabaseReadClient();
+  const { data, error } = await supabase
+    .from("world_cup_cache")
+    .select("rank, address, handle, score, n_bets, win_rate, avg_edge_per_share, pnl_usd, open_bets, top_market, top_side")
+    .order("rank", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    if (isMissingSchemaError(error)) {
+      return [];
+    }
+    throw error;
+  }
+
+  return ((data ?? []) as unknown as WorldCupSelectRow[]).map((row) => ({
+    rank: row.rank,
+    address: row.address,
+    handle: row.handle,
+    score: toNumber(row.score),
+    nBets: row.n_bets ?? 0,
+    winRate: toNumber(row.win_rate),
+    avgEdgePerShare: toNumber(row.avg_edge_per_share),
+    pnlUsd: toNumber(row.pnl_usd),
+    openBets: row.open_bets ?? 0,
+    topMarket: row.top_market,
+    topSide: row.top_side === "YES" || row.top_side === "NO" ? row.top_side : null
   }));
 }
 

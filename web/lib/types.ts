@@ -222,6 +222,22 @@ export interface FreshEntrySummary {
   lastEntryAt: string | null;   // most recent new-entry fill
 }
 
+// One row of the limited-time World Cup board: a trader ranked purely by forecasting edge on World
+// Cup soccer markets. Served from world_cup_cache, precomputed by the daily full ingest.
+export interface WorldCupRow {
+  rank: number;
+  address: string;
+  handle: string | null;
+  score: number;                // 0-10 World Cup skill score
+  nBets: number;                // resolved WC bets (sample size)
+  winRate: number;              // 0-1
+  avgEdgePerShare: number;      // per-position mean (outcome − entry) on WC bets
+  pnlUsd: number;               // realized $ on resolved WC bets
+  openBets: number;             // current open WC positions (live conviction)
+  topMarket: string | null;     // largest open WC position's market title
+  topSide: "YES" | "NO" | null; // its side
+}
+
 // One tracked fill in a participant's per-market ledger.
 export interface CrowdFill {
   outcomeIndex: number | null;
@@ -508,6 +524,41 @@ export interface Database {
           win_rate?: number | null;
           n_trades?: number | null;
           avg_edge_per_share?: number | null;
+          cached_at?: string;
+        };
+        Relationships: [];
+      };
+      world_cup_cache: {
+        Row: {
+          address: string;
+          rank: number;
+          handle: string | null;
+          score: number;
+          n_bets: number;
+          win_rate: number;
+          avg_edge_per_share: number;
+          pnl_usd: number;
+          open_bets: number;
+          top_market: string | null;
+          top_side: string | null;
+          cached_at: string;
+        };
+        Insert: {
+          address: string;
+          rank: number;
+          handle?: string | null;
+          score: number;
+          n_bets: number;
+          win_rate: number;
+          avg_edge_per_share: number;
+          pnl_usd: number;
+          open_bets: number;
+          top_market?: string | null;
+          top_side?: string | null;
+          cached_at?: string;
+        };
+        Update: {
+          rank?: number;
           cached_at?: string;
         };
         Relationships: [];
