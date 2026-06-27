@@ -812,19 +812,39 @@ export async function getWorldCupBoard(limit = 100): Promise<WorldCupRow[]> {
     throw error;
   }
 
-  return ((data ?? []) as unknown as WorldCupSelectRow[]).map((row) => ({
-    rank: row.rank,
-    address: row.address,
-    handle: row.handle,
-    score: toNumber(row.score),
-    nBets: row.n_bets ?? 0,
-    winRate: toNumber(row.win_rate),
-    avgEdgePerShare: toNumber(row.avg_edge_per_share),
-    pnlUsd: toNumber(row.pnl_usd),
-    openBets: row.open_bets ?? 0,
-    topMarket: row.top_market,
-    topSide: row.top_side === "YES" || row.top_side === "NO" ? row.top_side : null
-  }));
+  const rows = (data ?? []) as unknown as WorldCupSelectRow[];
+  if (rows.length === 0) {
+    return [];
+  }
+
+  // Exclude wallets currently flagged as bots. The board is rewritten only by the daily full ingest
+  // (non-bots at that moment), but an hourly rescore can re-flag a wallet is_bot_suspected between
+  // full ingests without touching world_cup_cache — so check the live flag here. Scoped .in() on the
+  // ≤limit board addresses (42 chars each, well under the URL limit), no extra query on the hot path.
+  const { data: botData } = await supabase
+    .from("wallets")
+    .select("address")
+    .in("address", rows.map((row) => row.address))
+    .eq("is_bot_suspected", true);
+  const bots = new Set((botData ?? []).map((row) => row.address));
+
+  // Re-rank contiguously after dropping bots so the podium/medals stay 1,2,3 (a gap would leave a
+  // missing #1 and a medal-less podium slot).
+  return rows
+    .filter((row) => !bots.has(row.address))
+    .map((row, index) => ({
+      rank: index + 1,
+      address: row.address,
+      handle: row.handle,
+      score: toNumber(row.score),
+      nBets: row.n_bets ?? 0,
+      winRate: toNumber(row.win_rate),
+      avgEdgePerShare: toNumber(row.avg_edge_per_share),
+      pnlUsd: toNumber(row.pnl_usd),
+      openBets: row.open_bets ?? 0,
+      topMarket: row.top_market,
+      topSide: row.top_side === "YES" || row.top_side === "NO" ? row.top_side : null
+    }));
 }
 
 // The ranked "Fresh Entries" list: markets the most leaderboard wallets *just opened a new position*
