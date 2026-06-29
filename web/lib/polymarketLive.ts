@@ -1,7 +1,7 @@
 import type { EventCandidate, MarketMeta, PricePoint } from "./marketAnalytics";
 import { parseEventCandidates, parseJsonArray } from "./marketAnalytics";
 import type { WalletPosition, WalletTradeGroup } from "./types";
-import { groupWalletTrades, type WalletTradeRowInput } from "./walletTrades";
+import { groupWalletTrades, applyClosedBasis, type WalletTradeRowInput, type ClosedBasisInput } from "./walletTrades";
 
 // Server-side, on-demand enrichment from Polymarket's public APIs, used as a *fallback* by
 // getMarketAnalytics. The batch pipeline only caches the top-N listed markets (Gamma) and the outcome
@@ -323,21 +323,16 @@ export async function fetchLiveWalletDetail(address: string): Promise<LiveWallet
   });
 
   // Trade history is grouped from the last ~200 fills only, so a position bought before that window
-  // and sold inside it has SELL fills but no BUY fills — leaving avg entry blank. /closed-positions
-  // carries the true cost basis (avgPrice) per closed position, so backfill the entry by position key.
-  const entryByKey = new Map<string, number>();
-  for (const row of closedRows) {
-    const conditionId = readStr(row, ["conditionId", "market", "marketId"]);
-    const avgPrice = readNum(row, ["avgPrice", "averagePrice", "price"]);
-    if (conditionId && avgPrice > 0) {
-      entryByKey.set(`${conditionId}:${readNum(row, ["outcomeIndex"])}`, avgPrice);
-    }
-  }
-  const tradeGroups = groupWalletTrades(fills).map((group) =>
-    group.avgEntryPrice === null
-      ? { ...group, avgEntryPrice: entryByKey.get(`${group.conditionId}:${group.outcomeIndex}`) ?? null }
-      : group
-  );
+  // shows blank avg entry / 0 bought shares. /closed-positions carries the truth (cost basis, size,
+  // realized P/L); applyClosedBasis backfills it (shared with the cached read path in supabase.ts).
+  const closedBasis: ClosedBasisInput[] = closedRows.map((row) => ({
+    conditionId: readStr(row, ["conditionId", "market", "marketId"]) || null,
+    outcomeIndex: readNum(row, ["outcomeIndex"]),
+    avgPrice: readNum(row, ["avgPrice", "averagePrice", "price"]),
+    size: readNum(row, ["size", "totalBought", "tokens"]),
+    realizedPnl: readNum(row, ["realizedPnl", "realizedPnL", "cashPnl"])
+  }));
+  const tradeGroups = applyClosedBasis(groupWalletTrades(fills), closedBasis);
 
   return { positions, tradeGroups };
 }

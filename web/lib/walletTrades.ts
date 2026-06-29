@@ -96,7 +96,41 @@ export function groupWalletTrades(rows: WalletTradeRowInput[]): WalletTradeGroup
       totalBoughtSize: roundTo(acc.buySize, 4),
       totalSoldSize: roundTo(acc.sellSize, 4),
       totalUsdc: roundTo(acc.totalUsdc, 2),
+      realizedPnl: null, // backfilled by applyClosedBasis from the closed-positions cache
       latestTradedAt: new Date(acc.latestMs).toISOString(),
       fills: acc.fills
     }));
+}
+
+// One closed-position basis row, keyed by conditionId + outcomeIndex. Both the cached read path
+// (wallet_closed_positions) and the live fallback (/closed-positions) map their rows into this.
+export interface ClosedBasisInput {
+  conditionId: string | null;
+  outcomeIndex: number | null;
+  avgPrice: number | null; // true cost-basis entry price
+  size: number | null; // shares closed (≈ shares bought for a fully-closed position)
+  realizedPnl: number | null;
+}
+
+// Backfill trade groups from the closed-positions cache. The trade history is grouped from only the
+// last ~200 fills, so a position bought before that window shows blank avg entry and 0 bought shares
+// even though it was really bought — the closed row carries the truth. Also attaches realized P/L.
+// Kept here (not duplicated per read path) so the cached and live fallbacks stay in sync.
+export function applyClosedBasis(groups: WalletTradeGroup[], closed: ClosedBasisInput[]): WalletTradeGroup[] {
+  const byKey = new Map<string, ClosedBasisInput>();
+  for (const row of closed) {
+    if (row.conditionId) byKey.set(`${row.conditionId}:${row.outcomeIndex}`, row);
+  }
+  return groups.map((group) => {
+    const match = byKey.get(`${group.conditionId}:${group.outcomeIndex}`);
+    if (!match) return group;
+    const avgPrice = match.avgPrice;
+    const size = match.size;
+    return {
+      ...group,
+      avgEntryPrice: group.avgEntryPrice === null && avgPrice !== null && avgPrice > 0 ? avgPrice : group.avgEntryPrice,
+      totalBoughtSize: group.totalBoughtSize === 0 && size !== null && size > 0 ? size : group.totalBoughtSize,
+      realizedPnl: match.realizedPnl
+    };
+  });
 }

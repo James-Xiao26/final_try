@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import type { CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, FreshEntrySummary, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, ResolvedMarket, WalletMetrics, WalletPosition, WalletProfile, WorldCupRow } from "./types";
 import type { DELeaderboardEntry, DEMarket, DEPosition, DecisionEngineInputs } from "./decisionEngine";
 import { HORIZONS } from "./types";
-import { groupWalletTrades } from "./walletTrades";
+import { groupWalletTrades, applyClosedBasis } from "./walletTrades";
 import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis, type TradeBasis } from "./recentTrades";
 import { buildCrowdMarketDetail, type CrowdClosedPosition, type CrowdLookups, type CrowdOpenPosition, type CrowdTradeFill } from "./marketCrowd";
 import type { MarketAnalytics, MarketMeta, PriceLine, PricePoint, WhaleFillInput } from "./marketAnalytics";
@@ -544,7 +544,7 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
     supabase.from("leaderboard_cache").select("rank, horizon_days").eq("address", normalized).order("horizon_days"),
     supabase.from("wallet_positions").select("condition_id, asset, market, outcome_index, size, avg_price, cur_price, initial_value, current_value, cash_pnl, end_date").eq("address", normalized),
     supabase.from("wallet_trades").select("condition_id, market, outcome_index, side, price, size, usdc_size, traded_at, transaction_hash").eq("address", normalized).order("traded_at", { ascending: false }),
-    supabase.from("wallet_closed_positions").select("condition_id, outcome_index, avg_price").eq("address", normalized)
+    supabase.from("wallet_closed_positions").select("condition_id, outcome_index, avg_price, size, realized_pnl").eq("address", normalized)
   ]);
 
   if (statsError) {
@@ -591,19 +591,17 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
   let positions = ((positionsData ?? []) as unknown as WalletPositionSelectRow[]).map(mapWalletPosition);
   let tradeGroups = groupWalletTrades((tradesData ?? []) as unknown as WalletTradeSelectRow[]);
 
-  // Trade history is grouped from the last ~200 fills, so a position bought before that window but
-  // sold inside it has SELL fills with no BUY fills, leaving avg entry blank. wallet_closed_positions
-  // carries the true cost basis (avg_price), so backfill the entry by conditionId:outcomeIndex.
-  const entryByKey = new Map<string, number>();
-  ((closedData ?? []) as unknown as { condition_id: string | null; outcome_index: number | null; avg_price: number | null }[]).forEach((row) => {
-    const avg = toNumber(row.avg_price);
-    if (row.condition_id && avg > 0) entryByKey.set(`${row.condition_id}:${row.outcome_index}`, avg);
-  });
-  tradeGroups = tradeGroups.map((group) =>
-    group.avgEntryPrice === null
-      ? { ...group, avgEntryPrice: entryByKey.get(`${group.conditionId}:${group.outcomeIndex}`) ?? null }
-      : group
-  );
+  // Trade history is grouped from the last ~200 fills, so a position bought before that window shows
+  // blank avg entry / 0 bought shares. wallet_closed_positions carries the truth (cost basis, size,
+  // realized P/L), so backfill by conditionId:outcomeIndex (shared with the live fallback).
+  const closedBasis = ((closedData ?? []) as unknown as ClosedPositionRowDb[]).map((row) => ({
+    conditionId: row.condition_id,
+    outcomeIndex: row.outcome_index,
+    avgPrice: row.avg_price,
+    size: row.size,
+    realizedPnl: row.realized_pnl
+  }));
+  tradeGroups = applyClosedBasis(tradeGroups, closedBasis);
 
   // Board-scoping: ingest only persists position/trade detail for the ~TOP_N leaderboard wallets, so
   // an eligible-but-non-board wallet (e.g. a World Cup specialist linked from that board) has a score

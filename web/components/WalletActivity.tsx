@@ -133,6 +133,7 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
                 <th className="r">Avg Exit</th>
                 <th className="r">Bought</th>
                 <th className="r">Sold</th>
+                <th className="r">P/L</th>
                 <th className="r">Last</th>
               </tr>
             </thead>
@@ -140,6 +141,7 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
               {tradeGroups.map((group, index) => {
                 const key = `${group.conditionId}:${group.outcomeIndex}:${index}`;
                 const isOpen = Boolean(openKeys[key]);
+                const pnl = group.realizedPnl;
                 return (
                   <Fragment key={key}>
                     <tr className="wa-grouprow" onClick={() => toggle(key)} style={{ cursor: "pointer" }}>
@@ -150,11 +152,14 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
                       <td className="r">{group.avgExitPrice === null ? "—" : formatPrice(group.avgExitPrice)}</td>
                       <td className="r">{formatNumber(group.totalBoughtSize)}</td>
                       <td className="r">{formatNumber(group.totalSoldSize)}</td>
+                      <td className={`r ${pnl === null ? "" : pnl >= 0 ? "pos" : "neg"}`}>
+                        {pnl === null ? "—" : `${pnl >= 0 ? "+" : ""}${formatUsd(pnl)}`}
+                      </td>
                       <td className="r" title={group.latestTradedAt}>{formatDate(group.latestTradedAt)}</td>
                     </tr>
                     {isOpen && (
                       <tr className="wa-fillsrow">
-                        <td colSpan={8}><FillRows fills={group.fills} /></td>
+                        <td colSpan={9}><FillRows fills={group.fills} /></td>
                       </tr>
                     )}
                   </Fragment>
