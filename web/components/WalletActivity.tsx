@@ -63,6 +63,10 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
     setOpenKeys((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  // Drop positions with no usable cost basis (initial value ≤ 0): Polymarket either omitted the field
+  // or the shares were free/converted, so both the P/L dollar and % would be misleading — exclude them.
+  const openPositions = positions.filter((position) => position.initialValue > 0);
+
   return (
     <>
       <section className="panel wa-section">
@@ -70,7 +74,7 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
           <h2>Current <span className="g">Positions</span></h2>
           <span className="meta">open holdings · marked to market</span>
         </div>
-        {positions.length === 0 ? (
+        {openPositions.length === 0 ? (
           <p className="muted" style={{ padding: 24, margin: 0 }}>No open positions on record.</p>
         ) : (
           <table className="wa-table">
@@ -86,10 +90,11 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
               </tr>
             </thead>
             <tbody>
-              {positions.map((position, index) => {
+              {openPositions.map((position, index) => {
                 const unrealized = position.currentValue - position.initialValue;
-                // % computed from the raw values (before formatUsd rounds the dollar figure) for accuracy.
-                const pct = position.initialValue > 0 ? unrealized / position.initialValue : null;
+                // % from the raw values (before formatUsd rounds the dollar) for accuracy; basis is
+                // guaranteed > 0 by the openPositions filter above.
+                const pct = unrealized / position.initialValue;
                 return (
                   <tr key={`${position.asset}-${index}`}>
                     <td className="wa-market"><span title={position.market ?? ""}>{position.market || "—"}</span></td>
@@ -100,7 +105,7 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
                     <td className="r">{formatUsd(position.currentValue)}</td>
                     <td className={`r ${unrealized >= 0 ? "pos" : "neg"}`}>
                       {unrealized >= 0 ? "+" : ""}{formatUsd(unrealized)}
-                      {pct !== null && <span className="wa-pct"> ({formatPercent(pct, true)})</span>}
+                      <span className="wa-pct"> ({formatPercent(pct, true)})</span>
                     </td>
                   </tr>
                 );
