@@ -6,6 +6,8 @@ export interface WalletTradeRowInput {
   condition_id: string | null;
   market: string | null;
   outcome_index: number | null;
+  outcome_label: string | null;
+  event_slug: string | null;
   side: string | null;
   price: number | null;
   size: number | null;
@@ -27,6 +29,8 @@ interface TradeGroupAcc {
   conditionId: string | null;
   market: string | null;
   outcomeIndex: number | null;
+  outcomeLabel: string | null;
+  eventSlug: string | null;
   buyWeighted: number; // Σ price·size over BUY fills, for the volume-weighted avg entry
   buySize: number;
   sellWeighted: number; // Σ price·size over SELL fills, for the volume-weighted avg exit
@@ -50,6 +54,8 @@ export function groupWalletTrades(rows: WalletTradeRowInput[]): WalletTradeGroup
         conditionId: row.condition_id,
         market: row.market,
         outcomeIndex: row.outcome_index,
+        outcomeLabel: row.outcome_label,
+        eventSlug: row.event_slug,
         buyWeighted: 0,
         buySize: 0,
         sellWeighted: 0,
@@ -91,6 +97,8 @@ export function groupWalletTrades(rows: WalletTradeRowInput[]): WalletTradeGroup
       conditionId: acc.conditionId,
       market: acc.market,
       outcomeIndex: acc.outcomeIndex,
+      outcomeLabel: acc.outcomeLabel,
+      eventSlug: acc.eventSlug,
       avgEntryPrice: acc.buySize > 0 ? roundTo(acc.buyWeighted / acc.buySize, 4) : null,
       avgExitPrice: acc.sellSize > 0 ? roundTo(acc.sellWeighted / acc.sellSize, 4) : null,
       totalBoughtSize: roundTo(acc.buySize, 4),
@@ -109,6 +117,8 @@ export interface ClosedBasisInput {
   conditionId: string | null;
   outcomeIndex: number | null;
   market: string | null;
+  outcomeLabel: string | null;
+  eventSlug: string | null;
   avgPrice: number | null; // true cost-basis entry price
   size: number | null; // shares closed (≈ shares bought for a fully-closed position)
   realizedPnl: number | null;
@@ -143,6 +153,8 @@ export function applyClosedBasis(groups: WalletTradeGroup[], closed: ClosedBasis
     const basis = closedBasisCost(match);
     return {
       ...group,
+      outcomeLabel: group.outcomeLabel ?? match.outcomeLabel,
+      eventSlug: group.eventSlug ?? match.eventSlug,
       avgEntryPrice: group.avgEntryPrice === null && avgPrice !== null && avgPrice > 0 ? avgPrice : group.avgEntryPrice,
       totalBoughtSize: group.totalBoughtSize === 0 && size !== null && size > 0 ? size : group.totalBoughtSize,
       realizedPnl,
@@ -161,6 +173,8 @@ export function applyClosedBasis(groups: WalletTradeGroup[], closed: ClosedBasis
       conditionId: row.conditionId,
       market: row.market,
       outcomeIndex: row.outcomeIndex,
+      outcomeLabel: row.outcomeLabel,
+      eventSlug: row.eventSlug,
       avgEntryPrice: avgPrice !== null && avgPrice > 0 ? avgPrice : null,
       avgExitPrice: exit,
       totalBoughtSize: size ?? 0,

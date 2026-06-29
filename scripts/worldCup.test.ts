@@ -16,6 +16,8 @@ function closed(overrides: Partial<ClosedPosition> = {}): ClosedPosition {
     realizedPnl: 10,
     closeTime: new Date().toISOString(),
     outcome: 1,
+    outcomeLabel: null,
+    eventSlug: null,
     ...overrides
   };
 }
@@ -36,6 +38,8 @@ function openPos(overrides: Partial<Position> = {}): Position {
     curPrice: 0.6,
     endDate: null,
     redeemable: false,
+    outcomeLabel: null,
+    eventSlug: null,
     ...overrides
   };
 }

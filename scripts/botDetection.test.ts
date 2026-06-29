@@ -18,6 +18,8 @@ function trade(overrides: Partial<TradeActivity> = {}): TradeActivity {
     asset: "asset",
     outcomeIndex: 0,
     market: "market",
+    outcomeLabel: null,
+    eventSlug: null,
     transactionHash: null,
     ...overrides
   };

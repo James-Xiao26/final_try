@@ -221,6 +221,8 @@ function position(overrides: Partial<Position> = {}): Position {
     curPrice: 0.6,
     endDate: null,
     redeemable: false,
+    outcomeLabel: null,
+    eventSlug: null,
     ...overrides
   };
 }

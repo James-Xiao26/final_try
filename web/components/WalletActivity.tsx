@@ -9,13 +9,23 @@ interface WalletActivityProps {
   tradeGroups: WalletTradeGroup[];
 }
 
-// Polymarket binary markets index 0/1 as Yes/No; multi-outcome markets carry no label here, so fall
-// back to the raw index.
-function outcomeLabel(index: number | null): string {
+// Prefer Polymarket's real outcome label ("Over"/"Under"/team/"Yes"/"No"); fall back to the index
+// (binary markets are 0=Yes/1=No) when the label wasn't captured (older cached rows).
+function outcomeLabel(label: string | null, index: number | null): string {
+  if (label) return label;
   if (index === 0) return "Yes";
   if (index === 1) return "No";
   if (index === null) return "—";
   return `#${index}`;
+}
+
+// Humanize an event slug ("cs2-paina-bk-2026-06-29" → "cs2 paina bk") so grouped markets whose title
+// omits the event (e.g. "Games Total: O/U 2.5") still say which match they belong to. Drops a trailing
+// ISO-ish date and turns dashes into spaces. Returns null when there's nothing useful left.
+function humanizeEvent(slug: string | null): string | null {
+  if (!slug) return null;
+  const text = slug.replace(/-\d{4}-\d{2}-\d{2}$/, "").replace(/-/g, " ").trim();
+  return text || null;
 }
 
 function sideClass(side: string | null): string {
@@ -98,7 +108,7 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
                 return (
                   <tr key={`${position.asset}-${index}`}>
                     <td className="wa-market"><span title={position.market ?? ""}>{position.market || "—"}</span></td>
-                    <td>{outcomeLabel(position.outcomeIndex)}</td>
+                    <td>{outcomeLabel(null, position.outcomeIndex)}</td>
                     <td className="r">{formatNumber(position.size)}</td>
                     <td className="r">{formatPrice(position.avgPrice)}</td>
                     <td className="r">{formatPrice(position.curPrice)}</td>
@@ -149,8 +159,11 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
                   <Fragment key={key}>
                     <tr className="wa-grouprow" onClick={() => hasFills && toggle(key)} style={{ cursor: hasFills ? "pointer" : "default" }}>
                       <td className="wa-caret">{hasFills ? (isOpen ? "▾" : "▸") : ""}</td>
-                      <td className="wa-market"><span title={group.market ?? ""}>{group.market || "—"}</span></td>
-                      <td>{outcomeLabel(group.outcomeIndex)}</td>
+                      <td className="wa-market">
+                        <span title={group.market ?? ""}>{group.market || "—"}</span>
+                        {humanizeEvent(group.eventSlug) && <span className="wa-event">{humanizeEvent(group.eventSlug)}</span>}
+                      </td>
+                      <td>{outcomeLabel(group.outcomeLabel, group.outcomeIndex)}</td>
                       <td className="r">{group.avgEntryPrice === null ? "—" : formatPrice(group.avgEntryPrice)}</td>
                       <td className="r">{group.avgExitPrice === null ? "—" : formatPrice(group.avgExitPrice)}</td>
                       <td className="r">{formatNumber(group.totalBoughtSize)}</td>

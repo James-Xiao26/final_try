@@ -20,6 +20,8 @@ function fill(partial: Partial<TradeActivity> & { side: TradeActivity["side"]; h
     asset: partial.asset ?? "tok",
     outcomeIndex: partial.outcomeIndex ?? 0,
     market: partial.market ?? "Will it rain?",
+    outcomeLabel: null,
+    eventSlug: null,
     transactionHash: null
   };
 }

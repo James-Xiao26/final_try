@@ -66,6 +66,10 @@ export interface WalletTradeGroup {
   conditionId: string | null;
   market: string | null;
   outcomeIndex: number | null;
+  // Real outcome label ("Over"/"Under"/team/"Yes"/"No") and event slug from Polymarket, so the row
+  // shows which side was taken and which event it was (the market title alone can omit both).
+  outcomeLabel: string | null;
+  eventSlug: string | null;
   avgEntryPrice: number | null;
   avgExitPrice: number | null;
   totalBoughtSize: number;
@@ -811,6 +815,8 @@ export interface Database {
           condition_id: string | null;
           market: string | null;
           outcome_index: number | null;
+          outcome_label: string | null;
+          event_slug: string | null;
           side: string | null;
           price: number | null;
           size: number | null;
@@ -858,6 +864,8 @@ export interface Database {
           size: number | null;
           close_time: string | null;
           first_traded_at: string | null;
+          outcome_label: string | null;
+          event_slug: string | null;
           ingested_at: string;
         };
         Insert: {

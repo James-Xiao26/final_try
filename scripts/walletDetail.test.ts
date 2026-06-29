@@ -15,6 +15,8 @@ function activity(partial: Partial<TradeActivity>): TradeActivity {
     asset: "a1",
     outcomeIndex: 0,
     market: "Will it rain?",
+    outcomeLabel: null,
+    eventSlug: null,
     transactionHash: null,
     ...partial
   };
@@ -36,6 +38,8 @@ function position(partial: Partial<Position>): Position {
     curPrice: 0.55,
     endDate: null,
     redeemable: false,
+    outcomeLabel: null,
+    eventSlug: null,
     ...partial
   };
 }

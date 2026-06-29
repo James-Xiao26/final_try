@@ -10,6 +10,8 @@ export interface ProfileFill {
   conditionId: string;
   market: string;
   outcomeIndex: number;
+  outcomeLabel: string | null;
+  eventSlug: string | null;
   side: "BUY" | "SELL" | "UNKNOWN";
   price: number;
   size: number;
@@ -68,6 +70,8 @@ export function profileFillsFromActivity(
       conditionId: trade.conditionId,
       market: trade.market,
       outcomeIndex: trade.outcomeIndex,
+      outcomeLabel: trade.outcomeLabel,
+      eventSlug: trade.eventSlug,
       side: trade.side,
       price: trade.price,
       size: trade.size,

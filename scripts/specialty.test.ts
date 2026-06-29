@@ -16,6 +16,8 @@ function position(overrides: Partial<ClosedPosition> = {}): ClosedPosition {
     realizedPnl: 0,
     closeTime: new Date().toISOString(),
     outcome: 1,
+    outcomeLabel: null,
+    eventSlug: null,
     ...overrides
   };
 }

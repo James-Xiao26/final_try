@@ -15,6 +15,8 @@ function activity(partial: Partial<TradeActivity>): TradeActivity {
     asset: "a1",
     outcomeIndex: 0,
     market: "Will it rain?",
+    outcomeLabel: null,
+    eventSlug: null,
     transactionHash: null,
     ...partial
   };

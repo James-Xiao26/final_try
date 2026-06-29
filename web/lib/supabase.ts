@@ -35,7 +35,7 @@ type WalletPositionSelectRow = Pick<
 type WalletTradeRowDb = Database["public"]["Tables"]["wallet_trades"]["Row"];
 type WalletTradeSelectRow = Pick<
   WalletTradeRowDb,
-  "condition_id" | "market" | "outcome_index" | "side" | "price" | "size" | "usdc_size" | "traded_at" | "transaction_hash"
+  "condition_id" | "market" | "outcome_index" | "outcome_label" | "event_slug" | "side" | "price" | "size" | "usdc_size" | "traded_at" | "transaction_hash"
 >;
 type WalletClosedPositionRowDb = Database["public"]["Tables"]["wallet_closed_positions"]["Row"];
 // The feed's basis lookups: open state from wallet_positions, closed basis from wallet_closed_positions.
@@ -543,8 +543,8 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
     supabase.from("equity_curve").select("horizon_days, ts, cumulative_pnl").eq("address", normalized).in("horizon_days", [...HORIZONS]).order("ts"),
     supabase.from("leaderboard_cache").select("rank, horizon_days").eq("address", normalized).order("horizon_days"),
     supabase.from("wallet_positions").select("condition_id, asset, market, outcome_index, size, avg_price, cur_price, initial_value, current_value, cash_pnl, end_date").eq("address", normalized),
-    supabase.from("wallet_trades").select("condition_id, market, outcome_index, side, price, size, usdc_size, traded_at, transaction_hash").eq("address", normalized).order("traded_at", { ascending: false }),
-    supabase.from("wallet_closed_positions").select("condition_id, outcome_index, market, avg_price, size, realized_pnl, close_time").eq("address", normalized)
+    supabase.from("wallet_trades").select("condition_id, market, outcome_index, outcome_label, event_slug, side, price, size, usdc_size, traded_at, transaction_hash").eq("address", normalized).order("traded_at", { ascending: false }),
+    supabase.from("wallet_closed_positions").select("condition_id, outcome_index, market, outcome_label, event_slug, avg_price, size, realized_pnl, close_time").eq("address", normalized)
   ]);
 
   if (statsError) {
@@ -598,6 +598,8 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
     conditionId: row.condition_id,
     outcomeIndex: row.outcome_index,
     market: row.market,
+    outcomeLabel: row.outcome_label,
+    eventSlug: row.event_slug,
     avgPrice: row.avg_price,
     size: row.size,
     realizedPnl: row.realized_pnl,
@@ -693,6 +695,8 @@ interface ClosedPositionRowDb {
   condition_id: string | null;
   outcome_index: number | null;
   market: string | null;
+  outcome_label: string | null;
+  event_slug: string | null;
   avg_price: number | null;
   realized_pnl: number | null;
   size: number | null;

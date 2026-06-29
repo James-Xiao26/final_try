@@ -294,6 +294,8 @@ function activity(overrides: Partial<TradeActivity> = {}): TradeActivity {
     asset: "a",
     outcomeIndex: 0,
     market: "m",
+    outcomeLabel: null,
+    eventSlug: null,
     transactionHash: null,
     ...overrides
   };
@@ -311,6 +313,8 @@ function closedPosition(overrides: Partial<ClosedPosition> = {}): ClosedPosition
     realizedPnl: 50,
     closeTime: new Date(Date.now() - 5 * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND).toISOString(),
     outcome: 1,
+    outcomeLabel: null,
+    eventSlug: null,
     ...overrides
   };
 }

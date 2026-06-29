@@ -16,6 +16,9 @@ export interface ClosedPosition {
   // eventual outcome). Positions held to resolution always have it (curPrice is 0/1); positions
   // sold before resolution only have it if the API payload carries a settled price.
   outcome: number | null;
+  // Human outcome label ("Over"/"Under"/team/"Yes"/"No") and event slug from the API, for display.
+  outcomeLabel: string | null;
+  eventSlug: string | null;
 }
 
 export interface Position {
@@ -35,6 +38,9 @@ export interface Position {
   // True once the market has resolved (the position is settleable). Distinguishes resolved-but-
   // unredeemed positions (which carry a realized win/loss) from genuinely-open ones.
   redeemable: boolean;
+  // Human outcome label ("Over"/"Under"/team/"Yes"/"No") and event slug from the API, for display.
+  outcomeLabel: string | null;
+  eventSlug: string | null;
 }
 
 export interface TradeActivity {
@@ -48,6 +54,10 @@ export interface TradeActivity {
   asset: string;
   outcomeIndex: number;
   market: string;
+  // Human outcome label ("Over"/"Under"/team/"Yes"/"No") and event slug from the API — index alone
+  // can't say whether an O/U bet was Over or Under, and the market title omits the event.
+  outcomeLabel: string | null;
+  eventSlug: string | null;
   transactionHash: string | null;
 }
 
@@ -279,7 +289,9 @@ export function mapClosedPosition(record: JsonRecord): ClosedPosition {
     avgPrice,
     realizedPnl,
     closeTime: timestampToIso(typeof timestamp === "string" || typeof timestamp === "number" ? timestamp : 0),
-    outcome
+    outcome,
+    outcomeLabel: readString(record, ["outcome"]) || null,
+    eventSlug: readString(record, ["eventSlug"]) || null
   };
 }
 
@@ -298,7 +310,9 @@ export function mapPosition(record: JsonRecord): Position {
     realizedPnl: readNumber(record, ["realizedPnl", "realizedPnL"]),
     curPrice: readNumber(record, ["curPrice", "price"]),
     endDate: readString(record, ["endDate"]) || null,
-    redeemable: record.redeemable === true
+    redeemable: record.redeemable === true,
+    outcomeLabel: readString(record, ["outcome"]) || null,
+    eventSlug: readString(record, ["eventSlug"]) || null
   };
 }
 
@@ -329,7 +343,9 @@ export function resolvedToClosed(positions: Position[]): ClosedPosition[] {
       realizedPnl: position.cashPnl,
       closeTime: isoFromEndDate(position.endDate),
       // Held to resolution and redeemable, so curPrice is the settled price (0 or 1) = the outcome.
-      outcome: outcomeFromResolvedPrice(position.curPrice)
+      outcome: outcomeFromResolvedPrice(position.curPrice),
+      outcomeLabel: position.outcomeLabel,
+      eventSlug: position.eventSlug
     }));
 }
 
@@ -358,6 +374,8 @@ export function mapActivity(record: JsonRecord): TradeActivity {
     asset: readString(record, ["asset", "tokenId"]),
     outcomeIndex: readNumber(record, ["outcomeIndex"]),
     market: readString(record, ["market", "title", "question"]),
+    outcomeLabel: readString(record, ["outcome"]) || null,
+    eventSlug: readString(record, ["eventSlug"]) || null,
     transactionHash: readString(record, ["transactionHash", "txHash"]) || null
   };
 }

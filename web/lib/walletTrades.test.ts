@@ -7,6 +7,8 @@ function row(partial: Partial<WalletTradeRowInput>): WalletTradeRowInput {
     condition_id: "c1",
     market: "Will it rain?",
     outcome_index: 0,
+    outcome_label: null,
+    event_slug: null,
     side: "BUY",
     price: 0.5,
     size: 10,
@@ -73,6 +75,8 @@ function closed(partial: Partial<ClosedBasisInput>): ClosedBasisInput {
     conditionId: "c1",
     outcomeIndex: 0,
     market: "Will it rain?",
+    outcomeLabel: null,
+    eventSlug: null,
     avgPrice: 0.4,
     size: 500,
     realizedPnl: 0,
@@ -117,13 +121,15 @@ test("applyClosedBasis leaves groups with no matching closed row untouched (P/L 
 test("applyClosedBasis appends synthetic rows for closed positions absent from the fill window", () => {
   // Fill window saturated by one market (c1); the wallet also closed c2 + c3 earlier (no fills here).
   const groups = applyClosedBasis(groupWalletTrades([row({ condition_id: "c1", side: "BUY", size: 10 })]), [
-    closed({ conditionId: "c2", market: "Old A", avgPrice: 0.5, size: 100, realizedPnl: 50, closeTime: "2026-01-10T00:00:00.000Z" }),
+    closed({ conditionId: "c2", market: "Old A", outcomeLabel: "Under", eventSlug: "cs2-foo-2026-01-10", avgPrice: 0.5, size: 100, realizedPnl: 50, closeTime: "2026-01-10T00:00:00.000Z" }),
     closed({ conditionId: "c3", market: "Old B", avgPrice: 0.2, size: 100, realizedPnl: -20, closeTime: "2026-01-08T00:00:00.000Z" })
   ]);
   assert.equal(groups.length, 3); // the live c1 group + two synthetic closed rows
   const synth = groups.find((g) => g.conditionId === "c2");
   assert.ok(synth);
   assert.equal(synth.market, "Old A");
+  assert.equal(synth.outcomeLabel, "Under"); // real side label carried onto the synthetic row
+  assert.equal(synth.eventSlug, "cs2-foo-2026-01-10");
   assert.equal(synth.totalBoughtSize, 100);
   assert.equal(synth.totalSoldSize, 100);
   assert.equal(synth.realizedPnl, 50);

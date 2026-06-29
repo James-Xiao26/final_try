@@ -18,6 +18,8 @@ function position(overrides: Partial<Position> = {}): Position {
     curPrice: 0,
     endDate: "2026-05-10",
     redeemable: true,
+    outcomeLabel: null,
+    eventSlug: null,
     ...overrides
   };
 }

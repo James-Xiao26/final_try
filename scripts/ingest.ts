@@ -430,6 +430,8 @@ interface Database {
           condition_id: string | null;
           market: string | null;
           outcome_index: number | null;
+          outcome_label: string | null;
+          event_slug: string | null;
           side: string | null;
           price: number | null;
           size: number | null;
@@ -443,6 +445,8 @@ interface Database {
           condition_id?: string | null;
           market?: string | null;
           outcome_index?: number | null;
+          outcome_label?: string | null;
+          event_slug?: string | null;
           side?: string | null;
           price?: number | null;
           size?: number | null;
@@ -455,6 +459,8 @@ interface Database {
           condition_id?: string | null;
           market?: string | null;
           outcome_index?: number | null;
+          outcome_label?: string | null;
+          event_slug?: string | null;
           side?: string | null;
           price?: number | null;
           size?: number | null;
@@ -477,6 +483,8 @@ interface Database {
           size: number | null;
           close_time: string | null;
           first_traded_at: string | null;
+          outcome_label: string | null;
+          event_slug: string | null;
           ingested_at: string;
         };
         Insert: {
@@ -489,6 +497,8 @@ interface Database {
           size?: number | null;
           close_time?: string | null;
           first_traded_at?: string | null;
+          outcome_label?: string | null;
+          event_slug?: string | null;
           ingested_at?: string;
         };
         Update: {
@@ -500,6 +510,8 @@ interface Database {
           size?: number | null;
           close_time?: string | null;
           first_traded_at?: string | null;
+          outcome_label?: string | null;
+          event_slug?: string | null;
           ingested_at?: string;
         };
         Relationships: [];
@@ -645,6 +657,9 @@ interface ClosedPositionRecord {
   // Resolved outcome of this position's token (1/0/null) — drives the copy-trade equity sim. Not
   // persisted; used only in-memory by writeDailyEquityCurves.
   outcome: number | null;
+  // Human outcome label ("Over"/"Under"/team/"Yes"/"No") and event slug, persisted for trade history.
+  outcomeLabel: string | null;
+  eventSlug: string | null;
 }
 
 // Supabase throws PostgrestError-shaped plain objects ({ message, code, details, hint }), not
@@ -809,7 +824,9 @@ export async function processWallet(
         size: position.size,
         closeTime: position.closeTime,
         firstTradedAt: entryDates.get(position.asset) ?? null,
-        outcome: position.outcome
+        outcome: position.outcome,
+        outcomeLabel: position.outcomeLabel,
+        eventSlug: position.eventSlug
       }));
 
   // Distinct outcome-token ids held at any point in the window — union of closed (sold/redeemed)
@@ -1138,6 +1155,8 @@ function toWalletTradeRow(fill: ProfileFill): Database["public"]["Tables"]["wall
     condition_id: fill.conditionId,
     market: fill.market,
     outcome_index: fill.outcomeIndex,
+    outcome_label: fill.outcomeLabel,
+    event_slug: fill.eventSlug,
     side: fill.side,
     price: fill.price,
     size: fill.size,
@@ -1218,7 +1237,9 @@ function toClosedPositionRow(record: ClosedPositionRecord): Database["public"]["
     realized_pnl: record.realizedPnl,
     size: record.size,
     close_time: record.closeTime,
-    first_traded_at: record.firstTradedAt
+    first_traded_at: record.firstTradedAt,
+    outcome_label: record.outcomeLabel,
+    event_slug: record.eventSlug
   };
 }
 
