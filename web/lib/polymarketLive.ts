@@ -327,13 +327,22 @@ export async function fetchLiveWalletDetail(address: string): Promise<LiveWallet
   // realized P/L); applyClosedBasis backfills it (shared with the cached read path in supabase.ts).
   const closedBasis: ClosedBasisInput[] = closedRows.map((row) => {
     const closeTs = readNum(row, ["closeTime", "timestamp", "resolutionTime", "endDate"]);
+    const avgPrice = readNum(row, ["avgPrice", "averagePrice", "price"]);
+    const size = readNum(row, ["size", "totalBought", "tokens"]);
+    // Mirror the ingest's mapClosedPosition: a position held to resolution but unredeemed reports
+    // realizedPnl 0 though it settled at 0/1, so use size·(outcome−avgPrice) when the outcome is known.
+    // Read curPrice only if actually present (a missing field must stay null, not default to 0=loss).
+    const curRaw = row.curPrice ?? row.resolvedPrice ?? row.payout;
+    const cur = typeof curRaw === "number" ? curRaw : null;
+    const outcome = cur === null ? null : cur >= 0.999 ? 1 : cur <= 0.001 ? 0 : null;
+    const reportedPnl = readNum(row, ["realizedPnl", "realizedPnL", "cashPnl"]);
     return {
       conditionId: readStr(row, ["conditionId", "market", "marketId"]) || null,
       outcomeIndex: readNum(row, ["outcomeIndex"]),
       market: readStr(row, ["title", "question", "market"]) || null,
-      avgPrice: readNum(row, ["avgPrice", "averagePrice", "price"]),
-      size: readNum(row, ["size", "totalBought", "tokens"]),
-      realizedPnl: readNum(row, ["realizedPnl", "realizedPnL", "cashPnl"]),
+      avgPrice,
+      size,
+      realizedPnl: reportedPnl === 0 && outcome !== null ? size * (outcome - avgPrice) : reportedPnl,
       closeTime: closeTs > 0 ? new Date(closeTs * 1000).toISOString() : null
     };
   });

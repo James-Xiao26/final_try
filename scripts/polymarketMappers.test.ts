@@ -40,6 +40,30 @@ test("mapClosedPosition maps canonical fields and lowercases the wallet", () => 
   assert.equal(out.outcome, 1);
 });
 
+test("mapClosedPosition derives settlement P/L for a resolved-but-unredeemed position (reported 0)", () => {
+  // Held to resolution, won (curPrice 1), but not yet redeemed → Polymarket reports realizedPnl 0.
+  const out = mapClosedPosition({ size: 100, avgPrice: 0.5, realizedPnl: 0, curPrice: 1 });
+  assert.equal(out.outcome, 1);
+  assert.equal(out.realizedPnl, 50); // 100·(1 − 0.5)
+});
+
+test("mapClosedPosition derives the settlement loss for a held-to-resolution loser (reported 0)", () => {
+  const out = mapClosedPosition({ size: 100, avgPrice: 0.25, realizedPnl: 0, curPrice: 0 });
+  assert.equal(out.outcome, 0);
+  assert.equal(out.realizedPnl, -25); // 100·(0 − 0.25)
+});
+
+test("mapClosedPosition keeps a non-zero reported P/L untouched (partial sell)", () => {
+  const out = mapClosedPosition({ size: 100, avgPrice: 0.5, realizedPnl: 12.5, curPrice: 1 });
+  assert.equal(out.realizedPnl, 12.5); // reported P/L wins; no settlement override
+});
+
+test("mapClosedPosition leaves reported-0 P/L at 0 when the outcome is unknown (still trading)", () => {
+  const out = mapClosedPosition({ size: 100, avgPrice: 0.5, realizedPnl: 0, curPrice: 0.5 });
+  assert.equal(out.outcome, null);
+  assert.equal(out.realizedPnl, 0);
+});
+
 test("mapClosedPosition reads alternate API key names", () => {
   const out = mapClosedPosition({
     user: "0xWALLET",

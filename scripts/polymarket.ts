@@ -257,19 +257,29 @@ async function fetchJson(
 
 export function mapClosedPosition(record: JsonRecord): ClosedPosition {
   const timestamp = record.closeTime ?? record.timestamp ?? record.resolutionTime ?? record.endDate ?? 0;
+  const size = readNumber(record, ["size", "totalBought", "tokens"]);
+  const avgPrice = readNumber(record, ["avgPrice", "averagePrice", "price"]);
+  // Sold positions only expose an outcome if the payload carries a settled price; absent that
+  // (or if the market is still trading), this is null and the position is excluded from edge.
+  const outcome = outcomeFromResolvedPrice(readOptionalNumber(record, ["curPrice", "outcome", "payout", "resolvedPrice"]));
+  // Polymarket reports realizedPnl=0 for a position held to resolution but not yet REDEEMED — the bet
+  // settled (curPrice 0/1) but the winnings sit unclaimed. Recording that as $0 understated win rate
+  // and showed a blank P/L in trade history. When the outcome is known and the reported P/L is 0, use
+  // the settlement value size·(outcome−avgPrice) (the true realized result). A partially-sold position
+  // reports a non-zero P/L, so this only corrects the fully-held-to-resolution case.
+  const reportedPnl = readNumber(record, ["realizedPnl", "realizedPnL", "pnl", "cashPnl"]);
+  const realizedPnl = reportedPnl === 0 && outcome !== null ? size * (outcome - avgPrice) : reportedPnl;
   return {
     proxyWallet: readString(record, ["proxyWallet", "user", "wallet"]).toLowerCase(),
     asset: readString(record, ["asset", "tokenId"]),
     conditionId: readString(record, ["conditionId", "market", "marketId"]),
     market: readString(record, ["market", "title", "question"]),
     outcomeIndex: readNumber(record, ["outcomeIndex"]),
-    size: readNumber(record, ["size", "totalBought", "tokens"]),
-    avgPrice: readNumber(record, ["avgPrice", "averagePrice", "price"]),
-    realizedPnl: readNumber(record, ["realizedPnl", "realizedPnL", "pnl", "cashPnl"]),
+    size,
+    avgPrice,
+    realizedPnl,
     closeTime: timestampToIso(typeof timestamp === "string" || typeof timestamp === "number" ? timestamp : 0),
-    // Sold positions only expose an outcome if the payload carries a settled price; absent that
-    // (or if the market is still trading), this is null and the position is excluded from edge.
-    outcome: outcomeFromResolvedPrice(readOptionalNumber(record, ["curPrice", "outcome", "payout", "resolvedPrice"]))
+    outcome
   };
 }
 
