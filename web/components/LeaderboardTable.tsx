@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import HorizonToggle from "@/components/HorizonToggle";
 import WalletSearch from "@/components/WalletSearch";
-import { formatEdge, formatNumber, formatPercent, shortenAddress } from "@/lib/format";
+import { formatEdge, formatNumber, formatPercent, shortenAddress, pnlBoardLabel } from "@/lib/format";
 import { HORIZONS } from "@/lib/types";
 import type { HorizonDays, LeaderboardRow } from "@/lib/types";
 
@@ -32,6 +32,20 @@ const GAUGE_DASH = 326.7; // 2πr for r=52
 
 function displayName(row: LeaderboardRow): string {
   return row.handle ? `@${row.handle}` : shortenAddress(row.address);
+}
+
+// Chips marking which Polymarket PnL leaderboards recruited this wallet (all-time/monthly/weekly).
+function PnlBoardChips({ codes }: { codes: string[] }) {
+  return (
+    <>
+      {codes.map((code) => {
+        const label = pnlBoardLabel(code);
+        return label ? (
+          <span key={code} className="lb-board" title={`Ranks on Polymarket's ${label} leaderboard`}>{label}</span>
+        ) : null;
+      })}
+    </>
+  );
 }
 
 export default function LeaderboardTable({ initialRows, initialHorizon }: LeaderboardTableProps) {
@@ -220,6 +234,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
                   <div className="cls">
                     {whaleClass(apex.skillScore)}
                     {apex.specialty ? <span className="lb-spec" title={`Strongest forecasting edge in ${apex.specialty} markets`}>{apex.specialty}</span> : null}
+                    <PnlBoardChips codes={apex.pnlBoards} />
                     <Link href={`/wallet/${apex.address}?horizon=${horizon}`} className="full">View dossier →</Link>
                   </div>
                 </div>
@@ -306,6 +321,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
                           {row.handle ? <><span className="at">@</span>{row.handle}</> : shortenAddress(row.address)}
                         </Link>
                         {row.specialty ? <span className="lb-spec" title={`Strongest forecasting edge in ${row.specialty} markets`}>{row.specialty}</span> : null}
+                        <PnlBoardChips codes={row.pnlBoards} />
                         <div className="meta">
                           {shortenAddress(row.address)}
                           <button type="button" aria-label={`Copy ${row.address}`} onClick={() => void navigator.clipboard.writeText(row.address)}>

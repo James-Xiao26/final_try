@@ -203,6 +203,13 @@ export const CONFIG = {
     { timePeriod: "WEEK",  orderBy: "PNL" }, // highest weekly profit
   ] as Array<{ timePeriod: string; orderBy: string }>,
 
+  // Leaderboard "PnL board" chips: a wallet is chipped for a Polymarket PnL board (all-time/monthly/
+  // weekly) only if it ranks within the top N of that board. Membership is captured for free from the
+  // candidate-discovery scan above (those exact boards are already paged each full ingest), so this is
+  // purely a display cutoff. Env-overridable so the chip threshold can be tuned without a code change;
+  // capped by SEED_WALLET_COUNT (the scan depth — wallets below that aren't seen at all).
+  PNL_BOARD_CHIP_TOP_N: Number(process.env.PNL_BOARD_CHIP_TOP_N) || 500,
+
   // Candidates scored per full ingest run. Each costs the same restricted-lane API
   // budget as a main leaderboard wallet. At 500/day with ~20k first-pass candidates
   // the full initial universe is covered in ~40 days; on steady state (new /trades stream

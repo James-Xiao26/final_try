@@ -59,3 +59,14 @@ export function formatPrice(value: number): string {
 export function isValidAddress(address: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
 }
+
+// Display label for a Polymarket PnL-board chip code ("pnl-all"/"pnl-month"/"pnl-week"). Unknown codes
+// return null so the UI can skip them (forward-compatible if new board codes are added ingest-side).
+const PNL_BOARD_LABELS: Record<string, string> = {
+  "pnl-all": "All-Time PnL",
+  "pnl-month": "Monthly PnL",
+  "pnl-week": "Weekly PnL"
+};
+export function pnlBoardLabel(code: string): string | null {
+  return PNL_BOARD_LABELS[code] ?? null;
+}

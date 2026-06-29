@@ -11,6 +11,9 @@ export interface LeaderboardRow {
   handle: string | null;
   // Market category the wallet is demonstrably best at, or null if it has no standout specialty.
   specialty: string | null;
+  // Polymarket PnL leaderboards this wallet ranks in the top N of, as codes: "pnl-all"/"pnl-month"/
+  // "pnl-week" (empty if none). See pnlBoardLabel for display strings.
+  pnlBoards: string[];
 }
 
 export interface WalletMetrics {
@@ -91,6 +94,8 @@ export interface WalletProfile {
   bio: string | null;
   isClaimed: boolean;
   isBotSuspected: boolean;
+  // Polymarket PnL leaderboards this wallet ranks on (chip codes; see pnlBoardLabel).
+  pnlBoards: string[];
   metrics: WalletMetrics[];
   equityCurve: EquityPoint[];
   equityCurves: Record<HorizonDays, EquityPoint[]>;
@@ -419,6 +424,7 @@ export interface Database {
           links: Record<string, unknown> | null;
           lifetime_pnl: number | null;
           specialty: string | null;
+          pnl_boards: string[] | null;
           first_seen_at: string;
           updated_at: string;
         };
@@ -431,6 +437,7 @@ export interface Database {
           links?: Record<string, unknown> | null;
           lifetime_pnl?: number | null;
           specialty?: string | null;
+          pnl_boards?: string[] | null;
         };
         Update: {
           is_bot_suspected?: boolean;

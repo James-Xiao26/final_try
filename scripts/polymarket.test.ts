@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolvedToClosed, type Position } from "./polymarket.js";
+import { resolvedToClosed, pnlBoardCode, type Position } from "./polymarket.js";
+
+test("pnlBoardCode maps PnL boards to chip codes and ignores non-PnL sources", () => {
+  assert.equal(pnlBoardCode("ALL", "PNL"), "pnl-all");
+  assert.equal(pnlBoardCode("MONTH", "PNL"), "pnl-month");
+  assert.equal(pnlBoardCode("WEEK", "pnl"), "pnl-week"); // orderBy case-insensitive
+  assert.equal(pnlBoardCode("ALL", "VOL"), null); // volume board → no PnL chip
+});
 
 function position(overrides: Partial<Position> = {}): Position {
   return {

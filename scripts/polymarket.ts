@@ -641,6 +641,21 @@ export interface DiscoveredCandidate {
   lifetimePnl: number | null;
 }
 
+// Stable chip code for a Polymarket PnL leaderboard, or null for any non-PnL source (e.g. the
+// /trades stream or a hypothetical VOL slice — those don't earn a "PnL board" chip). Pure + tested.
+export function pnlBoardCode(timePeriod: string, orderBy: string): string | null {
+  if (orderBy.toUpperCase() !== "PNL") return null;
+  return `pnl-${timePeriod.toLowerCase()}`;
+}
+
+// Result of the candidate scan: the new-to-us candidates, plus the full PnL-board membership map
+// (address → board codes it ranks in the top PNL_BOARD_CHIP_TOP_N of) captured from the same pages —
+// including already-known main-pool wallets, which is exactly who the leaderboard chips are for.
+export interface CandidateDiscovery {
+  candidates: DiscoveredCandidate[];
+  pnlBoardsByAddress: Map<string, string[]>;
+}
+
 // Pull wallets from every CANDIDATE_SOURCES variant and the live /trades stream.
 // Returns only addresses not already in `knownAddresses` (main leaderboard pass + existing
 // candidate_wallets rows) — callers insert with ignoreDuplicates so no existing scoring
@@ -650,8 +665,21 @@ export interface DiscoveredCandidate {
 // skipped without aborting the others. The trades stream is similarly non-fatal.
 export async function discoverCandidateAddresses(
   knownAddresses: Set<string>
-): Promise<DiscoveredCandidate[]> {
+): Promise<CandidateDiscovery> {
   const found = new Map<string, DiscoveredCandidate>();
+  // PnL-board membership for leaderboard chips. Captured for EVERY address on a PnL board's top-N
+  // (not just new candidates) — the chips are mostly for main-pool wallets, which `found` filters out.
+  const pnlBoardsByAddress = new Map<string, string[]>();
+  const addBoard = (address: string, boardCode: string): void => {
+    const normalized = address.toLowerCase();
+    if (!normalized.startsWith("0x")) return;
+    let boards = pnlBoardsByAddress.get(normalized);
+    if (!boards) {
+      boards = [];
+      pnlBoardsByAddress.set(normalized, boards);
+    }
+    if (!boards.includes(boardCode)) boards.push(boardCode);
+  };
 
   const remember = (address: string, source: string, userName: string | null, lifetimePnl: number | null): void => {
     const normalized = address.toLowerCase();
@@ -666,6 +694,7 @@ export async function discoverCandidateAddresses(
 
   for (const { timePeriod, orderBy } of CONFIG.CANDIDATE_SOURCES) {
     const source = `leaderboard_${orderBy.toLowerCase()}_${timePeriod}`;
+    const boardCode = pnlBoardCode(timePeriod, orderBy); // null for any non-PnL source
     try {
       for (let offset = 0; offset < CONFIG.SEED_WALLET_COUNT; offset += CONFIG.LEADERBOARD_PAGE_SIZE) {
         const params = new URLSearchParams({
@@ -676,7 +705,13 @@ export async function discoverCandidateAddresses(
           offset: String(offset)
         });
         const page = asArray(await fetchJson("/v1/leaderboard", params)).map(mapLeaderboard);
-        page.forEach((entry) => remember(entry.proxyWallet, source, entry.userName, entry.pnl));
+        page.forEach((entry, i) => {
+          remember(entry.proxyWallet, source, entry.userName, entry.pnl);
+          // Board rank = scan position (1-based); chip only the top PNL_BOARD_CHIP_TOP_N of each board.
+          if (boardCode && offset + i + 1 <= CONFIG.PNL_BOARD_CHIP_TOP_N) {
+            addBoard(entry.proxyWallet, boardCode);
+          }
+        });
         if (page.length < CONFIG.LEADERBOARD_PAGE_SIZE) {
           break;
         }
@@ -710,8 +745,12 @@ export async function discoverCandidateAddresses(
     );
   }
 
-  // Exclude already-known addresses so the caller only receives genuinely new wallets.
-  return [...found.values()].filter((c) => !knownAddresses.has(c.address));
+  // Exclude already-known addresses so the caller only receives genuinely new wallets. The board
+  // membership map is returned whole (known wallets included) — those are the leaderboard chip targets.
+  return {
+    candidates: [...found.values()].filter((c) => !knownAddresses.has(c.address)),
+    pnlBoardsByAddress
+  };
 }
 
 export async function discoverTopWallets(): Promise<DiscoveredWallet[]> {

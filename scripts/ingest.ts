@@ -31,6 +31,7 @@ interface Database {
           links: Record<string, unknown> | null;
           lifetime_pnl: number | null;
           specialty: string | null;
+          pnl_boards: string[] | null;
           first_seen_at: string;
           updated_at: string;
         };
@@ -43,6 +44,7 @@ interface Database {
           links?: Record<string, unknown> | null;
           lifetime_pnl?: number | null;
           specialty?: string | null;
+          pnl_boards?: string[] | null;
         };
         Update: {
           is_bot_suspected?: boolean;
@@ -52,6 +54,7 @@ interface Database {
           links?: Record<string, unknown> | null;
           lifetime_pnl?: number | null;
           specialty?: string | null;
+          pnl_boards?: string[] | null;
         };
         Relationships: [];
       };
@@ -1253,6 +1256,30 @@ async function getLeaderboardAddresses(supabase: SupabaseClient): Promise<Set<st
   return new Set((data ?? []).map((row) => row.address));
 }
 
+// Persist each leaderboard wallet's Polymarket PnL-board membership (the chips) onto wallets.pnl_boards,
+// from the membership map captured for free during candidate discovery. Writes every board wallet —
+// including those with no membership (set []) — so a wallet that fell off the PnL boards loses its chip.
+// Full-ingest-only: the candidate scan that feeds this runs only on the full pass.
+async function cachePnlBoardChips(
+  supabase: SupabaseClient,
+  boardAddresses: Set<string>,
+  pnlBoardsByAddress: Map<string, string[]>
+): Promise<number> {
+  const rows = [...boardAddresses].map((address) => ({
+    address,
+    pnl_boards: pnlBoardsByAddress.get(address) ?? []
+  }));
+  for (let offset = 0; offset < rows.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
+    const { error } = await supabase
+      .from("wallets")
+      .upsert(rows.slice(offset, offset + CONFIG.LEADERBOARD_FILTER_CHUNK), { onConflict: "address" });
+    if (error) {
+      throw error;
+    }
+  }
+  return rows.length;
+}
+
 // Full-ingest-only global wipe-and-replace of the closed-position basis cache, scoped to leaderboard
 // wallets. Like wallet_positions it needs the restricted-lane /closed-positions data, so the feed job
 // never refreshes it (the daily ingest is the sole writer) — closed-position P/L can be up to ~24h
@@ -1981,10 +2008,10 @@ async function registerCandidates(
 async function discoverAndRegisterCandidates(
   supabase: SupabaseClient,
   knownAddresses: Set<string>
-): Promise<{ discovered: number; registered: number }> {
-  const candidates = await discoverCandidateAddresses(knownAddresses);
+): Promise<{ discovered: number; registered: number; pnlBoardsByAddress: Map<string, string[]> }> {
+  const { candidates, pnlBoardsByAddress } = await discoverCandidateAddresses(knownAddresses);
   const registered = await registerCandidates(supabase, candidates);
-  return { discovered: candidates.length, registered };
+  return { discovered: candidates.length, registered, pnlBoardsByAddress };
 }
 
 interface CandidateScoringResult {
@@ -2300,10 +2327,14 @@ async function main(): Promise<void> {
   const mainAddressSet = new Set(discoveredWallets.map((w) => w.address));
   let candidatesDiscovered = 0;
   let candidatesRegistered = 0;
+  // PnL-board membership for the leaderboard chips, captured from the candidate scan; persisted after
+  // the rebuild once the board is known. Empty on a discovery failure (chips just won't refresh).
+  let pnlBoardsByAddress = new Map<string, string[]>();
   try {
     const cdResult = await discoverAndRegisterCandidates(supabase, mainAddressSet);
     candidatesDiscovered = cdResult.discovered;
     candidatesRegistered = cdResult.registered;
+    pnlBoardsByAddress = cdResult.pnlBoardsByAddress;
     console.log(`Candidate discovery: ${candidatesDiscovered} new addresses found, ${candidatesRegistered} registered`);
   } catch (reason) {
     console.warn(`Candidate discovery failed (non-fatal): ${describeError(reason)}`);
@@ -2394,6 +2425,13 @@ async function main(): Promise<void> {
   // (the persisted inserts, the crowded-markets position read-back, the equity curve) proportional to
   // TOP_N instead of the full eligible set — which is what pushed the 512MB dyno past its R15/SIGKILL line.
   const boardAddresses = await getLeaderboardAddresses(supabase);
+  // Stamp the PnL-board chips onto the board wallets (membership captured during discovery above).
+  try {
+    const chipped = await cachePnlBoardChips(supabase, boardAddresses, pnlBoardsByAddress);
+    console.log(`PnL-board chips: refreshed ${chipped} wallets`);
+  } catch (reason) {
+    console.warn(`PnL-board chip caching failed (non-fatal): ${describeError(reason)}`);
+  }
   const boardTrades = collectedTrades.filter((trade) => boardAddresses.has(trade.address));
   collectedTrades.length = 0;
   const boardFills = collectedFills.filter((fill) => boardAddresses.has(fill.address));

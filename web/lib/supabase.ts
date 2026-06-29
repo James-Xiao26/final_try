@@ -17,8 +17,8 @@ type EquityCurveRow = Database["public"]["Tables"]["equity_curve"]["Row"];
 type LeaderboardCacheRow = Database["public"]["Tables"]["leaderboard_cache"]["Row"];
 type LeaderboardSelectRow = Pick<LeaderboardCacheRow, "rank" | "address" | "skill_score" | "avg_edge_per_share" | "win_rate" | "n_trades">;
 type WalletHandleRow = Pick<WalletRow, "address" | "handle">;
-type WalletHandleSpecialtyRow = Pick<WalletRow, "address" | "handle" | "specialty">;
-type WalletProfileRow = Pick<WalletRow, "address" | "handle" | "bio" | "is_claimed" | "is_bot_suspected">;
+type WalletHandleSpecialtyRow = Pick<WalletRow, "address" | "handle" | "specialty" | "pnl_boards">;
+type WalletProfileRow = Pick<WalletRow, "address" | "handle" | "bio" | "is_claimed" | "is_bot_suspected" | "pnl_boards">;
 type CurveSelectRow = Pick<EquityCurveRow, "horizon_days" | "ts" | "cumulative_pnl">;
 type RankSelectRow = Pick<LeaderboardCacheRow, "rank" | "horizon_days">;
 type RecentTradeRowDb = Database["public"]["Tables"]["recent_trades"]["Row"];
@@ -166,12 +166,13 @@ export async function getLeaderboard(horizonDays: number): Promise<LeaderboardRo
   const addresses = leaderboardRows.map((row) => row.address);
   const handles = new Map<string, string | null>();
   const specialties = new Map<string, string | null>();
+  const pnlBoards = new Map<string, string[]>();
   if (addresses.length > 0) {
-    // Specialty rides this existing handle join (no extra round-trip): both are columns on `wallets`,
-    // already scoped to the leaderboard address set.
+    // Specialty + PnL-board chips ride this existing handle join (no extra round-trip): all columns on
+    // `wallets`, already scoped to the leaderboard address set.
     const { data: wallets, error: walletError } = await supabase
       .from("wallets")
-      .select("address, handle, specialty")
+      .select("address, handle, specialty, pnl_boards")
       .in("address", addresses);
 
     if (walletError) {
@@ -186,6 +187,7 @@ export async function getLeaderboard(horizonDays: number): Promise<LeaderboardRo
     walletRows.forEach((wallet) => {
       handles.set(wallet.address, wallet.handle);
       specialties.set(wallet.address, wallet.specialty);
+      pnlBoards.set(wallet.address, wallet.pnl_boards ?? []);
     });
   }
 
@@ -197,7 +199,8 @@ export async function getLeaderboard(horizonDays: number): Promise<LeaderboardRo
     winRate: toNumber(row.win_rate),
     nTrades: row.n_trades ?? 0,
     handle: handles.get(row.address) ?? null,
-    specialty: specialties.get(row.address) ?? null
+    specialty: specialties.get(row.address) ?? null,
+    pnlBoards: pnlBoards.get(row.address) ?? []
   }));
 }
 
@@ -514,7 +517,7 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
   const normalized = address.toLowerCase();
   const { data: walletData, error: walletError } = await supabase
     .from("wallets")
-    .select("address, handle, bio, is_claimed, is_bot_suspected")
+    .select("address, handle, bio, is_claimed, is_bot_suspected, pnl_boards")
     .eq("address", normalized)
     .maybeSingle();
 
@@ -627,6 +630,7 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
     bio: wallet.bio,
     isClaimed: wallet.is_claimed,
     isBotSuspected: wallet.is_bot_suspected,
+    pnlBoards: wallet.pnl_boards ?? [],
     metrics: ((stats ?? []) as unknown as WalletStatsRow[]).map(mapMetric),
     equityCurve: equityCurves[90],
     equityCurves,
