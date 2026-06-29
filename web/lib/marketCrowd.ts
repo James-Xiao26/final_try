@@ -214,6 +214,10 @@ export function summarizeCrowdedMarkets(
   }
 
   return summaries
+    // Convergence = markets leaderboard wallets are converging on *now*. Drop markets no one currently
+    // holds (openCount 0) — resolved or fully-exited — so a settled market (every position closed)
+    // can't sit at the top forever on historical participation alone. (Keep in sync with scripts copy.)
+    .filter((s) => s.openCount > 0)
     .sort((a, c) => c.traderCount - a.traderCount || c.committedUsd - a.committedUsd)
     .slice(0, limit);
 }

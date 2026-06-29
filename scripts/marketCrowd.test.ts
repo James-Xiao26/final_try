@@ -86,3 +86,13 @@ test("summarizeCrowdedMarkets skips rows with no conditionId and returns no rank
 test("summarizeCrowdedMarkets handles an empty input set", () => {
   assert.deepEqual(summarizeCrowdedMarkets([], [], ranks), []);
 });
+
+test("summarizeCrowdedMarkets drops a market no wallet currently holds (all positions closed)", () => {
+  // A resolved/fully-exited market: only closed positions, no open holdings → excluded.
+  const resolved = summarizeCrowdedMarkets([], [closed({ conditionId: "resolved" }), closed({ address: "0xb", conditionId: "resolved" })], ranks);
+  assert.equal(resolved.length, 0);
+  // A market with even one current holder is kept.
+  const active = summarizeCrowdedMarkets([open({ conditionId: "live" })], [closed({ conditionId: "live" })], ranks);
+  assert.equal(active.length, 1);
+  assert.equal(active[0]?.openCount, 1);
+});

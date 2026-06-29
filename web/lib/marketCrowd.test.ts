@@ -93,6 +93,14 @@ test("summarizeCrowdedMarkets ranks markets by trader count then committed capit
   assert.equal(out[0]?.conditionId, "c1"); // 2 traders beats c2's 1
 });
 
+test("summarizeCrowdedMarkets drops a market no wallet currently holds (all positions closed)", () => {
+  const resolved = summarizeCrowdedMarkets([], [closed({ conditionId: "resolved" }), closed({ address: "0xb", conditionId: "resolved" })], lookups);
+  assert.equal(resolved.length, 0);
+  const active = summarizeCrowdedMarkets([open({ conditionId: "live" })], [closed({ conditionId: "live" })], lookups);
+  assert.equal(active.length, 1);
+  assert.equal(active[0]?.openCount, 1);
+});
+
 test("buildCrowdMarketDetail prefers the open cache, derives side, P/L, and fill dates", () => {
   const positions = [open({ address: "0xa", outcomeIndex: 0, avgPrice: 0.5, curPrice: 0.6, size: 100, currentValue: 60, cashPnl: 10 })];
   const fills = [
