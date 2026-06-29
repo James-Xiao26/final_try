@@ -536,13 +536,15 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
     { data: curves, error: curvesError },
     { data: ranks, error: ranksError },
     { data: positionsData, error: positionsError },
-    { data: tradesData, error: tradesError }
+    { data: tradesData, error: tradesError },
+    { data: closedData }
   ] = await Promise.all([
     supabase.from("wallet_stats").select("*").eq("address", normalized).in("horizon_days", [...HORIZONS]).order("horizon_days"),
     supabase.from("equity_curve").select("horizon_days, ts, cumulative_pnl").eq("address", normalized).in("horizon_days", [...HORIZONS]).order("ts"),
     supabase.from("leaderboard_cache").select("rank, horizon_days").eq("address", normalized).order("horizon_days"),
     supabase.from("wallet_positions").select("condition_id, asset, market, outcome_index, size, avg_price, cur_price, initial_value, current_value, cash_pnl, end_date").eq("address", normalized),
-    supabase.from("wallet_trades").select("condition_id, market, outcome_index, side, price, size, usdc_size, traded_at, transaction_hash").eq("address", normalized).order("traded_at", { ascending: false })
+    supabase.from("wallet_trades").select("condition_id, market, outcome_index, side, price, size, usdc_size, traded_at, transaction_hash").eq("address", normalized).order("traded_at", { ascending: false }),
+    supabase.from("wallet_closed_positions").select("condition_id, outcome_index, avg_price").eq("address", normalized)
   ]);
 
   if (statsError) {
@@ -588,6 +590,20 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
 
   let positions = ((positionsData ?? []) as unknown as WalletPositionSelectRow[]).map(mapWalletPosition);
   let tradeGroups = groupWalletTrades((tradesData ?? []) as unknown as WalletTradeSelectRow[]);
+
+  // Trade history is grouped from the last ~200 fills, so a position bought before that window but
+  // sold inside it has SELL fills with no BUY fills, leaving avg entry blank. wallet_closed_positions
+  // carries the true cost basis (avg_price), so backfill the entry by conditionId:outcomeIndex.
+  const entryByKey = new Map<string, number>();
+  ((closedData ?? []) as unknown as { condition_id: string | null; outcome_index: number | null; avg_price: number | null }[]).forEach((row) => {
+    const avg = toNumber(row.avg_price);
+    if (row.condition_id && avg > 0) entryByKey.set(`${row.condition_id}:${row.outcome_index}`, avg);
+  });
+  tradeGroups = tradeGroups.map((group) =>
+    group.avgEntryPrice === null
+      ? { ...group, avgEntryPrice: entryByKey.get(`${group.conditionId}:${group.outcomeIndex}`) ?? null }
+      : group
+  );
 
   // Board-scoping: ingest only persists position/trade detail for the ~TOP_N leaderboard wallets, so
   // an eligible-but-non-board wallet (e.g. a World Cup specialist linked from that board) has a score

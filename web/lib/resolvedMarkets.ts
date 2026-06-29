@@ -145,6 +145,12 @@ export function summarizeResolvedMarkets(
     // Drop markets where no leaderboard wallet participated.
     if (participants.length === 0) continue;
 
+    // Drop noise: a lone participant who staked < $10 and lost.
+    if (participants.length === 1) {
+      const p = participants[0]!;
+      if (!p.won && (p.avgEntry ?? 0) * p.size < 10) continue;
+    }
+
     // Sort participants by realizedPnl desc (nulls last).
     participants.sort((a, b) => {
       const pa = a.realizedPnl;
