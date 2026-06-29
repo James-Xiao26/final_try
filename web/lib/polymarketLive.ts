@@ -325,13 +325,18 @@ export async function fetchLiveWalletDetail(address: string): Promise<LiveWallet
   // Trade history is grouped from the last ~200 fills only, so a position bought before that window
   // shows blank avg entry / 0 bought shares. /closed-positions carries the truth (cost basis, size,
   // realized P/L); applyClosedBasis backfills it (shared with the cached read path in supabase.ts).
-  const closedBasis: ClosedBasisInput[] = closedRows.map((row) => ({
-    conditionId: readStr(row, ["conditionId", "market", "marketId"]) || null,
-    outcomeIndex: readNum(row, ["outcomeIndex"]),
-    avgPrice: readNum(row, ["avgPrice", "averagePrice", "price"]),
-    size: readNum(row, ["size", "totalBought", "tokens"]),
-    realizedPnl: readNum(row, ["realizedPnl", "realizedPnL", "cashPnl"])
-  }));
+  const closedBasis: ClosedBasisInput[] = closedRows.map((row) => {
+    const closeTs = readNum(row, ["closeTime", "timestamp", "resolutionTime", "endDate"]);
+    return {
+      conditionId: readStr(row, ["conditionId", "market", "marketId"]) || null,
+      outcomeIndex: readNum(row, ["outcomeIndex"]),
+      market: readStr(row, ["title", "question", "market"]) || null,
+      avgPrice: readNum(row, ["avgPrice", "averagePrice", "price"]),
+      size: readNum(row, ["size", "totalBought", "tokens"]),
+      realizedPnl: readNum(row, ["realizedPnl", "realizedPnL", "cashPnl"]),
+      closeTime: closeTs > 0 ? new Date(closeTs * 1000).toISOString() : null
+    };
+  });
   const tradeGroups = applyClosedBasis(groupWalletTrades(fills), closedBasis);
 
   return { positions, tradeGroups };

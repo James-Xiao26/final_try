@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { groupWalletTrades, applyClosedBasis, type WalletTradeRowInput } from "./walletTrades";
+import { groupWalletTrades, applyClosedBasis, type WalletTradeRowInput, type ClosedBasisInput } from "./walletTrades";
 
 function row(partial: Partial<WalletTradeRowInput>): WalletTradeRowInput {
   return {
@@ -68,11 +68,24 @@ test("groupWalletTrades returns empty for empty input", () => {
   assert.deepEqual(groupWalletTrades([]), []);
 });
 
+function closed(partial: Partial<ClosedBasisInput>): ClosedBasisInput {
+  return {
+    conditionId: "c1",
+    outcomeIndex: 0,
+    market: "Will it rain?",
+    avgPrice: 0.4,
+    size: 500,
+    realizedPnl: 0,
+    closeTime: "2026-01-05T00:00:00.000Z",
+    ...partial
+  };
+}
+
 test("applyClosedBasis backfills blank entry / 0 bought from the closed row and attaches P/L", () => {
   // A position whose buys fell outside the fill window: only a SELL fill is present.
   const [group] = applyClosedBasis(
     groupWalletTrades([row({ side: "SELL", price: 0.9, size: 200 })]),
-    [{ conditionId: "c1", outcomeIndex: 0, avgPrice: 0.4, size: 500, realizedPnl: 250 }]
+    [closed({ avgPrice: 0.4, size: 500, realizedPnl: 250 })]
   );
   assert.ok(group);
   assert.equal(group.avgEntryPrice, 0.4); // was null (no buys), filled from the closed row
@@ -85,7 +98,7 @@ test("applyClosedBasis backfills blank entry / 0 bought from the closed row and 
 test("applyClosedBasis keeps fill-derived entry/bought when present, still attaches P/L", () => {
   const [group] = applyClosedBasis(
     groupWalletTrades([row({ side: "BUY", price: 0.6, size: 100 }), row({ side: "SELL", price: 0.9, size: 100 })]),
-    [{ conditionId: "c1", outcomeIndex: 0, avgPrice: 0.4, size: 500, realizedPnl: -30 }]
+    [closed({ avgPrice: 0.4, size: 500, realizedPnl: -30 })]
   );
   assert.ok(group);
   assert.equal(group.avgEntryPrice, 0.6); // real buy fill in window wins over the closed-row basis
@@ -99,4 +112,24 @@ test("applyClosedBasis leaves groups with no matching closed row untouched (P/L 
   const [group] = applyClosedBasis(groupWalletTrades([row({ side: "BUY", price: 0.5, size: 50 })]), []);
   assert.ok(group);
   assert.equal(group.realizedPnl, null);
+});
+
+test("applyClosedBasis appends synthetic rows for closed positions absent from the fill window", () => {
+  // Fill window saturated by one market (c1); the wallet also closed c2 + c3 earlier (no fills here).
+  const groups = applyClosedBasis(groupWalletTrades([row({ condition_id: "c1", side: "BUY", size: 10 })]), [
+    closed({ conditionId: "c2", market: "Old A", avgPrice: 0.5, size: 100, realizedPnl: 50, closeTime: "2026-01-10T00:00:00.000Z" }),
+    closed({ conditionId: "c3", market: "Old B", avgPrice: 0.2, size: 100, realizedPnl: -20, closeTime: "2026-01-08T00:00:00.000Z" })
+  ]);
+  assert.equal(groups.length, 3); // the live c1 group + two synthetic closed rows
+  const synth = groups.find((g) => g.conditionId === "c2");
+  assert.ok(synth);
+  assert.equal(synth.market, "Old A");
+  assert.equal(synth.totalBoughtSize, 100);
+  assert.equal(synth.totalSoldSize, 100);
+  assert.equal(synth.realizedPnl, 50);
+  // exit = entry + pnl/size = 0.5 + 50/100 = 1.0 (won, settled at $1)
+  assert.equal(synth.avgExitPrice, 1);
+  assert.equal(synth.fills.length, 0);
+  // Sorted newest-first by date: c1 (today, from the row default 2026-01-01) vs c2 (Jan 10) vs c3 (Jan 8).
+  assert.deepEqual(groups.map((g) => g.conditionId), ["c2", "c3", "c1"]);
 });

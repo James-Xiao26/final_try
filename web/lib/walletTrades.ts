@@ -108,33 +108,71 @@ export function groupWalletTrades(rows: WalletTradeRowInput[]): WalletTradeGroup
 export interface ClosedBasisInput {
   conditionId: string | null;
   outcomeIndex: number | null;
+  market: string | null;
   avgPrice: number | null; // true cost-basis entry price
   size: number | null; // shares closed (≈ shares bought for a fully-closed position)
   realizedPnl: number | null;
+  closeTime: string | null;
 }
 
-// Backfill trade groups from the closed-positions cache. The trade history is grouped from only the
-// last ~200 fills, so a position bought before that window shows blank avg entry and 0 bought shares
-// even though it was really bought — the closed row carries the truth. Also attaches realized P/L.
+// Cost basis of a closed row (avgPrice·size); 0 when either is missing.
+function closedBasisCost(row: ClosedBasisInput): number {
+  return row.avgPrice !== null && row.size !== null ? row.avgPrice * row.size : 0;
+}
+
+// Merge the closed-positions cache into the fill-grouped trade history. Two jobs:
+//  1. Backfill: the history is grouped from only the last ~200 fills, so a position bought before that
+//     window shows blank avg entry / 0 bought shares — the closed row carries the truth. Attach P/L too.
+//  2. Append: a wallet that churns one market (a scalper) can fill the entire 200-fill window with a
+//     single market, hiding every other position it ever closed. Closed positions with no fill group
+//     are appended as synthetic rows (entry/size/P/L from the closed row, exit derived from realized
+//     P/L, no raw fills) so the trade history reflects real history, not just the saturated window.
 // Kept here (not duplicated per read path) so the cached and live fallbacks stay in sync.
 export function applyClosedBasis(groups: WalletTradeGroup[], closed: ClosedBasisInput[]): WalletTradeGroup[] {
   const byKey = new Map<string, ClosedBasisInput>();
   for (const row of closed) {
     if (row.conditionId) byKey.set(`${row.conditionId}:${row.outcomeIndex}`, row);
   }
-  return groups.map((group) => {
-    const match = byKey.get(`${group.conditionId}:${group.outcomeIndex}`);
+  const seen = new Set<string>();
+  const backfilled = groups.map((group) => {
+    const key = `${group.conditionId}:${group.outcomeIndex}`;
+    seen.add(key);
+    const match = byKey.get(key);
     if (!match) return group;
-    const avgPrice = match.avgPrice;
-    const size = match.size;
-    // % uses the closed row's own cost basis (avgPrice·size) so it reconciles with realizedPnl.
-    const basis = avgPrice !== null && size !== null ? avgPrice * size : 0;
+    const { avgPrice, size, realizedPnl } = match;
+    const basis = closedBasisCost(match);
     return {
       ...group,
       avgEntryPrice: group.avgEntryPrice === null && avgPrice !== null && avgPrice > 0 ? avgPrice : group.avgEntryPrice,
       totalBoughtSize: group.totalBoughtSize === 0 && size !== null && size > 0 ? size : group.totalBoughtSize,
-      realizedPnl: match.realizedPnl,
-      realizedPnlPct: match.realizedPnl !== null && basis > 0 ? match.realizedPnl / basis : null
+      realizedPnl,
+      realizedPnlPct: realizedPnl !== null && basis > 0 ? realizedPnl / basis : null
     };
   });
+
+  // Synthetic rows for closed positions with no fill group in the window.
+  for (const row of closed) {
+    if (!row.conditionId || seen.has(`${row.conditionId}:${row.outcomeIndex}`)) continue;
+    const { avgPrice, size, realizedPnl } = row;
+    const basis = closedBasisCost(row);
+    // Effective exit price implied by the realized P/L: exit = entry + realizedPnl/size.
+    const exit = avgPrice !== null && size !== null && size > 0 && realizedPnl !== null ? avgPrice + realizedPnl / size : null;
+    backfilled.push({
+      conditionId: row.conditionId,
+      market: row.market,
+      outcomeIndex: row.outcomeIndex,
+      avgEntryPrice: avgPrice !== null && avgPrice > 0 ? avgPrice : null,
+      avgExitPrice: exit,
+      totalBoughtSize: size ?? 0,
+      totalSoldSize: size ?? 0,
+      totalUsdc: roundTo(basis, 2),
+      realizedPnl,
+      realizedPnlPct: realizedPnl !== null && basis > 0 ? realizedPnl / basis : null,
+      latestTradedAt: row.closeTime ?? "",
+      fills: [] // no raw fills available for an out-of-window closed position
+    });
+  }
+
+  // Re-sort the combined list newest-activity first (invalid/empty dates sink to the bottom).
+  return backfilled.sort((a, b) => (Date.parse(b.latestTradedAt) || 0) - (Date.parse(a.latestTradedAt) || 0));
 }

@@ -544,7 +544,7 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
     supabase.from("leaderboard_cache").select("rank, horizon_days").eq("address", normalized).order("horizon_days"),
     supabase.from("wallet_positions").select("condition_id, asset, market, outcome_index, size, avg_price, cur_price, initial_value, current_value, cash_pnl, end_date").eq("address", normalized),
     supabase.from("wallet_trades").select("condition_id, market, outcome_index, side, price, size, usdc_size, traded_at, transaction_hash").eq("address", normalized).order("traded_at", { ascending: false }),
-    supabase.from("wallet_closed_positions").select("condition_id, outcome_index, avg_price, size, realized_pnl").eq("address", normalized)
+    supabase.from("wallet_closed_positions").select("condition_id, outcome_index, market, avg_price, size, realized_pnl, close_time").eq("address", normalized)
   ]);
 
   if (statsError) {
@@ -597,9 +597,11 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
   const closedBasis = ((closedData ?? []) as unknown as ClosedPositionRowDb[]).map((row) => ({
     conditionId: row.condition_id,
     outcomeIndex: row.outcome_index,
+    market: row.market,
     avgPrice: row.avg_price,
     size: row.size,
-    realizedPnl: row.realized_pnl
+    realizedPnl: row.realized_pnl,
+    closeTime: row.close_time
   }));
   tradeGroups = applyClosedBasis(tradeGroups, closedBasis);
 

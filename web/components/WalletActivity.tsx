@@ -140,12 +140,15 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
             <tbody>
               {tradeGroups.map((group, index) => {
                 const key = `${group.conditionId}:${group.outcomeIndex}:${index}`;
-                const isOpen = Boolean(openKeys[key]);
+                // Synthetic rows for out-of-window closed positions carry no raw fills, so they aren't
+                // expandable (no fill ledger to show).
+                const hasFills = group.fills.length > 0;
+                const isOpen = hasFills && Boolean(openKeys[key]);
                 const pnl = group.realizedPnl;
                 return (
                   <Fragment key={key}>
-                    <tr className="wa-grouprow" onClick={() => toggle(key)} style={{ cursor: "pointer" }}>
-                      <td className="wa-caret">{isOpen ? "▾" : "▸"}</td>
+                    <tr className="wa-grouprow" onClick={() => hasFills && toggle(key)} style={{ cursor: hasFills ? "pointer" : "default" }}>
+                      <td className="wa-caret">{hasFills ? (isOpen ? "▾" : "▸") : ""}</td>
                       <td className="wa-market"><span title={group.market ?? ""}>{group.market || "—"}</span></td>
                       <td>{outcomeLabel(group.outcomeIndex)}</td>
                       <td className="r">{group.avgEntryPrice === null ? "—" : formatPrice(group.avgEntryPrice)}</td>
