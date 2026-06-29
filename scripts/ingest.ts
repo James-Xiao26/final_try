@@ -1850,6 +1850,11 @@ export async function rescoreTopWallets(
   let scored = 0;
   let failed = 0;
   let bots = 0;
+  // processWallet already pulls /positions, so collect its open positions here and refresh
+  // wallet_positions for this set (a superset of the board). Without this, only the daily full
+  // ingest writes positions, so a wallet new to the board showed a blank Current Positions until
+  // the next full pass — the web's live-Polymarket fallback covered it but at an API-call cost.
+  const collectedPositions: OpenPositionRecord[] = [];
   const worker = async (): Promise<void> => {
     while (cursor < addresses.length) {
       const address = addresses[cursor];
@@ -1858,7 +1863,7 @@ export async function rescoreTopWallets(
         continue;
       }
       try {
-        // The rescore refreshes only scores; equity_curve is owned by the daily full ingest's
+        // The rescore refreshes scores + positions; equity_curve is owned by the daily full ingest's
         // writeDailyEquityCurves (board wallets only). processWallet no longer writes any curve.
         const result = await processWallet(
           supabase,
@@ -1868,6 +1873,7 @@ export async function rescoreTopWallets(
         );
         scored += 1;
         bots += result.bot ? 1 : 0;
+        collectedPositions.push(...result.openPositions); // push between awaits — safe across workers.
       } catch (reason) {
         failed += 1;
         console.warn(`Rescore ${address}: ${describeError(reason)}`);
@@ -1875,6 +1881,24 @@ export async function rescoreTopWallets(
     }
   };
   await Promise.all(Array.from({ length: Math.min(CONFIG.WALLET_CONCURRENCY, addresses.length) }, () => worker()));
+
+  // Scoped replace of wallet_positions for the rescored set: delete just these addresses' rows
+  // (chunked so the .in() list can't overflow the request URL), then insert the fresh ones. A wallet
+  // now holding nothing (or newly flagged a bot) correctly ends with zero rows → web live fallback.
+  for (let offset = 0; offset < addresses.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
+    const slice = addresses.slice(offset, offset + CONFIG.LEADERBOARD_FILTER_CHUNK);
+    const { error } = await supabase.from("wallet_positions").delete().in("address", slice);
+    if (error) {
+      throw error;
+    }
+  }
+  for (let offset = 0; offset < collectedPositions.length; offset += CONFIG.RECENT_TRADES_INSERT_CHUNK) {
+    const rows = collectedPositions.slice(offset, offset + CONFIG.RECENT_TRADES_INSERT_CHUNK).map(toWalletPositionRow);
+    const { error } = await supabase.from("wallet_positions").insert(rows);
+    if (error) {
+      throw error;
+    }
+  }
 
   // Re-rank the whole board from the refreshed scores. The rebuild ranks across ALL wallet_stats
   // rows, so a rescored wallet whose score dropped can fall below a wallet we didn't touch — exactly
