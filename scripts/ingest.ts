@@ -1211,9 +1211,9 @@ async function replaceWalletTrades(supabase: SupabaseClient, fills: ProfileFill[
   return fills.length;
 }
 
-// Full-ingest-only global wipe-and-replace of current open positions. Unlike wallet_trades these are
-// not refreshed by the feed job (they need the restricted-lane /positions call), so the daily ingest
-// is the sole writer.
+// Full-ingest global wipe-and-replace of current open positions. The feed job (refreshLeaderboardFeed)
+// and the hourly rescore both scoped-replace the leaderboard subset on their own cadence; this global
+// pass writes every eligible wallet during the daily full ingest.
 async function replaceWalletPositions(supabase: SupabaseClient, positions: OpenPositionRecord[]): Promise<number> {
   const { error: deleteError } = await supabase.from("wallet_positions").delete().gte("id", 0);
   if (deleteError) {
@@ -1735,7 +1735,7 @@ async function writeDailyEquityCurves(
 async function refreshLeaderboardFeed(
   supabase: SupabaseClient,
   client: PolymarketClient
-): Promise<{ wallets: number; trades: number; walletTrades: number; freshEntries: number }> {
+): Promise<{ wallets: number; trades: number; walletTrades: number; freshEntries: number; positions: number }> {
   const cutoffMs = Date.now() - CONFIG.RECENT_TRADE_WINDOW_HOURS * 60 * 60 * CONFIG.MS_PER_SECOND;
 
   // Pull skill + rank alongside the address: the Fresh Entries cache weights each new entrant by skill
@@ -1747,7 +1747,7 @@ async function refreshLeaderboardFeed(
   }
   const addresses = [...new Set((data ?? []).map((row) => row.address))];
   if (addresses.length === 0) {
-    return { wallets: 0, trades: 0, walletTrades: 0, freshEntries: 0 };
+    return { wallets: 0, trades: 0, walletTrades: 0, freshEntries: 0, positions: 0 };
   }
   const skillByAddress = new Map<string, number>();
   const rankByAddress = new Map<string, number>();
@@ -1766,6 +1766,12 @@ async function refreshLeaderboardFeed(
   const collected: RecentTrade[] = [];
   const collectedFills: ProfileFill[] = [];
   const collectedEntries: NewEntry[] = [];
+  // Current open positions, refreshed in the same pass so Current Positions stays as fresh as Trade
+  // History (both ≤ feed cadence). refreshedPositionAddresses are the wallets whose /positions call
+  // succeeded — only those get their wallet_positions scoped-replaced, so a transient /positions hiccup
+  // keeps a wallet's last-known positions rather than blanking them.
+  const collectedPositions: OpenPositionRecord[] = [];
+  const refreshedPositionAddresses: string[] = [];
   let cursor = 0;
   const worker = async (): Promise<void> => {
     while (cursor < addresses.length) {
@@ -1780,6 +1786,17 @@ async function refreshLeaderboardFeed(
         collected.push(...recentTradesFromActivity(activity, address, cutoffMs));
         collectedFills.push(...profileFillsFromActivity(activity, address, CONFIG.PROFILE_TRADES_LIMIT));
         collectedEntries.push(...newEntriesFromActivity(activity, address, cutoffMs));
+        // Own try: /positions is the restricted lane and can fail independently; a hiccup here must not
+        // drop the trades just collected. The first/last fill dates come from the activity in hand.
+        try {
+          const currentPositions = await client.getCurrentPositions(address);
+          const entryDates = earliestEntryDates(activity);
+          const lastFillDates = latestFillDates(activity);
+          collectedPositions.push(...openPositionRecords(currentPositions, address, entryDates, lastFillDates));
+          refreshedPositionAddresses.push(address);
+        } catch (reason) {
+          console.warn(`Feed positions refresh failed for ${address}: ${describeError(reason)}`);
+        }
       } catch (reason) {
         console.warn(`Feed refresh failed for ${address}: ${describeError(reason)}`);
       }
@@ -1807,8 +1824,36 @@ async function refreshLeaderboardFeed(
 
   await insertRecentTrades(supabase, collected);
   await insertWalletTrades(supabase, collectedFills);
+
+  // Scoped replace of wallet_positions for the wallets whose /positions succeeded this pass — so a
+  // brand-new open position (already visible in the just-refreshed Trade History) also shows under
+  // Current Positions within one feed cadence, instead of waiting up to an hour for the rescore or a
+  // day for the full ingest. Delete is chunked to keep the .in() list under the request-URL limit; a
+  // wallet now holding nothing ends with zero rows (it was in refreshedPositionAddresses but
+  // contributed no openPositionRecords), correctly clearing stale holdings.
+  for (let offset = 0; offset < refreshedPositionAddresses.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
+    const slice = refreshedPositionAddresses.slice(offset, offset + CONFIG.LEADERBOARD_FILTER_CHUNK);
+    const { error: positionsDeleteError } = await supabase.from("wallet_positions").delete().in("address", slice);
+    if (positionsDeleteError) {
+      throw positionsDeleteError;
+    }
+  }
+  for (let offset = 0; offset < collectedPositions.length; offset += CONFIG.RECENT_TRADES_INSERT_CHUNK) {
+    const rows = collectedPositions.slice(offset, offset + CONFIG.RECENT_TRADES_INSERT_CHUNK).map(toWalletPositionRow);
+    const { error: positionsInsertError } = await supabase.from("wallet_positions").insert(rows);
+    if (positionsInsertError) {
+      throw positionsInsertError;
+    }
+  }
+
   const freshEntries = await cacheFreshEntries(supabase, collectedEntries, skillByAddress, rankByAddress);
-  return { wallets: addresses.length, trades: collected.length, walletTrades: collectedFills.length, freshEntries };
+  return {
+    wallets: addresses.length,
+    trades: collected.length,
+    walletTrades: collectedFills.length,
+    freshEntries,
+    positions: collectedPositions.length
+  };
 }
 
 // ── Hourly leaderboard rescore ─────────────────────────────────────────────────────────
@@ -2261,10 +2306,11 @@ async function main(): Promise<void> {
   // rewrite their recent_trades rows. Cheap (general lane only) and decoupled from scoring, so it can
   // run every few minutes between full ingests. Requires leaderboard_cache from a prior full ingest.
   if (process.argv.includes("--feed-only")) {
-    const { wallets, trades, walletTrades, freshEntries } = await refreshLeaderboardFeed(supabase, new PolymarketClient());
+    const { wallets, trades, walletTrades, freshEntries, positions } = await refreshLeaderboardFeed(supabase, new PolymarketClient());
     console.log(
-      `Refreshed feed: ${trades} recent trades + ${walletTrades} profile fills + ${freshEntries} fresh-entry markets ` +
-        `across ${wallets} leaderboard wallets; elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`
+      `Refreshed feed: ${trades} recent trades + ${walletTrades} profile fills + ${positions} open positions + ` +
+        `${freshEntries} fresh-entry markets across ${wallets} leaderboard wallets; ` +
+        `elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`
     );
     return;
   }
