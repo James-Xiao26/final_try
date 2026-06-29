@@ -74,6 +74,9 @@ export interface WalletTradeGroup {
   // Realized P/L for the position, from the closed-positions cache (null when still fully open or no
   // matching closed row). Backfilled by applyClosedBasis, not derived from the windowed fills.
   realizedPnl: number | null;
+  // Realized P/L as a fraction of cost basis (realizedPnl / (avgPrice·size) of the closed row). Same
+  // source as realizedPnl so the two reconcile; null when there's no usable cost basis.
+  realizedPnlPct: number | null;
   latestTradedAt: string;
   fills: WalletFill[];
 }

@@ -78,6 +78,8 @@ test("applyClosedBasis backfills blank entry / 0 bought from the closed row and 
   assert.equal(group.avgEntryPrice, 0.4); // was null (no buys), filled from the closed row
   assert.equal(group.totalBoughtSize, 500); // was 0 (no buys), filled from the closed row
   assert.equal(group.realizedPnl, 250);
+  // % = realizedPnl / (avgPrice·size) = 250 / (0.4·500=200) = 1.25
+  assert.equal(group.realizedPnlPct, 1.25);
 });
 
 test("applyClosedBasis keeps fill-derived entry/bought when present, still attaches P/L", () => {
@@ -89,6 +91,8 @@ test("applyClosedBasis keeps fill-derived entry/bought when present, still attac
   assert.equal(group.avgEntryPrice, 0.6); // real buy fill in window wins over the closed-row basis
   assert.equal(group.totalBoughtSize, 100);
   assert.equal(group.realizedPnl, -30);
+  // % still uses the closed row's basis (0.4·500=200), not the window buys: -30/200 = -0.15
+  assert.equal(group.realizedPnlPct, -0.15);
 });
 
 test("applyClosedBasis leaves groups with no matching closed row untouched (P/L null)", () => {

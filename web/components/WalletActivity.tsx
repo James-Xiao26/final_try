@@ -153,7 +153,10 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
                       <td className="r">{formatNumber(group.totalBoughtSize)}</td>
                       <td className="r">{formatNumber(group.totalSoldSize)}</td>
                       <td className={`r ${pnl === null ? "" : pnl >= 0 ? "pos" : "neg"}`}>
-                        {pnl === null ? "—" : `${pnl >= 0 ? "+" : ""}${formatUsd(pnl)}`}
+                        {pnl === null ? "—" : <>{pnl >= 0 ? "+" : ""}{formatUsd(pnl)}</>}
+                        {group.realizedPnlPct !== null && (
+                          <span className="wa-pct"> ({formatPercent(group.realizedPnlPct, true)})</span>
+                        )}
                       </td>
                       <td className="r" title={group.latestTradedAt}>{formatDate(group.latestTradedAt)}</td>
                     </tr>

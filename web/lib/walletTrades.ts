@@ -97,6 +97,7 @@ export function groupWalletTrades(rows: WalletTradeRowInput[]): WalletTradeGroup
       totalSoldSize: roundTo(acc.sellSize, 4),
       totalUsdc: roundTo(acc.totalUsdc, 2),
       realizedPnl: null, // backfilled by applyClosedBasis from the closed-positions cache
+      realizedPnlPct: null,
       latestTradedAt: new Date(acc.latestMs).toISOString(),
       fills: acc.fills
     }));
@@ -126,11 +127,14 @@ export function applyClosedBasis(groups: WalletTradeGroup[], closed: ClosedBasis
     if (!match) return group;
     const avgPrice = match.avgPrice;
     const size = match.size;
+    // % uses the closed row's own cost basis (avgPrice·size) so it reconciles with realizedPnl.
+    const basis = avgPrice !== null && size !== null ? avgPrice * size : 0;
     return {
       ...group,
       avgEntryPrice: group.avgEntryPrice === null && avgPrice !== null && avgPrice > 0 ? avgPrice : group.avgEntryPrice,
       totalBoughtSize: group.totalBoughtSize === 0 && size !== null && size > 0 ? size : group.totalBoughtSize,
-      realizedPnl: match.realizedPnl
+      realizedPnl: match.realizedPnl,
+      realizedPnlPct: match.realizedPnl !== null && basis > 0 ? match.realizedPnl / basis : null
     };
   });
 }
