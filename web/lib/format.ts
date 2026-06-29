@@ -60,13 +60,23 @@ export function isValidAddress(address: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
 }
 
-// Display label for a Polymarket PnL-board chip code ("pnl-all"/"pnl-month"/"pnl-week"). Unknown codes
-// return null so the UI can skip them (forward-compatible if new board codes are added ingest-side).
-const PNL_BOARD_LABELS: Record<string, string> = {
+// Display labels for Polymarket leaderboard chip codes (PnL + Volume, all-time/monthly/weekly).
+const CHIP_BOARD_LABELS: Record<string, string> = {
   "pnl-all": "All-Time PnL",
   "pnl-month": "Monthly PnL",
-  "pnl-week": "Weekly PnL"
+  "pnl-week": "Weekly PnL",
+  "vol-all": "All-Time Volume",
+  "vol-month": "Monthly Volume",
+  "vol-week": "Weekly Volume"
 };
-export function pnlBoardLabel(code: string): string | null {
-  return PNL_BOARD_LABELS[code] ?? null;
+
+// Parse a stored chip entry ("code:rank", e.g. "pnl-all:3") into a display label + rank, plus whether
+// it's a PnL or Volume board (for styling). Returns null for an unknown/malformed code so the UI can
+// skip it (forward-compatible if new board codes are added ingest-side).
+export function parseChip(entry: string): { label: string; rank: number; kind: "pnl" | "vol" } | null {
+  const [code, rankStr] = entry.split(":");
+  const label = code ? CHIP_BOARD_LABELS[code] : undefined;
+  const rank = Number(rankStr);
+  if (!label || !code || !Number.isFinite(rank)) return null;
+  return { label, rank, kind: code.startsWith("vol-") ? "vol" : "pnl" };
 }

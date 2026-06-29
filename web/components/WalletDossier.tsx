@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatCompactUsd, shortenAddress, pnlBoardLabel } from "@/lib/format";
+import { formatCompactUsd, shortenAddress, parseChip } from "@/lib/format";
 
 interface WalletDossierProps {
   address: string;
@@ -9,7 +9,7 @@ interface WalletDossierProps {
   bio: string | null;
   isBotSuspected: boolean;
   badges: { label: string; horizonDays: number }[];
-  pnlBoards: string[];      // Polymarket PnL leaderboards this wallet ranks on (chip codes)
+  leaderboardChips: string[]; // Polymarket leaderboards this wallet ranks on ("code:rank" entries)
   skill: number | null;     // 90-day skill score (signal)
   volume: number | null;    // 90-day total volume (≈ mass)
 }
@@ -27,7 +27,7 @@ function whaleClass(skill: number | null): string {
   return "Porpoise";
 }
 
-export default function WalletDossier({ address, handle, bio, isBotSuspected, badges, pnlBoards, skill, volume }: WalletDossierProps) {
+export default function WalletDossier({ address, handle, bio, isBotSuspected, badges, leaderboardChips, skill, volume }: WalletDossierProps) {
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -60,9 +60,13 @@ export default function WalletDossier({ address, handle, bio, isBotSuspected, ba
           {badges.map((b) => (
             <span key={`${b.label}-${b.horizonDays}`} className="tag">{b.label}</span>
           ))}
-          {pnlBoards.map((code) => {
-            const label = pnlBoardLabel(code);
-            return label ? <span key={code} className="tag board" title={`Ranks on Polymarket's ${label} leaderboard`}>{label}</span> : null;
+          {leaderboardChips.map((entry) => {
+            const parsed = parseChip(entry);
+            return parsed ? (
+              <span key={entry} className={`tag board ${parsed.kind === "vol" ? "vol" : ""}`} title={`Ranked #${parsed.rank} on Polymarket's ${parsed.label} leaderboard`}>
+                {parsed.label} #{parsed.rank}
+              </span>
+            ) : null;
           })}
           {isBotSuspected ? <span className="tag warn">Automaton Suspected</span> : null}
         </div>

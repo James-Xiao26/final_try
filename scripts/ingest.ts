@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { botSignal, type BotSignal } from "./botDetection.js";
 import { CONFIG } from "./config.js";
 import { computeMetrics, type WalletMetrics } from "./metrics.js";
-import { apiStats, discoverTopWallets, discoverCandidateAddresses, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet, type EventSummary } from "./polymarket.js";
+import { apiStats, discoverTopWallets, discoverCandidateAddresses, scanChipBoards, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet, type EventSummary } from "./polymarket.js";
 import { recentTradesFromActivity, type RecentTrade } from "./recentTrades.js";
 import { walletSpecialty } from "./specialty.js";
 import { worldCupStats } from "./worldCup.js";
@@ -31,7 +31,7 @@ interface Database {
           links: Record<string, unknown> | null;
           lifetime_pnl: number | null;
           specialty: string | null;
-          pnl_boards: string[] | null;
+          leaderboard_chips: string[] | null;
           first_seen_at: string;
           updated_at: string;
         };
@@ -44,7 +44,7 @@ interface Database {
           links?: Record<string, unknown> | null;
           lifetime_pnl?: number | null;
           specialty?: string | null;
-          pnl_boards?: string[] | null;
+          leaderboard_chips?: string[] | null;
         };
         Update: {
           is_bot_suspected?: boolean;
@@ -54,7 +54,7 @@ interface Database {
           links?: Record<string, unknown> | null;
           lifetime_pnl?: number | null;
           specialty?: string | null;
-          pnl_boards?: string[] | null;
+          leaderboard_chips?: string[] | null;
         };
         Relationships: [];
       };
@@ -1256,18 +1256,18 @@ async function getLeaderboardAddresses(supabase: SupabaseClient): Promise<Set<st
   return new Set((data ?? []).map((row) => row.address));
 }
 
-// Persist each leaderboard wallet's Polymarket PnL-board membership (the chips) onto wallets.pnl_boards,
-// from the membership map captured for free during candidate discovery. Writes every board wallet —
-// including those with no membership (set []) — so a wallet that fell off the PnL boards loses its chip.
-// Full-ingest-only: the candidate scan that feeds this runs only on the full pass.
-async function cachePnlBoardChips(
+// Persist each leaderboard wallet's Polymarket leaderboard chips (rank per PnL/Volume board, as
+// "code:rank" entries) onto wallets.leaderboard_chips, from the scanChipBoards map. Writes every board
+// wallet — including those with no chips (set []) — so a wallet that fell off the boards loses them.
+// Full-ingest-only: the chip-board scan that feeds this runs only on the full pass.
+async function cacheLeaderboardChips(
   supabase: SupabaseClient,
   boardAddresses: Set<string>,
-  pnlBoardsByAddress: Map<string, string[]>
+  chipsByAddress: Map<string, string[]>
 ): Promise<number> {
   const rows = [...boardAddresses].map((address) => ({
     address,
-    pnl_boards: pnlBoardsByAddress.get(address) ?? []
+    leaderboard_chips: chipsByAddress.get(address) ?? []
   }));
   for (let offset = 0; offset < rows.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
     const { error } = await supabase
@@ -2008,10 +2008,10 @@ async function registerCandidates(
 async function discoverAndRegisterCandidates(
   supabase: SupabaseClient,
   knownAddresses: Set<string>
-): Promise<{ discovered: number; registered: number; pnlBoardsByAddress: Map<string, string[]> }> {
-  const { candidates, pnlBoardsByAddress } = await discoverCandidateAddresses(knownAddresses);
+): Promise<{ discovered: number; registered: number }> {
+  const candidates = await discoverCandidateAddresses(knownAddresses);
   const registered = await registerCandidates(supabase, candidates);
-  return { discovered: candidates.length, registered, pnlBoardsByAddress };
+  return { discovered: candidates.length, registered };
 }
 
 interface CandidateScoringResult {
@@ -2327,17 +2327,24 @@ async function main(): Promise<void> {
   const mainAddressSet = new Set(discoveredWallets.map((w) => w.address));
   let candidatesDiscovered = 0;
   let candidatesRegistered = 0;
-  // PnL-board membership for the leaderboard chips, captured from the candidate scan; persisted after
-  // the rebuild once the board is known. Empty on a discovery failure (chips just won't refresh).
-  let pnlBoardsByAddress = new Map<string, string[]>();
   try {
     const cdResult = await discoverAndRegisterCandidates(supabase, mainAddressSet);
     candidatesDiscovered = cdResult.discovered;
     candidatesRegistered = cdResult.registered;
-    pnlBoardsByAddress = cdResult.pnlBoardsByAddress;
     console.log(`Candidate discovery: ${candidatesDiscovered} new addresses found, ${candidatesRegistered} registered`);
   } catch (reason) {
     console.warn(`Candidate discovery failed (non-fatal): ${describeError(reason)}`);
+  }
+
+  // Leaderboard chips: scan the PnL + Volume boards (all-time/monthly/weekly) to PNL_BOARD_CHIP_TOP_N
+  // and record each wallet's rank per board. Persisted onto the board wallets after the rebuild.
+  // Empty on failure (chips just won't refresh this run). Full-ingest-only.
+  let chipsByAddress = new Map<string, string[]>();
+  try {
+    chipsByAddress = await scanChipBoards();
+    console.log(`Chip-board scan: ${chipsByAddress.size} wallets ranked across ${CONFIG.CHIP_BOARDS.length} boards`);
+  } catch (reason) {
+    console.warn(`Chip-board scan failed (non-fatal): ${describeError(reason)}`);
   }
   // Load tracked candidates and append to the worker pool so they compete for leaderboard
   // slots on every full run — no separate pass needed, their scores land in wallet_stats
@@ -2425,12 +2432,12 @@ async function main(): Promise<void> {
   // (the persisted inserts, the crowded-markets position read-back, the equity curve) proportional to
   // TOP_N instead of the full eligible set — which is what pushed the 512MB dyno past its R15/SIGKILL line.
   const boardAddresses = await getLeaderboardAddresses(supabase);
-  // Stamp the PnL-board chips onto the board wallets (membership captured during discovery above).
+  // Stamp the leaderboard chips (rank per PnL/Volume board) onto the board wallets.
   try {
-    const chipped = await cachePnlBoardChips(supabase, boardAddresses, pnlBoardsByAddress);
-    console.log(`PnL-board chips: refreshed ${chipped} wallets`);
+    const chipped = await cacheLeaderboardChips(supabase, boardAddresses, chipsByAddress);
+    console.log(`Leaderboard chips: refreshed ${chipped} wallets`);
   } catch (reason) {
-    console.warn(`PnL-board chip caching failed (non-fatal): ${describeError(reason)}`);
+    console.warn(`Leaderboard chip caching failed (non-fatal): ${describeError(reason)}`);
   }
   const boardTrades = collectedTrades.filter((trade) => boardAddresses.has(trade.address));
   collectedTrades.length = 0;

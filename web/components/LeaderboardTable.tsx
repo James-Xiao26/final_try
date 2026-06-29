@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import HorizonToggle from "@/components/HorizonToggle";
 import WalletSearch from "@/components/WalletSearch";
-import { formatEdge, formatNumber, formatPercent, shortenAddress, pnlBoardLabel } from "@/lib/format";
+import { formatEdge, formatNumber, formatPercent, shortenAddress, parseChip } from "@/lib/format";
 import { HORIZONS } from "@/lib/types";
 import type { HorizonDays, LeaderboardRow } from "@/lib/types";
 
@@ -34,14 +34,21 @@ function displayName(row: LeaderboardRow): string {
   return row.handle ? `@${row.handle}` : shortenAddress(row.address);
 }
 
-// Chips marking which Polymarket PnL leaderboards recruited this wallet (all-time/monthly/weekly).
-function PnlBoardChips({ codes }: { codes: string[] }) {
+// Chips marking which Polymarket leaderboards this wallet ranks on (PnL/Volume, all-time/monthly/
+// weekly), with its rank. Entries are "code:rank"; volume boards get a distinct tint.
+function LeaderboardChips({ chips }: { chips: string[] }) {
   return (
     <>
-      {codes.map((code) => {
-        const label = pnlBoardLabel(code);
-        return label ? (
-          <span key={code} className="lb-board" title={`Ranks on Polymarket's ${label} leaderboard`}>{label}</span>
+      {chips.map((entry) => {
+        const parsed = parseChip(entry);
+        return parsed ? (
+          <span
+            key={entry}
+            className={`lb-board ${parsed.kind === "vol" ? "vol" : ""}`}
+            title={`Ranked #${parsed.rank} on Polymarket's ${parsed.label} leaderboard`}
+          >
+            {parsed.label} #{parsed.rank}
+          </span>
         ) : null;
       })}
     </>
@@ -234,7 +241,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
                   <div className="cls">
                     {whaleClass(apex.skillScore)}
                     {apex.specialty ? <span className="lb-spec" title={`Strongest forecasting edge in ${apex.specialty} markets`}>{apex.specialty}</span> : null}
-                    <PnlBoardChips codes={apex.pnlBoards} />
+                    <LeaderboardChips chips={apex.leaderboardChips} />
                     <Link href={`/wallet/${apex.address}?horizon=${horizon}`} className="full">View dossier →</Link>
                   </div>
                 </div>
@@ -321,7 +328,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
                           {row.handle ? <><span className="at">@</span>{row.handle}</> : shortenAddress(row.address)}
                         </Link>
                         {row.specialty ? <span className="lb-spec" title={`Strongest forecasting edge in ${row.specialty} markets`}>{row.specialty}</span> : null}
-                        <PnlBoardChips codes={row.pnlBoards} />
+                        <LeaderboardChips chips={row.leaderboardChips} />
                         <div className="meta">
                           {shortenAddress(row.address)}
                           <button type="button" aria-label={`Copy ${row.address}`} onClick={() => void navigator.clipboard.writeText(row.address)}>

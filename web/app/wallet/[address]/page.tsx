@@ -76,7 +76,7 @@ export default async function WalletPage({ params, searchParams }: WalletPagePro
         bio={profile.bio}
         isBotSuspected={profile.isBotSuspected}
         badges={profile.badges}
-        pnlBoards={profile.pnlBoards}
+        leaderboardChips={profile.leaderboardChips}
         skill={m90?.skillScore ?? null}
         volume={m90?.totalVolumeUsd ?? null}
       />
