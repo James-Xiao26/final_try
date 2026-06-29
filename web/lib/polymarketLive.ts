@@ -285,6 +285,10 @@ export async function fetchLiveWalletDetail(address: string): Promise<LiveWallet
   ]);
 
   const positions: WalletPosition[] = positionRows
+    // Mirror the ingest's openPositionRecords: drop resolved-but-unredeemed holdings (redeemable===true).
+    // They've settled (curPrice 0/1) and aren't "open holdings marked to market" — without this a wallet
+    // whose positions have all resolved shows them all at a $0 current price (see openPositionRecords).
+    .filter((row) => row.redeemable !== true)
     .map((row) => ({
       conditionId: readStr(row, ["conditionId", "market", "marketId"]) || null,
       asset: readStr(row, ["asset", "tokenId"]),
