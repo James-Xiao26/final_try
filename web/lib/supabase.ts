@@ -609,10 +609,14 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
   // an eligible-but-non-board wallet (e.g. a World Cup specialist linked from that board) has a score
   // but empty position/trade caches. Fall back to a live read from Polymarket so the profile isn't
   // blank — cached in Next's Data Cache, degrades to empty on failure (see fetchLiveWalletDetail).
-  if (positions.length === 0 && tradeGroups.length === 0) {
+  // Fire when *either* cache is empty (not both): the ~10-min feed cron refreshes wallet_trades for
+  // current board wallets but only the daily full ingest writes wallet_positions, so a wallet new to
+  // the board shows trades with a blank Current Positions until the next full ingest. Fill only the
+  // empty side so a cached (and avg-entry-backfilled) side is kept.
+  if (positions.length === 0 || tradeGroups.length === 0) {
     const live = await fetchLiveWalletDetail(normalized);
-    positions = live.positions;
-    tradeGroups = live.tradeGroups;
+    if (positions.length === 0) positions = live.positions;
+    if (tradeGroups.length === 0) tradeGroups = live.tradeGroups;
   }
 
   return {
