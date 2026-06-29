@@ -744,6 +744,7 @@ input:focus { border-color: var(--green) !important; }
 .wa-table tbody td { padding: 13px 14px; vertical-align: middle; border-top: 1px solid rgba(54,236,208,0.07); font-family: var(--font-display); font-weight: 600; font-size: 13.5px; }
 .wa-table tbody td.r { text-align: right; }
 .wa-table td.pos { color: var(--green); } .wa-table td.neg { color: var(--red); }
+.wa-pct { font-size: 0.85em; opacity: 0.7; }
 .wa-market { max-width: 320px; }
 .wa-market span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wa-caret { width: 22px; color: var(--muted); }

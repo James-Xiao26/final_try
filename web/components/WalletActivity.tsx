@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { formatPrice, formatUsd, formatNumber } from "@/lib/format";
+import { formatPrice, formatUsd, formatNumber, formatPercent } from "@/lib/format";
 import type { WalletFill, WalletPosition, WalletTradeGroup } from "@/lib/types";
 
 interface WalletActivityProps {
@@ -88,6 +88,8 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
             <tbody>
               {positions.map((position, index) => {
                 const unrealized = position.currentValue - position.initialValue;
+                // % computed from the raw values (before formatUsd rounds the dollar figure) for accuracy.
+                const pct = position.initialValue > 0 ? unrealized / position.initialValue : null;
                 return (
                   <tr key={`${position.asset}-${index}`}>
                     <td className="wa-market"><span title={position.market ?? ""}>{position.market || "—"}</span></td>
@@ -96,7 +98,10 @@ export default function WalletActivity({ positions, tradeGroups }: WalletActivit
                     <td className="r">{formatPrice(position.avgPrice)}</td>
                     <td className="r">{formatPrice(position.curPrice)}</td>
                     <td className="r">{formatUsd(position.currentValue)}</td>
-                    <td className={`r ${unrealized >= 0 ? "pos" : "neg"}`}>{unrealized >= 0 ? "+" : ""}{formatUsd(unrealized)}</td>
+                    <td className={`r ${unrealized >= 0 ? "pos" : "neg"}`}>
+                      {unrealized >= 0 ? "+" : ""}{formatUsd(unrealized)}
+                      {pct !== null && <span className="wa-pct"> ({formatPercent(pct, true)})</span>}
+                    </td>
                   </tr>
                 );
               })}
