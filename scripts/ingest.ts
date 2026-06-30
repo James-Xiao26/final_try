@@ -1305,11 +1305,8 @@ async function replaceWalletClosedPositions(
   return scoped.length;
 }
 
-// How many ranked markets to persist into crowded_markets_cache. The web reads the top 40; storing a
-// bit more leaves headroom without bloating the table.
-const CROWDED_MARKETS_CACHE_LIMIT = 100;
-
-// Same headroom for the Fresh Entries ("flow") cache.
+// crowded_markets_cache stores all markets with ≥5 leaderboard participants (no row cap).
+// Fresh Entries cache row cap.
 const FRESH_ENTRIES_CACHE_LIMIT = 100;
 
 // Page through a leaderboard-scoped table (PostgREST caps one response at 1000 rows). The factory
@@ -1448,9 +1445,9 @@ async function cacheCrowdedMarkets(supabase: SupabaseClient): Promise<number> {
     closeTime: row.close_time
   }));
 
-  const summaries = summarizeCrowdedMarkets(positions, closed, rankByAddress, CROWDED_MARKETS_CACHE_LIMIT);
+  const summaries = summarizeCrowdedMarkets(positions, closed, rankByAddress);
 
-  // Wipe-and-replace: the table is tiny (≤100 rows) so the dead-row churn is negligible.
+  // Wipe-and-replace: stores all markets with ≥5 leaderboard participants.
   const { error: deleteError } = await supabase.from("crowded_markets_cache").delete().gte("rank", 0);
   if (deleteError) {
     throw deleteError;

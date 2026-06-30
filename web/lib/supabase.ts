@@ -813,7 +813,7 @@ interface CrowdedCacheSelectRow {
   last_traded_at: string | null;
 }
 
-export async function getCrowdedMarkets(limit = 40): Promise<CrowdedMarketSummary[]> {
+export async function getCrowdedMarkets(): Promise<CrowdedMarketSummary[]> {
   const supabase = createSupabaseReadClient();
 
   const { data, error } = await supabase
@@ -821,8 +821,8 @@ export async function getCrowdedMarkets(limit = 40): Promise<CrowdedMarketSummar
     .select(
       "condition_id, market, trader_count, yes_traders, no_traders, open_count, closed_count, committed_usd, net_exposure_usd, top_rank, cur_price, last_traded_at"
     )
-    .order("rank", { ascending: true })
-    .limit(limit);
+    .gte("trader_count", 5)
+    .order("rank", { ascending: true });
 
   if (error) {
     if (isMissingSchemaError(error)) {

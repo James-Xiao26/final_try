@@ -29,11 +29,13 @@ function closed(p: Partial<CrowdClosedPosition>): CrowdClosedPosition {
 }
 
 const ranks = new Map<string, number>([["0xa", 1], ["0xb", 5]]);
+// minTraders=1 lets unit tests use small fixtures without hitting the ≥5 production threshold.
+const MIN1 = 1;
 
 test("summarizeCrowdedMarkets counts distinct wallets, YES/NO split, committed capital, and best rank", () => {
   const positions = [open({ address: "0xa", outcomeIndex: 0 }), open({ address: "0xb", outcomeIndex: 1, curPrice: 0.55 })];
   const closedRows = [closed({ address: "0xa", outcomeIndex: 0, closeTime: "2026-01-03T00:00:00.000Z" })];
-  const [summary] = summarizeCrowdedMarkets(positions, closedRows, ranks);
+  const [summary] = summarizeCrowdedMarkets(positions, closedRows, ranks, MIN1);
   assert.ok(summary);
   assert.equal(summary.conditionId, "c1");
   assert.equal(summary.traderCount, 2);
@@ -48,25 +50,33 @@ test("summarizeCrowdedMarkets counts distinct wallets, YES/NO split, committed c
   assert.equal(summary.lastTradedAt, "2026-01-03T00:00:00.000Z");
 });
 
-test("summarizeCrowdedMarkets ranks markets by trader count then committed capital, honoring the limit", () => {
+test("summarizeCrowdedMarkets ranks markets by trader count then committed capital", () => {
   const positions = [
     open({ address: "0xa", conditionId: "c1" }),
     open({ address: "0xb", conditionId: "c1" }),
     open({ address: "0xa", conditionId: "c2", size: 1000 })
   ];
   // c1 has 2 traders, c2 has 1 → c1 ranks first by trader count.
-  const ranked = summarizeCrowdedMarkets(positions, [], ranks);
+  const ranked = summarizeCrowdedMarkets(positions, [], ranks, MIN1);
   assert.equal(ranked.length, 2);
   assert.equal(ranked[0]?.conditionId, "c1");
   assert.equal(ranked[1]?.conditionId, "c2");
-  // limit truncates.
-  assert.equal(summarizeCrowdedMarkets(positions, [], ranks, 1).length, 1);
+});
+
+test("summarizeCrowdedMarkets applies the minTraders threshold", () => {
+  const positions = [
+    open({ address: "0xa", conditionId: "c1" }),
+    open({ address: "0xb", conditionId: "c1" }),
+    open({ address: "0xa", conditionId: "c2" }),
+  ];
+  // default minTraders=5: neither market qualifies
+  assert.equal(summarizeCrowdedMarkets(positions, [], ranks).length, 0);
 });
 
 test("summarizeCrowdedMarkets derives the YES price from outcome 0 directly and outcome 1 as its complement", () => {
-  const yesSummary = summarizeCrowdedMarkets([open({ outcomeIndex: 0, curPrice: 0.62 })], [], ranks);
+  const yesSummary = summarizeCrowdedMarkets([open({ outcomeIndex: 0, curPrice: 0.62 })], [], ranks, MIN1);
   assert.equal(yesSummary[0]?.curPrice, 0.62);
-  const noSummary = summarizeCrowdedMarkets([open({ outcomeIndex: 1, curPrice: 0.62 })], [], ranks);
+  const noSummary = summarizeCrowdedMarkets([open({ outcomeIndex: 1, curPrice: 0.62 })], [], ranks, MIN1);
   assert.ok(noSummary[0]);
   assert.ok(Math.abs((noSummary[0].curPrice ?? 0) - 0.38) < 1e-9);
 });
@@ -75,7 +85,8 @@ test("summarizeCrowdedMarkets skips rows with no conditionId and returns no rank
   const summaries = summarizeCrowdedMarkets(
     [open({ address: "0xz", conditionId: null }), open({ address: "0xz", conditionId: "c9" })],
     [],
-    ranks
+    ranks,
+    MIN1
   );
   assert.equal(summaries.length, 1);
   assert.equal(summaries[0]?.conditionId, "c9");
@@ -89,10 +100,10 @@ test("summarizeCrowdedMarkets handles an empty input set", () => {
 
 test("summarizeCrowdedMarkets drops a market no wallet currently holds (all positions closed)", () => {
   // A resolved/fully-exited market: only closed positions, no open holdings → excluded.
-  const resolved = summarizeCrowdedMarkets([], [closed({ conditionId: "resolved" }), closed({ address: "0xb", conditionId: "resolved" })], ranks);
+  const resolved = summarizeCrowdedMarkets([], [closed({ conditionId: "resolved" }), closed({ address: "0xb", conditionId: "resolved" })], ranks, MIN1);
   assert.equal(resolved.length, 0);
   // A market with even one current holder is kept.
-  const active = summarizeCrowdedMarkets([open({ conditionId: "live" })], [closed({ conditionId: "live" })], ranks);
+  const active = summarizeCrowdedMarkets([open({ conditionId: "live" })], [closed({ conditionId: "live" })], ranks, MIN1);
   assert.equal(active.length, 1);
   assert.equal(active[0]?.openCount, 1);
 });

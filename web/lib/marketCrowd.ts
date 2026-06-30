@@ -169,14 +169,14 @@ function bucketize(positions: CrowdOpenPosition[], closed: CrowdClosedPosition[]
   return buckets;
 }
 
-// Rank the markets by how many leaderboard wallets are in them (then by committed capital). Returns
-// the top `limit` summaries, each with the YES/NO split, exposure, and freshest close time. Built
-// from the position caches only (open + closed); fills are reserved for the per-market detail.
+// All markets where ≥5 leaderboard wallets currently hold a position, ranked by participant count
+// then committed capital. Built from the position caches only (open + closed); fills are reserved
+// for the per-market detail. (Keep in sync with scripts copy.)
 export function summarizeCrowdedMarkets(
   positions: CrowdOpenPosition[],
   closed: CrowdClosedPosition[],
   lookups: Pick<CrowdLookups, "rankByAddress">,
-  limit = 40
+  minTraders = 5
 ): CrowdedMarketSummary[] {
   const buckets = bucketize(positions, closed);
   const summaries: CrowdedMarketSummary[] = [];
@@ -217,9 +217,8 @@ export function summarizeCrowdedMarkets(
     // Convergence = markets leaderboard wallets are converging on *now*. Drop markets no one currently
     // holds (openCount 0) — resolved or fully-exited — so a settled market (every position closed)
     // can't sit at the top forever on historical participation alone. (Keep in sync with scripts copy.)
-    .filter((s) => s.openCount > 0)
-    .sort((a, c) => c.traderCount - a.traderCount || c.committedUsd - a.committedUsd)
-    .slice(0, limit);
+    .filter((s) => s.openCount > 0 && s.traderCount >= minTraders)
+    .sort((a, c) => c.traderCount - a.traderCount || c.committedUsd - a.committedUsd);
 }
 
 // Reconstruct the leaderboard's cumulative net holdings on each side over time, forward from the

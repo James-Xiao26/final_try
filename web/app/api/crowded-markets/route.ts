@@ -13,7 +13,7 @@ export async function GET() {
   }
 
   try {
-    const markets = await withTimeout(getCrowdedMarkets(100), 8000, []);
+    const markets = await withTimeout(getCrowdedMarkets(), 8000, []);
 
     return NextResponse.json(
       { markets },
