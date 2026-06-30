@@ -1,4 +1,3 @@
-import ConvergencePanel from "@/components/ConvergencePanel";
 import FreshEntriesPanel from "@/components/FreshEntriesPanel";
 import RecentTradesFeed from "@/components/RecentTradesFeed";
 import ResolvedMarketsPanel from "@/components/ResolvedMarketsPanel";
@@ -13,9 +12,9 @@ export default async function HomePage() {
   // Each section degrades independently: a Supabase failure (e.g. free-tier cold-start 57014
   // timeout on the first hit) must never crash the whole page. The client components poll their
   // /api/* routes on mount, so empty initial data just renders the shell and then hydrates live.
-  // Fresh Contacts + Convergence are gated (signed-in only), so their data is NOT fetched here —
-  // it would otherwise be baked into the public cached HTML. Their panels fetch it client-side from
-  // the auth-gated API once the user is signed in.
+  // Fresh Contacts is gated (signed-in only), so its data is NOT fetched here — it would otherwise
+  // be baked into the public cached HTML. The panel fetches it client-side from the auth-gated API
+  // once the user is signed in. (Convergence moved to the /decision "Signals" page.)
   const [{ positions, traderCount }, resolvedMarkets] = await Promise.all([
     withTimeout(getRecentLeaderboardTrades(), 1500, { positions: [], traderCount: 0 }).catch(() => ({ positions: [], traderCount: 0 })),
     withTimeout(getResolvedMarkets(), 1500, []).catch(() => [])
@@ -38,8 +37,6 @@ export default async function HomePage() {
       <ResolvedMarketsPanel rows={resolvedMarkets} />
 
       <FreshEntriesPanel />
-
-      <ConvergencePanel />
     </main>
   );
 }
