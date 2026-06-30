@@ -5,12 +5,21 @@ import HorizonToggle from "@/components/HorizonToggle";
 import { windowedCurve } from "@/lib/equityCurve";
 import { formatCompactPercent, formatCompactUsd, formatEdge, formatNumber, formatPercent, formatUsd } from "@/lib/format";
 import { HORIZONS } from "@/lib/types";
-import type { EquityPoint, HorizonDays, WalletMetrics } from "@/lib/types";
+import type { ClosedTrade, EquityPoint, HorizonDays, WalletMetrics } from "@/lib/types";
 
 interface WalletTelemetryProps {
   metrics: WalletMetrics[];
   equityCurves: Record<HorizonDays, EquityPoint[]>;
+  closedTrades: ClosedTrade[];
   initialHorizon: HorizonDays;
+}
+
+// Outcome side label for a step trade — Polymarket's real label, else binary Yes/No from the index.
+function tradeOutcome(label: string | null, index: number | null): string {
+  if (label) return label;
+  if (index === 0) return "Yes";
+  if (index === 1) return "No";
+  return "";
 }
 
 const DRAW_LEN = 4000;
@@ -22,7 +31,15 @@ function tickLabel(ms: number): string {
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 }
 
-function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: HorizonDays }) {
+function DiveProfile({
+  points,
+  horizon,
+  tradesByDay
+}: {
+  points: EquityPoint[];
+  horizon: HorizonDays;
+  tradesByDay: Map<string, ClosedTrade[]>;
+}) {
   const [drawn, setDrawn] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
 
@@ -120,6 +137,10 @@ function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: Hori
   const hy = hover !== null ? ys[hover] ?? 0 : 0;
   const hoverPoint = hover !== null ? pts[hover] : undefined;
   const hoverPct = hover !== null ? pcts[hover] ?? 0 : 0;
+  // The closed positions that moved the balance on the hovered step's day (the curve steps on each
+  // position's close date). Empty for the window-start baseline and any flat day.
+  const hoverTrades = hoverPoint ? tradesByDay.get(hoverPoint.ts.slice(0, 10)) ?? [] : [];
+  const TRADES_SHOWN = 6;
   // Keep the tooltip box inside the chart horizontally (it's centered on the point otherwise).
   const tipLeft = Math.min(88, Math.max(12, (hx / W) * 100));
 
@@ -189,7 +210,8 @@ function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: Hori
             padding: "5px 9px",
             fontSize: 11.5,
             lineHeight: 1.4,
-            whiteSpace: "nowrap",
+            whiteSpace: hoverTrades.length > 0 ? "normal" : "nowrap",
+            maxWidth: hoverTrades.length > 0 ? 340 : undefined,
             color: "#cfeee9",
             zIndex: 5
           }}
@@ -199,15 +221,49 @@ function DiveProfile({ points, horizon }: { points: EquityPoint[]; horizon: Hori
             {formatUsd(hoverPoint.cumulativePnl)}{" "}
             <span style={{ color: hoverPct >= 0 ? "var(--green)" : "var(--red)" }}>{formatCompactPercent(hoverPct)}</span>
           </div>
+          {hoverTrades.length > 0 && (
+            <div style={{ marginTop: 5, paddingTop: 5, borderTop: "1px solid rgba(54,236,208,0.2)" }}>
+              <div style={{ opacity: 0.65, marginBottom: 3 }}>
+                {hoverTrades.length} {hoverTrades.length === 1 ? "market settled" : "markets settled"}
+              </div>
+              {hoverTrades.slice(0, TRADES_SHOWN).map((t, i) => {
+                const side = tradeOutcome(t.outcomeLabel, t.outcomeIndex);
+                return (
+                  <div key={i} style={{ display: "flex", gap: 10, justifyContent: "space-between", maxWidth: 320 }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                      {t.market ?? "—"}{side && <span style={{ opacity: 0.6 }}> · {side}</span>}
+                    </span>
+                    {t.realizedPnl !== null && (
+                      <span style={{ color: t.realizedPnl >= 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
+                        {t.realizedPnl >= 0 ? "+" : ""}{formatUsd(t.realizedPnl)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+              {hoverTrades.length > TRADES_SHOWN && (
+                <div style={{ opacity: 0.6, marginTop: 2 }}>+{hoverTrades.length - TRADES_SHOWN} more</div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-export default function WalletTelemetry({ metrics, equityCurves, initialHorizon }: WalletTelemetryProps) {
+export default function WalletTelemetry({ metrics, equityCurves, closedTrades, initialHorizon }: WalletTelemetryProps) {
   const [horizon, setHorizon] = useState<HorizonDays>(initialHorizon);
   const points = equityCurves[horizon] ?? [];
+  // Group closed positions by UTC close-day so the chart can look up a step's trades by its date.
+  // Horizon-independent (the day key is the same across windows), so build it once for the wallet.
+  const tradesByDay = new Map<string, ClosedTrade[]>();
+  for (const trade of closedTrades) {
+    const day = trade.closeTime.slice(0, 10);
+    const list = tradesByDay.get(day) ?? [];
+    list.push(trade);
+    tradesByDay.set(day, list);
+  }
   // Final return % of the $100-stake copy-trade simulation, vs the window-start stake (empty curve → 0%).
   const stake = points[0]?.cumulativePnl || 100;
   const finalPct = ((points[points.length - 1]?.cumulativePnl ?? stake) / stake - 1) * 100;
@@ -259,9 +315,10 @@ export default function WalletTelemetry({ metrics, equityCurves, initialHorizon 
         </div>
         <p className="muted" style={{ margin: "0 0 14px", fontSize: 12.5, lineHeight: 1.45, maxWidth: 560 }}>
           Hypothetical return if you’d copied every trade this wallet made starting from $100, staking 1% of your
-          running balance on each — shown as % gain/loss vs that $100.
+          running balance on each — shown as % gain/loss vs that $100. Hover a step to see the markets that
+          settled that day.
         </p>
-        <DiveProfile points={points} horizon={horizon} />
+        <DiveProfile points={points} horizon={horizon} tradesByDay={tradesByDay} />
         <div className="dive-foot"><span>% return · $100 start · 1% per trade</span><span>{horizon}-day trace</span></div>
       </section>
     </>

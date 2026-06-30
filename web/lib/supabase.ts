@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import type { CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, FreshEntrySummary, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, ResolvedMarket, WalletMetrics, WalletPosition, WalletProfile, WorldCupRow } from "./types";
+import type { ClosedTrade, CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, FreshEntrySummary, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, ResolvedMarket, WalletMetrics, WalletPosition, WalletProfile, WorldCupRow } from "./types";
 import type { DELeaderboardEntry, DEMarket, DEPosition, DecisionEngineInputs } from "./decisionEngine";
 import { HORIZONS } from "./types";
 import { groupWalletTrades, applyClosedBasis } from "./walletTrades";
@@ -610,6 +610,19 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
   }));
   tradeGroups = applyClosedBasis(tradeGroups, closedBasis);
 
+  // The dive-profile curve steps the balance on each closed position's close date, so surface those
+  // closes (within the longest horizon window) for the per-step hover. Same source as the basis above.
+  const maxHorizonMs = Date.now() - Math.max(...HORIZONS) * 86_400_000;
+  const closedTrades: ClosedTrade[] = closedBasis
+    .filter((row) => row.closeTime !== null && Date.parse(row.closeTime) >= maxHorizonMs)
+    .map((row) => ({
+      closeTime: row.closeTime as string,
+      market: row.market,
+      outcomeLabel: row.outcomeLabel,
+      outcomeIndex: row.outcomeIndex,
+      realizedPnl: row.realizedPnl
+    }));
+
   // Board-scoping: ingest only persists position/trade detail for the ~TOP_N leaderboard wallets, so
   // an eligible-but-non-board wallet (e.g. a World Cup specialist linked from that board) has a score
   // but empty position/trade caches. Fall back to a live read from Polymarket so the profile isn't
@@ -639,7 +652,8 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
       horizonDays: rank.horizon_days
     })),
     positions,
-    tradeGroups
+    tradeGroups,
+    closedTrades
   };
 }
 

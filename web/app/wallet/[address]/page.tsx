@@ -84,6 +84,7 @@ export default async function WalletPage({ params, searchParams }: WalletPagePro
       <WalletTelemetry
         metrics={profile.metrics}
         equityCurves={profile.equityCurves}
+        closedTrades={profile.closedTrades}
         initialHorizon={initialHorizon}
       />
 

@@ -88,6 +88,17 @@ export interface WalletTradeGroup {
   fills: WalletFill[];
 }
 
+// One closed position behind a step in the dive-profile equity curve. The curve steps the balance on
+// each position's close date, so surfacing these lets the chart show, on hover, exactly which resolved
+// or sold trades moved the balance that day. Matched to a curve point by close-day (UTC "YYYY-MM-DD").
+export interface ClosedTrade {
+  closeTime: string;
+  market: string | null;
+  outcomeLabel: string | null;
+  outcomeIndex: number | null;
+  realizedPnl: number | null;
+}
+
 export interface WalletProfile {
   address: string;
   handle: string | null;
@@ -102,6 +113,8 @@ export interface WalletProfile {
   badges: { label: string; horizonDays: number }[];
   positions: WalletPosition[];
   tradeGroups: WalletTradeGroup[];
+  // Closed positions within the max horizon window, for the dive-profile step tooltips (see ClosedTrade).
+  closedTrades: ClosedTrade[];
 }
 
 // Sortable columns on the Markets page. "change" maps to the leading outcome's 24h price change.
