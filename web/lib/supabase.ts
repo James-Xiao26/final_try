@@ -615,13 +615,25 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
   const maxHorizonMs = Date.now() - Math.max(...HORIZONS) * 86_400_000;
   const closedTrades: ClosedTrade[] = closedBasis
     .filter((row) => row.closeTime !== null && Date.parse(row.closeTime) >= maxHorizonMs)
-    .map((row) => ({
-      closeTime: row.closeTime as string,
-      market: row.market,
-      outcomeLabel: row.outcomeLabel,
-      outcomeIndex: row.outcomeIndex,
-      realizedPnl: row.realizedPnl
-    }));
+    .map((row) => {
+      // Forecasting result from entry + realized P/L: exit = entry + pnl/size, % = pnl/costBasis. Both
+      // are size-independent, so they reflect the wallet's edge, not how big they bet. Guarded against a
+      // zero entry/size (free/converted shares) → null, so the row shows "—" rather than a bogus number.
+      const entry = row.avgPrice;
+      const cost = (entry ?? 0) * (row.size ?? 0);
+      const hasPnl = row.realizedPnl !== null;
+      const avgExit = hasPnl && row.size && row.size > 0 && entry !== null ? entry + row.realizedPnl! / row.size : null;
+      const pctReturn = hasPnl && cost > 0 ? row.realizedPnl! / cost : null;
+      return {
+        closeTime: row.closeTime as string,
+        market: row.market,
+        outcomeLabel: row.outcomeLabel,
+        outcomeIndex: row.outcomeIndex,
+        avgEntry: entry,
+        avgExit,
+        pctReturn
+      };
+    });
 
   // Board-scoping: ingest only persists position/trade detail for the ~TOP_N leaderboard wallets, so
   // an eligible-but-non-board wallet (e.g. a World Cup specialist linked from that board) has a score

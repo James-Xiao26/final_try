@@ -3,7 +3,7 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import HorizonToggle from "@/components/HorizonToggle";
 import { windowedCurve } from "@/lib/equityCurve";
-import { formatCompactPercent, formatCompactUsd, formatEdge, formatNumber, formatPercent, formatUsd } from "@/lib/format";
+import { formatCompactPercent, formatCompactUsd, formatEdge, formatNumber, formatPercent, formatPrice, formatUsd } from "@/lib/format";
 import { HORIZONS } from "@/lib/types";
 import type { ClosedTrade, EquityPoint, HorizonDays, WalletMetrics } from "@/lib/types";
 
@@ -159,16 +159,20 @@ function DiveProfile({
   const selPoint = pts[sel];
   const selTrades = selPoint ? tradesByDay.get(selPoint.ts.slice(0, 10)) ?? [] : [];
   const selPct = pcts[sel] ?? 0;
-  const dayNet = selTrades.reduce((sum, t) => sum + (t.realizedPnl ?? 0), 0);
+  // Forecasting tally for the day: how many calls landed vs missed (size-independent, by % sign).
+  const wins = selTrades.filter((t) => t.pctReturn !== null && t.pctReturn >= 0).length;
+  const losses = selTrades.filter((t) => t.pctReturn !== null && t.pctReturn < 0).length;
   const sx = xs[sel] ?? 0;
   const sy = ys[sel] ?? 0;
   // Keep the tooltip box inside the chart horizontally (it's centered on the point otherwise).
   const tipLeft = Math.min(88, Math.max(12, (hx / W) * 100));
 
-  // Biggest movers first in the log — the day's headline trades read at the top.
-  const selTradesSorted = [...selTrades].sort(
-    (a, b) => Math.abs(b.realizedPnl ?? 0) - Math.abs(a.realizedPnl ?? 0)
-  );
+  // Best calls first — sort by % return descending (the strongest forecasts top the log), nulls last.
+  const selTradesSorted = [...selTrades].sort((a, b) => {
+    if (a.pctReturn === null) return 1;
+    if (b.pctReturn === null) return -1;
+    return b.pctReturn - a.pctReturn;
+  });
 
   return (
     <>
@@ -266,7 +270,7 @@ function DiveProfile({
         <div className="wl-slog-sum">
           {selTrades.length > 0 ? (
             <>
-              <span className={dayNet >= 0 ? "net pos" : "net neg"}>{dayNet >= 0 ? "+" : ""}{formatUsd(dayNet)}</span>
+              <span className="tally"><span className="pos">{wins}W</span> · <span className="neg">{losses}L</span></span>
               <span className="cnt">{selTrades.length} {selTrades.length === 1 ? "market" : "markets"}</span>
             </>
           ) : (
@@ -274,18 +278,31 @@ function DiveProfile({
           )}
         </div>
       </div>
+      {selTrades.length > 0 && (
+        <div className="wl-slog-cols">
+          <span className="sp" />
+          <span className="mkt">Market</span>
+          <span className="px">Entry → Exit</span>
+          <span className="pct">Return</span>
+        </div>
+      )}
       <div className="wl-slog-body">
         {selTradesSorted.length > 0 ? (
           selTradesSorted.map((t, i) => {
             const side = tradeOutcome(t.outcomeLabel, t.outcomeIndex);
-            const win = (t.realizedPnl ?? 0) >= 0;
+            const tone = t.pctReturn === null ? "neu" : t.pctReturn >= 0 ? "pos" : "neg";
             return (
               <div className="wl-slog-row" key={i}>
-                <span className={`dot ${win ? "pos" : "neg"}`} />
+                <span className={`dot ${tone}`} />
                 <span className="mkt">{t.market ?? "—"}{side && <span className="side"> · {side}</span>}</span>
-                {t.realizedPnl !== null && (
-                  <span className={`pnl ${win ? "pos" : "neg"}`}>{win ? "+" : ""}{formatUsd(t.realizedPnl)}</span>
-                )}
+                <span className="px">
+                  {t.avgEntry !== null ? formatPrice(t.avgEntry) : "—"}
+                  <span className="arr"> → </span>
+                  {t.avgExit !== null ? formatPrice(t.avgExit) : "—"}
+                </span>
+                <span className={`pct ${tone}`}>
+                  {t.pctReturn !== null ? formatCompactPercent(t.pctReturn * 100) : "—"}
+                </span>
               </div>
             );
           })

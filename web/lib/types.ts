@@ -91,12 +91,18 @@ export interface WalletTradeGroup {
 // One closed position behind a step in the dive-profile equity curve. The curve steps the balance on
 // each position's close date, so surfacing these lets the chart show, on hover, exactly which resolved
 // or sold trades moved the balance that day. Matched to a curve point by close-day (UTC "YYYY-MM-DD").
+// The Settlement Log shows forecasting outcome (entry → exit and % return), NOT the wallet's dollar P/L
+// — the copy-trade curve is about edge, not the wallet's position sizing.
 export interface ClosedTrade {
   closeTime: string;
   market: string | null;
   outcomeLabel: string | null;
   outcomeIndex: number | null;
-  realizedPnl: number | null;
+  // Per-share avg entry / avg exit (0..1 implied probability; exit ≈ 1.00 on a resolved win, 0.00 on a
+  // loss, or the avg sell price). pctReturn = (exit − entry)/entry — size-independent forecasting result.
+  avgEntry: number | null;
+  avgExit: number | null;
+  pctReturn: number | null;
 }
 
 export interface WalletProfile {
