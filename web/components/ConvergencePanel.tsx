@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatCompactUsd } from "@/lib/format";
 import type { CrowdedMarketSummary } from "@/lib/types";
 import { useUser } from "@/lib/supabaseBrowser";
@@ -11,6 +11,8 @@ import { useScrollLog } from "./useScrollLog";
 interface ConvergencePanelProps {
   initialRows?: CrowdedMarketSummary[];
 }
+
+type SortMode = "consensus" | "recent" | "crowded";
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -27,17 +29,30 @@ function elapsedFrom(iso: string | null): string {
   return `${Math.floor(h / 24)}d`;
 }
 
-// Lean = which side the committed capital tilts toward. Returns a label + class.
+function getConsensusPct(row: CrowdedMarketSummary): number {
+  const total = row.yesTraders + row.noTraders;
+  if (total === 0) return 0;
+  return Math.abs(row.yesTraders - row.noTraders) / total;
+}
+
 function lean(row: CrowdedMarketSummary): { label: string; cls: string } {
   if (row.yesTraders > row.noTraders) return { label: "YES", cls: "yes" };
   if (row.noTraders > row.yesTraders) return { label: "NO", cls: "no" };
   return { label: "SPLIT", cls: "split" };
 }
 
+function consensusTier(pct: number): { label: string; cls: string } | null {
+  if (pct === 1) return { label: "UNANIMOUS", cls: "t-unanimous" };
+  if (pct >= 0.67) return { label: "STRONG", cls: "t-strong" };
+  return null;
+}
+
 function ConvergenceRow({ row }: { row: CrowdedMarketSummary }) {
   const total = Math.max(1, row.yesTraders + row.noTraders);
   const yesPct = (row.yesTraders / total) * 100;
   const l = lean(row);
+  const cpct = getConsensusPct(row);
+  const tier = consensusTier(cpct);
 
   return (
     <Link className="cv-row" href={`/market/${encodeURIComponent(row.conditionId)}`} title="Open market analytics">
@@ -46,10 +61,13 @@ function ConvergenceRow({ row }: { row: CrowdedMarketSummary }) {
         <span className="cv-contacts-lbl">contacts</span>
       </div>
       <div className="cv-market-cell">
-        <span className="cv-q" title={row.market ?? ""}>{row.market || "—"}</span>
+        <div className="cv-q-row">
+          <span className="cv-q" title={row.market ?? ""}>{row.market || "—"}</span>
+          {tier ? <span className={`cv-tier ${tier.cls}`}>{tier.label}</span> : null}
+        </div>
         <div className="cv-meta">
           {row.topRank !== null ? <span className="cv-toprank">Top contact #{row.topRank}</span> : null}
-          <span className="cv-last">last close {elapsedFrom(row.lastTradedAt)}</span>
+          <span className="cv-last">last trade {elapsedFrom(row.lastTradedAt)}</span>
         </div>
       </div>
       <div className="cv-split-cell">
@@ -73,34 +91,42 @@ function ConvergenceRow({ row }: { row: CrowdedMarketSummary }) {
   );
 }
 
+const SORT_OPTS: { key: SortMode; label: string; desc: string }[] = [
+  { key: "consensus", label: "CONSENSUS", desc: "Most one-sided first" },
+  { key: "recent",    label: "RECENT",    desc: "Latest leaderboard entry" },
+  { key: "crowded",   label: "CROWDED",   desc: "Most contacts" },
+];
+
 export default function ConvergencePanel({ initialRows = [] }: ConvergencePanelProps) {
   const { loading, signedIn } = useUser();
   const [rows, setRows] = useState(initialRows);
+  const [sort, setSort] = useState<SortMode>("consensus");
   const { locked, shellRef, logRef, hoverProps } = useScrollLog(rows);
 
+  const sorted = useMemo(() => {
+    const r = [...rows];
+    if (sort === "consensus") r.sort((a, b) => getConsensusPct(b) - getConsensusPct(a));
+    else if (sort === "recent") r.sort((a, b) => (b.lastTradedAt ?? "").localeCompare(a.lastTradedAt ?? ""));
+    // "crowded": keep server order (traderCount desc)
+    return r;
+  }, [rows, sort]);
+
   useEffect(() => {
-    if (!signedIn) return; // gated: only signed-in users fetch the real data
+    if (!signedIn) return;
     let active = true;
     const poll = (): void => {
       if (document.hidden) return;
       fetch("/api/crowded-markets")
-        .then((response) => (response.ok ? (response.json() as Promise<{ markets: CrowdedMarketSummary[] }>) : Promise.reject(new Error("request failed"))))
-        .then((data) => {
-          if (active) setRows(data.markets);
-        })
-        .catch(() => {
-          /* keep last good data */
-        });
+        .then((r) => (r.ok ? (r.json() as Promise<{ markets: CrowdedMarketSummary[] }>) : Promise.reject(new Error("request failed"))))
+        .then((data) => { if (active) setRows(data.markets); })
+        .catch(() => { /* keep last good data */ });
     };
     const id = setInterval(poll, POLL_INTERVAL_MS);
-    poll(); // fetch immediately so empty SSR data hydrates without waiting 60 s
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
+    poll();
+    return () => { active = false; clearInterval(id); };
   }, [signedIn]);
 
-  if (loading) return <section className="cv-section" aria-busy="true" style={{ minHeight: 120 }} />;
+  if (loading) return <section className="sig-page" aria-busy="true" style={{ minHeight: 200 }} />;
   if (!signedIn) {
     return (
       <LockedPanel
@@ -112,19 +138,45 @@ export default function ConvergencePanel({ initialRows = [] }: ConvergencePanelP
   }
 
   return (
-    <section className="cv-section">
-      <div className="cv-head">
-        <h2>Convergence <span className="g">Zones</span></h2>
-        <span className="cv-sub">Where the pod is feeding — markets the most tracked contacts hold</span>
+    <section className="sig-page">
+      <header className="sig-hero">
+        <div className="sig-eyebrow">
+          <span className="sig-ping" aria-hidden="true" />
+          SIGNALS — LIVE INTELLIGENCE
+        </div>
+        <div className="sig-title-row">
+          <h1 className="sig-title">CONVERGENCE <em>ZONES</em></h1>
+          {rows.length > 0 && <span className="sig-count">{rows.length} markets</span>}
+        </div>
+        <p className="sig-desc">
+          Markets where the tracked pod is concentrating — where multiple leaderboard contacts are positioned.
+        </p>
+        <div className="sig-rule" aria-hidden="true" />
+      </header>
+
+      <div className="sig-filters" role="group" aria-label="Sort convergence zones">
+        {SORT_OPTS.map((o) => (
+          <button
+            key={o.key}
+            type="button"
+            className={`sig-filt${sort === o.key ? " active" : ""}`}
+            onClick={() => setSort(o.key)}
+            aria-pressed={sort === o.key}
+          >
+            <span className="sig-filt-key">{o.label}</span>
+            <span className="sig-filt-desc">{o.desc}</span>
+          </button>
+        ))}
       </div>
+
       <div className="panel cv-list log-shell at-top" ref={shellRef}>
         <div className={`cv-scroll log-scroll ${locked ? "hovered" : ""}`} ref={logRef} {...hoverProps}>
-          {rows.length === 0 ? (
+          {sorted.length === 0 ? (
             <p className="muted" style={{ padding: 36, textAlign: "center", margin: 0 }}>
               No converged markets yet — the board&apos;s positions haven&apos;t been ingested.
             </p>
           ) : (
-            rows.map((row) => <ConvergenceRow key={row.conditionId} row={row} />)
+            sorted.map((row) => <ConvergenceRow key={row.conditionId} row={row} />)
           )}
         </div>
       </div>

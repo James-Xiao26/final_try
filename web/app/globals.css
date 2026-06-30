@@ -943,11 +943,62 @@ input:focus { border-color: var(--green) !important; }
    hold. YES is encoded teal (--green), NO coral (--red), split
    amber (--yellow), matching the rest of the console.
    ============================================================ */
-.cv-section { margin-top: 30px; }
-.cv-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 8px; flex-wrap: wrap; }
-.cv-head h2 { font-family: var(--font-display); font-weight: 600; font-size: 16px; letter-spacing: 0.14em; text-transform: uppercase; margin: 0; }
-.cv-head h2 .g { color: var(--green); }
-.cv-sub { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+/* ── Signals page hero ─────────────────────────────────────────────────────── */
+.sig-page { display: flex; flex-direction: column; gap: 0; }
+
+.sig-hero { padding: 28px 0 20px; }
+.sig-eyebrow {
+  display: flex; align-items: center; gap: 9px;
+  font-family: var(--font-display); font-size: 9.5px; letter-spacing: 0.24em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 14px;
+}
+.sig-ping {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 8px var(--green);
+  animation: sig-pulse 2.4s ease-in-out infinite;
+}
+@keyframes sig-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--green); }
+  50%       { opacity: 0.35; box-shadow: 0 0 3px var(--green); }
+}
+.sig-title-row { display: flex; align-items: baseline; gap: 14px; margin-bottom: 10px; flex-wrap: wrap; }
+.sig-title {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: clamp(24px, 4.5vw, 44px); letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--text); margin: 0; line-height: 1;
+}
+.sig-title em { font-style: normal; color: var(--green); text-shadow: 0 0 28px rgba(54,236,208,0.38); }
+.sig-count {
+  font-family: var(--font-display); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--yellow); background: rgba(255,210,122,0.07); border: 1px solid rgba(255,210,122,0.22);
+  border-radius: 2px; padding: 3px 9px; white-space: nowrap;
+}
+.sig-desc { font-size: 11.5px; color: var(--muted); letter-spacing: 0.03em; max-width: 500px; margin: 0 0 18px; line-height: 1.6; }
+.sig-rule { height: 1px; background: linear-gradient(90deg, var(--green) 0%, rgba(54,236,208,0.18) 55%, transparent 85%); margin-bottom: 20px; }
+
+/* ── Filter / sort bar ─────────────────────────────────────────────────────── */
+.sig-filters {
+  display: flex; gap: 2px; margin-bottom: 10px;
+  background: rgba(4,20,30,0.7); border: 1px solid var(--line); border-radius: 3px; padding: 2px;
+}
+.sig-filt {
+  position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 12px; background: transparent; border: none; border-radius: 2px;
+  cursor: pointer; transition: background .15s;
+}
+.sig-filt:hover { background: rgba(54,236,208,0.05); }
+.sig-filt-key {
+  font-family: var(--font-display); font-weight: 600; font-size: 10.5px; letter-spacing: 0.16em;
+  color: var(--muted); text-transform: uppercase; transition: color .15s;
+}
+.sig-filt-desc { font-size: 9px; letter-spacing: 0.08em; color: var(--muted-d); transition: color .15s; }
+.sig-filt.active { background: rgba(54,236,208,0.08); }
+.sig-filt.active .sig-filt-key { color: var(--green); }
+.sig-filt.active .sig-filt-desc { color: var(--muted); }
+.sig-filt.active::after {
+  content: ""; position: absolute; bottom: 0; left: 10%; right: 10%; height: 1.5px;
+  background: var(--green); box-shadow: 0 0 6px var(--green); border-radius: 1px;
+}
 
 .cv-list { padding: 6px; display: flex; flex-direction: column; }
 /* inner hover-lock scroller (see useScrollLog); the rows stack here, the .cv-list panel holds the edge fades */
@@ -976,13 +1027,18 @@ input:focus { border-color: var(--green) !important; }
 .cv-contacts-lbl { font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-d); margin-top: 5px; }
 
 .cv-market-cell { min-width: 0; }
-.cv-q { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.cv-q-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cv-q { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   color: var(--text); font-size: 15px; font-family: var(--font-display); font-weight: 500; letter-spacing: 0.01em; }
 .cv-row:hover .cv-q { color: var(--green); }
 .cv-meta { display: flex; align-items: center; gap: 12px; margin-top: 7px; }
 .cv-toprank { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--yellow);
   border: 1px solid rgba(255,210,122,0.3); background: rgba(255,210,122,0.06); border-radius: 2px; padding: 2px 7px; }
 .cv-last { font-size: 10px; letter-spacing: 0.06em; color: var(--muted-d); }
+.cv-tier { flex-shrink: 0; font-family: var(--font-display); font-weight: 600; font-size: 8px;
+  letter-spacing: 0.22em; text-transform: uppercase; padding: 2px 7px; border-radius: 1px; }
+.cv-tier.t-unanimous { color: var(--yellow); border: 1px solid rgba(255,210,122,0.38); background: rgba(255,210,122,0.07); }
+.cv-tier.t-strong { color: var(--muted); border: 1px solid rgba(54,236,208,0.18); background: transparent; }
 
 .cv-split-cell { display: flex; flex-direction: column; gap: 7px; }
 .cv-splitbar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: rgba(4,20,30,0.6);
