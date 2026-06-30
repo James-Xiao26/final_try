@@ -112,18 +112,6 @@ test("buildPriceSeries handles empty input without dividing by zero", () => {
   assert.equal(s.points.length, 0);
   assert.equal(s.latest, null);
   assert.equal(s.volatility, null);
-  assert.deepEqual(s.regimeShifts, []);
-});
-
-test("buildPriceSeries flags a regime shift on an outsized daily move", () => {
-  // A long calm stretch then a jump should exceed regimeK·stdev.
-  const rows: PricePoint[] = [];
-  for (let i = 0; i < 10; i += 1) rows.push({ ts: `2026-06-${String(i + 1).padStart(2, "0")}`, price: 0.5 + (i % 2) * 0.005 });
-  rows.push({ ts: "2026-06-20", price: 0.85 }); // big jump
-  const s = buildPriceSeries(rows, 2);
-  assert.ok(s.regimeShifts.length >= 1);
-  assert.equal(s.regimeShifts.at(-1)?.ts, "2026-06-20");
-  assert.ok((s.regimeShifts.at(-1)?.delta ?? 0) > 0.2);
 });
 
 // ── detectWhaleTrades ─────────────────────────────────────────────────────────

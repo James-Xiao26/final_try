@@ -1475,7 +1475,6 @@ input:focus { border-color: var(--green) !important; }
 .ma-leg.price::before { background: var(--green); }
 .ma-leg.buy::before { background: var(--green); border-radius: 50%; width: 8px; height: 8px; }
 .ma-leg.sell::before { background: transparent; border: 1.5px solid var(--red); border-radius: 50%; width: 8px; height: 8px; }
-.ma-leg.regime::before { background: var(--yellow); }
 
 .ma-chartbox { position: relative; width: 100%; }
 .ma-hz { position: absolute; top: 0; right: 0; z-index: 2; display: inline-flex; gap: 2px; padding: 3px;

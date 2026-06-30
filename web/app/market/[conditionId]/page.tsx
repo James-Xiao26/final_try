@@ -229,16 +229,12 @@ export default async function MarketPage({ params }: MarketPageProps) {
             )}
             <span className="ma-leg buy">Whale buy</span>
             <span className="ma-leg sell">Whale sell</span>
-            {series.regimeShifts.length > 0 ? <span className="ma-leg regime">Regime shift</span> : null}
           </div>
         </div>
         <PriceChart series={series} whales={whales.trades} extraLines={analytics.extraLines} />
         <p className="ma-caption">
           YES implied probability over time (intraday resolution), with tracked whale trades overlaid at
           their YES-equivalent price so buys/sells sit on the line (marker size ∝ trade value).
-          {series.regimeShifts.length > 0
-            ? ` ${series.regimeShifts.length} regime shift${series.regimeShifts.length === 1 ? "" : "s"} flagged — days where the consensus moved more than 2.5σ (likely news shocks).`
-            : ""}
         </p>
       </section>
 

@@ -12,13 +12,6 @@ export interface PricePoint {
   price: number; // YES probability in [0,1]
 }
 
-export interface RegimeShift {
-  ts: string;
-  from: number;
-  to: number;
-  delta: number; // signed price move (probability points) on this day
-}
-
 export interface PriceSeries {
   points: PricePoint[]; // intraday line points, sorted ascending by ts
   latest: number | null;
@@ -31,8 +24,6 @@ export interface PriceSeries {
   // Daily realized volatility: stdev of day-over-day price changes (probability points). A rough
   // "how jumpy is this market" gauge — higher means the consensus is unsettled.
   volatility: number | null;
-  // Days whose move exceeded `regimeK`× the series stdev — candidate regime changes (news shocks).
-  regimeShifts: RegimeShift[];
 }
 
 function dayOf(ts: string): string {
@@ -47,10 +38,9 @@ function stdev(values: number[]): number {
 }
 
 // Keep the raw (intraday) price points for an accurate line, sorted ascending, and derive the headline
-// stats from a day-over-day collapse (so "24h drift" / "daily swing" / regime shifts stay daily, while
-// the chart line itself captures every intraday move). `regimeK` is how many stdevs a daily move must
-// exceed to flag a regime shift.
-export function buildPriceSeries(rows: PricePoint[], regimeK = 2.5): PriceSeries {
+// stats from a day-over-day collapse (so "24h drift" / "daily swing" stay daily, while the chart line
+// itself captures every intraday move).
+export function buildPriceSeries(rows: PricePoint[]): PriceSeries {
   const points = rows
     .filter((r) => typeof r.price === "number" && !Number.isNaN(r.price))
     .slice()
@@ -67,7 +57,6 @@ export function buildPriceSeries(rows: PricePoint[], regimeK = 2.5): PriceSeries
       min: null,
       max: null,
       volatility: null,
-      regimeShifts: []
     };
   }
 
@@ -93,21 +82,6 @@ export function buildPriceSeries(rows: PricePoint[], regimeK = 2.5): PriceSeries
   const sevenAgo = dailyPoints[Math.max(0, dailyPoints.length - 8)]?.price ?? first;
   const change7d = latest !== null && sevenAgo !== null ? latest - sevenAgo : null;
 
-  const regimeShifts: RegimeShift[] = [];
-  if (volatility > 0) {
-    for (let i = 1; i < dailyPoints.length; i += 1) {
-      const delta = (dailyPoints[i]?.price ?? 0) - (dailyPoints[i - 1]?.price ?? 0);
-      if (Math.abs(delta) >= regimeK * volatility) {
-        regimeShifts.push({
-          ts: dailyPoints[i]?.ts ?? "",
-          from: dailyPoints[i - 1]?.price ?? 0,
-          to: dailyPoints[i]?.price ?? 0,
-          delta
-        });
-      }
-    }
-  }
-
   return {
     points,
     latest,
@@ -118,7 +92,6 @@ export function buildPriceSeries(rows: PricePoint[], regimeK = 2.5): PriceSeries
     min,
     max,
     volatility,
-    regimeShifts
   };
 }
 

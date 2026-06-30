@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PriceLine, PricePoint, PriceSeries, RegimeShift, WhaleTrade } from "@/lib/marketAnalytics";
+import type { PriceLine, PricePoint, PriceSeries, WhaleTrade } from "@/lib/marketAnalytics";
 import { PRICE_LINE_COLORS } from "@/lib/marketAnalytics";
 import { formatCompactUsd, shortenAddress } from "@/lib/format";
 
@@ -78,25 +78,23 @@ export default function PriceChart({ series, whales, extraLines = [] }: PriceCha
 
   const options = useMemo(() => HORIZON_OPTIONS.filter((o) => o.value === null || o.value < spanDays), [spanDays]);
 
-  // Window the points / whales / regime markers / extra lines to the selected horizon (relative to the
-  // last point).
+  // Window the points / whales / extra lines to the selected horizon (relative to the last point).
   const view = useMemo(() => {
     const pts = series.points;
     if (pts.length === 0) {
-      return { points: [] as PricePoint[], whales: [] as WhaleTrade[], regimes: [] as RegimeShift[], extras: [] as PriceLine[] };
+      return { points: [] as PricePoint[], whales: [] as WhaleTrade[], extras: [] as PriceLine[] };
     }
     if (horizon === null) {
-      return { points: pts, whales, regimes: series.regimeShifts, extras: extraLines };
+      return { points: pts, whales, extras: extraLines };
     }
     const lastMs = tms(pts[pts.length - 1]?.ts ?? "");
     const cutoff = lastMs - horizon * DAY_MS;
     return {
       points: pts.filter((p) => tms(p.ts) >= cutoff),
       whales: whales.filter((w) => w.ts >= cutoff),
-      regimes: series.regimeShifts.filter((r) => tms(r.ts) >= cutoff),
       extras: extraLines.map((l) => ({ label: l.label, points: l.points.filter((p) => tms(p.ts) >= cutoff) }))
     };
-  }, [series.points, series.regimeShifts, whales, extraLines, horizon]);
+  }, [series.points, whales, extraLines, horizon]);
 
   useEffect(() => {
     setDrawn(false);
@@ -165,10 +163,8 @@ export default function PriceChart({ series, whales, extraLines = [] }: PriceCha
         return { w, x: nx(w.ts), y: py, r };
       });
 
-    const regimes = view.regimes.map((s) => ({ x: nx(tms(s.ts)), s }));
-
-    return { times, startMs, endMs, nx, ny, line, area, extraPaths, xticks, yticks, markers, regimes };
-  }, [points, view.whales, view.regimes, view.extras, width]);
+    return { times, startMs, endMs, nx, ny, line, area, extraPaths, xticks, yticks, markers };
+  }, [points, view.whales, view.extras, width]);
 
   // Nearest point to the hovered x (in px), for the crosshair readout.
   let hover: { x: number; y: number; ts: number; price: number } | null = null;
@@ -243,11 +239,6 @@ export default function PriceChart({ series, whales, extraLines = [] }: PriceCha
         ))}
         {model.xticks.map((t, i) => (
           <text key={i} className="ma-axis" x={t.x} y={H - 6} textAnchor={t.anchor}>{t.label}</text>
-        ))}
-
-        {/* Regime-change markers: outsized daily moves (news shocks) */}
-        {model.regimes.map((r, i) => (
-          <line key={`rg${i}`} x1={r.x} y1={padT} x2={r.x} y2={H - padB} stroke="rgba(255,210,122,0.35)" strokeWidth="1" strokeDasharray="3 4" />
         ))}
 
         <path d={model.area} fill="url(#maPrice)" style={{ opacity: drawn ? 1 : 0, transition: "opacity 1s ease .2s" }} />
