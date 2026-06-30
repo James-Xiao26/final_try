@@ -42,10 +42,16 @@ function DiveProfile({
 }) {
   const [drawn, setDrawn] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
+  // `hover` is the transient pointer (drives the crosshair + tiny tooltip, clears on mouse-leave);
+  // `selected` is sticky (drives the Settlement Log below the chart + a persistent step marker), so the
+  // log stays readable after the cursor leaves. Null until the user scrubs → falls back to the most
+  // recent settlement day so the log shows something meaningful on load.
+  const [selected, setSelected] = useState<number | null>(null);
 
   useEffect(() => {
     setDrawn(false);
     setHover(null);
+    setSelected(null);
     const id = requestAnimationFrame(() => requestAnimationFrame(() => setDrawn(true)));
     return () => cancelAnimationFrame(id);
   }, [horizon, points]);
@@ -131,20 +137,41 @@ function DiveProfile({
       }
     }
     setHover(best);
+    setSelected(best);
   };
 
   const hx = hover !== null ? xs[hover] ?? 0 : 0;
   const hy = hover !== null ? ys[hover] ?? 0 : 0;
   const hoverPoint = hover !== null ? pts[hover] : undefined;
   const hoverPct = hover !== null ? pcts[hover] ?? 0 : 0;
-  // The closed positions that moved the balance on the hovered step's day (the curve steps on each
-  // position's close date). Empty for the window-start baseline and any flat day.
-  const hoverTrades = hoverPoint ? tradesByDay.get(hoverPoint.ts.slice(0, 10)) ?? [] : [];
-  const TRADES_SHOWN = 6;
+
+  // Sticky selection for the Settlement Log: the scrubbed step, falling back to the most recent day
+  // that actually settled markets (so the log isn't empty on load). The curve steps on each closed
+  // position's close date, so a step's day keys directly into tradesByDay.
+  let defaultSel = lastIdx;
+  for (let i = lastIdx; i >= 0; i--) {
+    if ((tradesByDay.get(pts[i]?.ts.slice(0, 10) ?? "")?.length ?? 0) > 0) {
+      defaultSel = i;
+      break;
+    }
+  }
+  const sel = selected ?? defaultSel;
+  const selPoint = pts[sel];
+  const selTrades = selPoint ? tradesByDay.get(selPoint.ts.slice(0, 10)) ?? [] : [];
+  const selPct = pcts[sel] ?? 0;
+  const dayNet = selTrades.reduce((sum, t) => sum + (t.realizedPnl ?? 0), 0);
+  const sx = xs[sel] ?? 0;
+  const sy = ys[sel] ?? 0;
   // Keep the tooltip box inside the chart horizontally (it's centered on the point otherwise).
   const tipLeft = Math.min(88, Math.max(12, (hx / W) * 100));
 
+  // Biggest movers first in the log — the day's headline trades read at the top.
+  const selTradesSorted = [...selTrades].sort(
+    (a, b) => Math.abs(b.realizedPnl ?? 0) - Math.abs(a.realizedPnl ?? 0)
+  );
+
   return (
+    <>
     <div
       className="wl-chartbox"
       style={{ position: "relative" }}
@@ -189,6 +216,10 @@ function DiveProfile({
           <animate attributeName="r" from="5" to="16" dur="2.2s" repeatCount="indefinite" />
           <animate attributeName="opacity" from="0.6" to="0" dur="2.2s" repeatCount="indefinite" />
         </circle>
+        {/* Persistent marker on the selected step — keeps the curve tied to the Settlement Log below. */}
+        {selPoint && sel !== lastIdx && (
+          <circle cx={sx} cy={sy} r="4" fill="#36ecd0" style={{ filter: "drop-shadow(0 0 5px rgba(54,236,208,0.7))" }} />
+        )}
         {hover !== null && (
           <>
             <line x1={hx} y1={padT} x2={hx} y2={H - padB} stroke="rgba(54,236,208,0.45)" strokeWidth="1" strokeDasharray="4 4" />
@@ -210,8 +241,7 @@ function DiveProfile({
             padding: "5px 9px",
             fontSize: 11.5,
             lineHeight: 1.4,
-            whiteSpace: hoverTrades.length > 0 ? "normal" : "nowrap",
-            maxWidth: hoverTrades.length > 0 ? 340 : undefined,
+            whiteSpace: "nowrap",
             color: "#cfeee9",
             zIndex: 5
           }}
@@ -221,34 +251,54 @@ function DiveProfile({
             {formatUsd(hoverPoint.cumulativePnl)}{" "}
             <span style={{ color: hoverPct >= 0 ? "var(--green)" : "var(--red)" }}>{formatCompactPercent(hoverPct)}</span>
           </div>
-          {hoverTrades.length > 0 && (
-            <div style={{ marginTop: 5, paddingTop: 5, borderTop: "1px solid rgba(54,236,208,0.2)" }}>
-              <div style={{ opacity: 0.65, marginBottom: 3 }}>
-                {hoverTrades.length} {hoverTrades.length === 1 ? "market settled" : "markets settled"}
-              </div>
-              {hoverTrades.slice(0, TRADES_SHOWN).map((t, i) => {
-                const side = tradeOutcome(t.outcomeLabel, t.outcomeIndex);
-                return (
-                  <div key={i} style={{ display: "flex", gap: 10, justifyContent: "space-between", maxWidth: 320 }}>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
-                      {t.market ?? "—"}{side && <span style={{ opacity: 0.6 }}> · {side}</span>}
-                    </span>
-                    {t.realizedPnl !== null && (
-                      <span style={{ color: t.realizedPnl >= 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
-                        {t.realizedPnl >= 0 ? "+" : ""}{formatUsd(t.realizedPnl)}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-              {hoverTrades.length > TRADES_SHOWN && (
-                <div style={{ opacity: 0.6, marginTop: 2 }}>+{hoverTrades.length - TRADES_SHOWN} more</div>
-              )}
-            </div>
-          )}
         </div>
       )}
     </div>
+
+    {/* Settlement Log — the per-step detail, pulled out of the cramped on-graph tooltip into a roomy
+        readout band. Scrubbing the curve (or its persistent marker) drives which day this shows. */}
+    <div className="wl-slog">
+      <div className="wl-slog-head">
+        <div className="wl-slog-when">
+          <span className="lbl">Settlement Log</span>
+          <span className="day">{selPoint ? tickLabel(Date.parse(selPoint.ts)) : "—"}</span>
+        </div>
+        <div className="wl-slog-sum">
+          {selTrades.length > 0 ? (
+            <>
+              <span className={dayNet >= 0 ? "net pos" : "net neg"}>{dayNet >= 0 ? "+" : ""}{formatUsd(dayNet)}</span>
+              <span className="cnt">{selTrades.length} {selTrades.length === 1 ? "market" : "markets"}</span>
+            </>
+          ) : (
+            <span className={`net ${selPct >= 0 ? "pos" : "neg"}`}>{formatCompactPercent(selPct)}</span>
+          )}
+        </div>
+      </div>
+      <div className="wl-slog-body">
+        {selTradesSorted.length > 0 ? (
+          selTradesSorted.map((t, i) => {
+            const side = tradeOutcome(t.outcomeLabel, t.outcomeIndex);
+            const win = (t.realizedPnl ?? 0) >= 0;
+            return (
+              <div className="wl-slog-row" key={i}>
+                <span className={`dot ${win ? "pos" : "neg"}`} />
+                <span className="mkt">{t.market ?? "—"}{side && <span className="side"> · {side}</span>}</span>
+                {t.realizedPnl !== null && (
+                  <span className={`pnl ${win ? "pos" : "neg"}`}>{win ? "+" : ""}{formatUsd(t.realizedPnl)}</span>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div className="wl-slog-empty">
+            {sel === lastIdx
+              ? "Open positions marked to today’s prices — no markets settled this day."
+              : "No markets settled — balance held flat."}
+          </div>
+        )}
+      </div>
+    </div>
+    </>
   );
 }
 
@@ -315,8 +365,8 @@ export default function WalletTelemetry({ metrics, equityCurves, closedTrades, i
         </div>
         <p className="muted" style={{ margin: "0 0 14px", fontSize: 12.5, lineHeight: 1.45, maxWidth: 560 }}>
           Hypothetical return if you’d copied every trade this wallet made starting from $100, staking 1% of your
-          running balance on each — shown as % gain/loss vs that $100. Hover a step to see the markets that
-          settled that day.
+          running balance on each — shown as % gain/loss vs that $100. Scrub the curve to read the markets
+          that settled on any step in the Settlement Log below.
         </p>
         <DiveProfile points={points} horizon={horizon} tradesByDay={tradesByDay} />
         <div className="dive-foot"><span>% return · $100 start · 1% per trade</span><span>{horizon}-day trace</span></div>
