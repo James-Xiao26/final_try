@@ -36,6 +36,16 @@
 // condition_id -> the actual YES token id (no more inferring it from settled prices), then CLOB
 // prices-history gets its real daily series. This fills in genuine missing data — same match
 // tolerance, same everything else — not a relaxation of the locked methodology, so no version bump.
+//
+// v6: EXPERIMENTAL, not part of the locked v1 formula. Computes a second, separate "specialty-
+// weighted" smart-money price alongside the locked one — same skill*sqrt(cost) base, but doubled
+// when the wallet's own proven specialty (wallets.specialty, from scripts/specialty.ts) matches the
+// market's category (via the same classifyMarket() keyword classifier specialty itself is computed
+// with, applied to the market's question — not markets.category, which is Gamma's raw tag and much
+// noisier than the classifier). Reported side by side with locked-v1 on the exact same markets for a
+// direct comparison. The locked smartPct/livePriceAtEntry/actual/gap fields are never touched by
+// this — if the experimental version doesn't measurably beat v1, nothing about the live feature
+// needs to change.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -43,6 +53,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PolymarketClient } from "./polymarket.js";
 import { dailyPointsFromHistory } from "./priceHistory.js";
+import { classifyMarket } from "./specialty.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -69,6 +80,10 @@ const PRICE_MATCH_TOLERANCE_DAYS = 10; // max distance from smart money's entry 
 const GAP_THRESHOLDS = [0, 0.05, 0.1, 0.2]; // profit-simulation buckets, probability points
 const LEAD_TIME_THRESHOLDS_DAYS = [0, 3, 7, 14, 30]; // conviction-vs-lead-time buckets
 
+// EXPERIMENTAL (v6) — not part of the locked v1 formula, see the header note. A round, simple
+// starting multiplier; if this line of work continues, tune it against the backtest, not by feel.
+const SPECIALTY_BOOST = 2;
+
 // Persisted, ever-growing record of matched results — see the v4 note at the top of the file for why
 // this exists (wallet_closed_positions is a rolling window, not an archive).
 const HISTORY_FILE = join(dirname(fileURLToPath(import.meta.url)), "backtestSmartMoneyHistory.json");
@@ -82,6 +97,7 @@ interface HistoryEntry {
   daysEarly: number | null;
   recordedAt: string; // when this run first captured it
   methodologyVersion: string;
+  smartPctSpecialty?: number; // EXPERIMENTAL (v6) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -104,6 +120,7 @@ interface ClosedRow {
   size: number | null;
   first_traded_at: string | null;
   close_time: string | null;
+  market: string | null; // EXPERIMENTAL (v6) — market question, for classifyMarket()
 }
 
 async function fetchAllClosedPositions(): Promise<ClosedRow[]> {
@@ -112,7 +129,7 @@ async function fetchAllClosedPositions(): Promise<ClosedRow[]> {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from("wallet_closed_positions")
-      .select("address, condition_id, outcome_index, avg_price, realized_pnl, size, first_traded_at, close_time")
+      .select("address, condition_id, outcome_index, avg_price, realized_pnl, size, first_traded_at, close_time, market")
       .range(from, from + PAGE - 1);
     if (error) throw error;
     const batch = (data ?? []) as ClosedRow[];
@@ -133,6 +150,18 @@ async function fetchSkillByAddress(): Promise<Map<string, number>> {
     }
   }
   return skill;
+}
+
+// EXPERIMENTAL (v6) — wallets.specialty, the category scripts/specialty.ts's walletSpecialty already
+// determined each wallet has a proven edge in (or null if none).
+async function fetchSpecialtyByAddress(): Promise<Map<string, string>> {
+  const { data, error } = await supabase.from("wallets").select("address, specialty");
+  if (error) throw error;
+  const specialty = new Map<string, string>();
+  for (const row of (data ?? []) as { address: string; specialty: string | null }[]) {
+    if (row.specialty) specialty.set(row.address, row.specialty);
+  }
+  return specialty;
 }
 
 // exitValue ~1 -> held to a winning resolution, ~0 -> held to a loss. Mid-range -> sold early
@@ -240,8 +269,12 @@ function nearestPrice(series: Map<string, number>, targetMs: number, toleranceDa
 
 async function main(): Promise<void> {
   console.log("Fetching closed positions + leaderboard skill scores...");
-  const [allClosed, skillByAddress] = await Promise.all([fetchAllClosedPositions(), fetchSkillByAddress()]);
-  console.log(`${allClosed.length} closed-position rows, ${skillByAddress.size} leaderboard wallets\n`);
+  const [allClosed, skillByAddress, specialtyByAddress] = await Promise.all([
+    fetchAllClosedPositions(),
+    fetchSkillByAddress(),
+    fetchSpecialtyByAddress()
+  ]);
+  console.log(`${allClosed.length} closed-position rows, ${skillByAddress.size} leaderboard wallets, ${specialtyByAddress.size} with a specialty\n`);
 
   const byCondition = new Map<string, ClosedRow[]>();
   for (const row of allClosed) {
@@ -255,6 +288,7 @@ async function main(): Promise<void> {
     conditionId: string;
     smartPct: number;
     dollarPct: number;
+    smartPctSpecialty: number; // EXPERIMENTAL (v6) — equals smartPct when no positioned wallet has a specialty match
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -295,10 +329,17 @@ async function main(): Promise<void> {
     const distinctWallets = new Set(positioned.map((r) => r.address));
     if (distinctWallets.size < MIN_PARTICIPANTS) continue;
 
+    // EXPERIMENTAL (v6): classify the market once via the same keyword classifier wallets.specialty
+    // was itself computed with (not markets.category, which is Gamma's raw tag and much noisier).
+    const marketTitle = rows.find((r) => r.market)?.market ?? null;
+    const marketCategory = marketTitle ? classifyMarket(marketTitle) : null;
+
     let smartWeight = 0;
     let smartWeighted = 0;
     let dollarWeight = 0;
     let dollarWeighted = 0;
+    let specialtyWeight = 0;
+    let specialtyWeighted = 0;
     let dateWeight = 0;
     let dateWeighted = 0; // sum(weight * entry epoch ms) -> weighted-average entry date
     for (const row of positioned) {
@@ -310,6 +351,10 @@ async function main(): Promise<void> {
       smartWeighted += w * yesEq;
       dollarWeight += c;
       dollarWeighted += c * yesEq;
+      const isSpecialtyMatch = marketCategory !== null && specialtyByAddress.get(row.address) === marketCategory;
+      const wSpecialty = isSpecialtyMatch ? w * SPECIALTY_BOOST : w;
+      specialtyWeight += wSpecialty;
+      specialtyWeighted += wSpecialty * yesEq;
       const entryMs = row.first_traded_at ? Date.parse(row.first_traded_at) : NaN;
       if (Number.isFinite(entryMs)) {
         dateWeight += w;
@@ -331,6 +376,7 @@ async function main(): Promise<void> {
       conditionId,
       smartPct: smartWeighted / smartWeight,
       dollarPct: dollarWeighted / dollarWeight,
+      smartPctSpecialty: specialtyWeight > 0 ? specialtyWeighted / specialtyWeight : smartWeighted / smartWeight,
       actual,
       daysEarly,
       refEntryMs
@@ -460,8 +506,9 @@ async function main(): Promise<void> {
   }
 
   // Fold into the persisted history — resolved markets already recorded stay as-is (their outcome and
-  // matched price are fixed historical facts), new ones from this run get added. This is what makes
-  // the sample actually grow across runs instead of shifting with wallet_closed_positions' rolling window.
+  // matched price are fixed historical facts, LOCKED and never touched), new ones from this run get
+  // added. This is what makes the sample actually grow across runs instead of shifting with
+  // wallet_closed_positions' rolling window.
   const before = history.size;
   const now = new Date().toISOString();
   for (const s of [...matched, ...liveFetched]) {
@@ -474,11 +521,32 @@ async function main(): Promise<void> {
       gap: s.gap,
       daysEarly: s.daysEarly,
       recordedAt: now,
-      methodologyVersion: METHODOLOGY_VERSION
+      methodologyVersion: METHODOLOGY_VERSION,
+      smartPctSpecialty: s.smartPctSpecialty
     });
   }
   saveHistory(history);
-  console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)\n`);
+  console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
+
+  // EXPERIMENTAL (v6) backfill: existing entries never got smartPctSpecialty (the field didn't exist
+  // yet). It doesn't touch any locked field, so it's safe to add retroactively for any entry whose
+  // underlying market is still represented in this run's samples (older ones may have aged out of
+  // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
+  // simply excluded from the experimental comparison below until/unless re-derivable).
+  const samplesByCondition = new Map(samples.map((s) => [s.conditionId, s]));
+  let backfilled = 0;
+  for (const entry of history.values()) {
+    if (entry.smartPctSpecialty !== undefined) continue;
+    const sample = samplesByCondition.get(entry.conditionId);
+    if (!sample) continue;
+    entry.smartPctSpecialty = sample.smartPctSpecialty;
+    backfilled += 1;
+  }
+  if (backfilled > 0) {
+    saveHistory(history);
+    console.log(`${backfilled} existing entries backfilled with smartPctSpecialty`);
+  }
+  console.log();
 
   const all = [...history.values()];
   if (all.length === 0) {
@@ -527,6 +595,41 @@ async function main(): Promise<void> {
     console.log(
       `  >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
     );
+  }
+
+  // ── EXPERIMENTAL (v6): specialty-weighted, compared head-to-head against locked v1 on the exact
+  // same entries (not the full history — a fair comparison needs identical samples on both sides). ──
+  const withSpecialty = currentVersionAll.filter((s) => s.smartPctSpecialty !== undefined);
+  console.log(`\nEXPERIMENTAL: specialty-weighted (${SPECIALTY_BOOST}x boost when market matches wallet's proven category), n=${withSpecialty.length}:`);
+  if (withSpecialty.length === 0) {
+    console.log("  No entries have smartPctSpecialty yet.");
+  } else {
+    const v1BrierSub = mean(withSpecialty.map((s) => brier(s.smartPct, s.actual)));
+    const specialtyBrier = mean(withSpecialty.map((s) => brier(s.smartPctSpecialty!, s.actual)));
+    console.log(`  locked v1 Brier (same ${withSpecialty.length} entries): ${v1BrierSub.toFixed(4)}`);
+    console.log(`  specialty-weighted Brier:                    ${specialtyBrier.toFixed(4)}`);
+    console.log(
+      specialtyBrier < v1BrierSub
+        ? "  -> specialty weighting improves on locked v1 on this sample."
+        : "  -> specialty weighting does NOT improve on locked v1 on this sample — not worth shipping as-is."
+    );
+
+    console.log("\n  Simulated return per $1 staked using the specialty-weighted tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withSpecialty
+        .map((s) => ({ ...s, gapSpecialty: s.smartPctSpecialty! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapSpecialty) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapSpecialty >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
   }
 }
 
