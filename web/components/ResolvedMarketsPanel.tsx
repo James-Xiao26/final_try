@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatNumber, formatPercent, formatPrice, formatUsd, shortenAddress } from "@/lib/format";
 import type { ResolvedMarket, ResolvedParticipant } from "@/lib/types";
 import { useScrollLog } from "./useScrollLog";
@@ -9,6 +9,8 @@ import { useScrollLog } from "./useScrollLog";
 interface ResolvedMarketsPanelProps {
   rows: ResolvedMarket[];
 }
+
+const POLL_INTERVAL_MS = 60_000;
 
 // Relative time since resolution (within a 7-day window).
 function resolvedAgo(iso: string): string {
@@ -143,8 +145,37 @@ function MarketRow({ market }: { market: ResolvedMarket }) {
   );
 }
 
-export default function ResolvedMarketsPanel({ rows }: ResolvedMarketsPanelProps) {
+export default function ResolvedMarketsPanel({ rows: initialRows }: ResolvedMarketsPanelProps) {
+  const [rows, setRows] = useState(initialRows);
   const { locked, shellRef, logRef, hoverProps } = useScrollLog(rows);
+
+  // Self-heal empty/stale SSR data (e.g. a cold-Supabase-connection timeout baked into the ISR
+  // cache) the same way RecentTradesFeed does, instead of relying solely on the SSR snapshot.
+  useEffect(() => {
+    let active = true;
+    const poll = (): void => {
+      if (document.hidden) return;
+      fetch("/api/resolved-markets")
+        .then((response) => (response.ok ? (response.json() as Promise<ResolvedMarket[]>) : Promise.reject(new Error("Resolved markets request failed"))))
+        .then((data) => {
+          if (active) setRows(data);
+        })
+        .catch(() => {
+          /* keep last good data */
+        });
+    };
+    const intervalId = setInterval(poll, POLL_INTERVAL_MS);
+    poll();
+    const onVisibility = (): void => {
+      if (!document.hidden) poll();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   return (
     <section className="act-feed rm-feed">
