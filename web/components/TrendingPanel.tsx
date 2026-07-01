@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatCompactUsd, formatPercent } from "@/lib/format";
+import { isSportsCategory } from "@/lib/trendingMarkets";
 import type { TrendingMarket } from "@/lib/types";
 
 interface TrendingPanelProps {
@@ -66,7 +67,7 @@ function TrendingCard({ row }: { row: TrendingMarket }) {
       <div className="tr-cardhead">
         {row.category ? <span className="tr-cat">{row.category}</span> : null}
         <span className="tr-timing">
-          {startsIn(row.gameStartTime) ?? resolvesIn(row.endDate)}
+          {(isSportsCategory(row.category) ? startsIn(row.gameStartTime) : null) ?? resolvesIn(row.endDate)}
         </span>
       </div>
       <div className="tr-q">{row.market ?? "—"}</div>

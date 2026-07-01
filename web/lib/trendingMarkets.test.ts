@@ -116,17 +116,30 @@ test("resolve-soon score is high for an imminent endDate, ~0 for a far one, 0 fo
   assert.equal(none, 0);
 });
 
-test("start-soon score only applies to markets with a gameStartTime, doesn't penalize its absence", () => {
+test("start-soon score only applies to sports/esports markets with a gameStartTime, doesn't penalize its absence", () => {
   const now = Date.parse("2026-01-01T00:00:00.000Z");
   const rows: CrowdOpenPosition[] = [];
   const startsSoon = scoreTrendingMarket(
-    market({ endDate: null, currentPrice: null, gameStartTime: "2026-01-01T06:00:00.000Z" }),
+    market({ category: "Sports", endDate: null, currentPrice: null, gameStartTime: "2026-01-01T06:00:00.000Z" }),
     rows,
     now
   );
-  const noGameStart = scoreTrendingMarket(market({ endDate: null, currentPrice: null, gameStartTime: null }), rows, now);
+  const noGameStart = scoreTrendingMarket(market({ category: "Sports", endDate: null, currentPrice: null, gameStartTime: null }), rows, now);
   assert.ok(startsSoon > 0.5);
   assert.equal(noGameStart, 0);
+});
+
+test("start-soon score is gated to sports/esports categories -- a leaked gameStartTime on another category doesn't count", () => {
+  // Real production data: Gamma sets gameStartTime on some recurring non-sports markets too
+  // (e.g. weekly tweet-count trackers tagged Culture) — it isn't exclusively a scheduled-game field.
+  const now = Date.parse("2026-01-01T00:00:00.000Z");
+  const rows: CrowdOpenPosition[] = [];
+  const leaked = scoreTrendingMarket(
+    market({ category: "Culture", endDate: null, currentPrice: null, gameStartTime: "2026-01-01T06:00:00.000Z" }),
+    rows,
+    now
+  );
+  assert.equal(leaked, 0);
 });
 
 test("buildTrendingMarkets ranks by composite score, not volume", () => {

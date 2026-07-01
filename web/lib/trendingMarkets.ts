@@ -14,6 +14,22 @@ export const NEAR_ENTRY_CENTS = 0.05; // near-entry score decays to 0 by a 5¢ g
 export const RESOLVE_SOON_HALFLIFE_DAYS = 1; // score ~0.5 at 1 day out
 export const START_SOON_HALFLIFE_DAYS = 1;
 
+// Gamma's gameStartTime isn't exclusively a scheduled-game field despite the name — spot-checking
+// production data turned up the same field on recurring/periodic markets (e.g. weekly "tweet count"
+// trackers) in Culture/Finance/Politics categories, where it represents some internal bucket-open
+// timestamp, not a real-world event about to happen. Gate the "start soon" score to categories that
+// are actually sports/esports so a leaked timestamp on an unrelated market can't earn undeserved
+// credit. ponytail: a category-string allowlist, not exhaustive — extend as new sports categories
+// show up in `markets.category` (mapEvent's category is Gamma's own tag label, so it varies by sport).
+const SPORTS_CATEGORIES = new Set([
+  "sports", "esports", "soccer", "basketball", "baseball", "football", "hockey",
+  "tennis", "mma", "boxing", "golf", "cricket", "rugby", "formula 1", "fifa world cup"
+]);
+
+export function isSportsCategory(category: string | null): boolean {
+  return category !== null && SPORTS_CATEGORIES.has(category.toLowerCase());
+}
+
 function cost(p: CrowdOpenPosition): number {
   return p.size * p.avgPrice;
 }
@@ -96,7 +112,7 @@ export function scoreTrendingMarket(market: MarketRow, rows: CrowdOpenPosition[]
     score += Math.max(0, 1 - gap / NEAR_ENTRY_CENTS);
   }
 
-  if (market.gameStartTime) {
+  if (market.gameStartTime && isSportsCategory(market.category)) {
     const days = daysUntil(market.gameStartTime, now);
     if (Number.isFinite(days) && days > 0) score += proximityScore(days, START_SOON_HALFLIFE_DAYS);
   }
