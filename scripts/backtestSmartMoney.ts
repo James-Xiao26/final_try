@@ -29,11 +29,20 @@
 // positioned wallets roll off the board. Snapshotting each run's computed results (fixed historical
 // facts once computed — a resolved market's outcome and matched price never change) is what actually
 // makes the sample grow across repeated runs instead of just shifting.
+//
+// v5: the v3 cache-only match only covered 17 of 298 qualifying markets — market_price_history only
+// has data for tokens a leaderboard wallet held or that were in the top-liquidity listed set, not a
+// full archive. For markets the cache missed, fetch the real thing directly: Gamma resolves
+// condition_id -> the actual YES token id (no more inferring it from settled prices), then CLOB
+// prices-history gets its real daily series. This fills in genuine missing data — same match
+// tolerance, same everything else — not a relaxation of the locked methodology, so no version bump.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PolymarketClient } from "./polymarket.js";
+import { dailyPointsFromHistory } from "./priceHistory.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -418,16 +427,44 @@ async function main(): Promise<void> {
     if (livePriceAtEntry === null) continue;
     matched.push({ ...s, livePriceAtEntry, gap: s.smartPct - livePriceAtEntry });
   }
+  console.log(`${matched.length} markets matched from the market_price_history cache this run`);
 
-  console.log(`${matched.length} markets matched to a live price within ${PRICE_MATCH_TOLERANCE_DAYS} days of smart money's entry this run`);
+  // Load history now (not later) so the live-fetch pass below can skip anything already captured in
+  // a previous run — otherwise every run would re-hit Gamma+CLOB for the same never-going-to-match
+  // markets forever.
+  const history = loadHistory();
+  const matchedIds = new Set(matched.map((s) => s.conditionId));
+  const client = new PolymarketClient();
+  const liveFetched: MatchedSample[] = [];
+  const toFetch = samples.filter((s) => s.refEntryMs !== null && !matchedIds.has(s.conditionId) && !history.has(s.conditionId));
+  if (toFetch.length > 0) {
+    console.log(`Fetching real price history from Gamma+CLOB for ${toFetch.length} markets the cache missed...`);
+    let done = 0;
+    for (const s of toFetch) {
+      done += 1;
+      if (done % 25 === 0) console.log(`  ...${done}/${toFetch.length}`);
+      const yesTokenId = await client.getYesTokenId(s.conditionId);
+      if (!yesTokenId) continue;
+      const raw = await client.getPriceHistory(yesTokenId);
+      if (raw.length === 0) continue;
+      // clobTokenIds[0] is the YES token directly (Gamma tells us, not inferred from settled
+      // prices), so no orientation step needed — dailyPointsFromHistory's price is already YES-equivalent.
+      const points = dailyPointsFromHistory(raw, 3650, Date.now());
+      if (points.length === 0) continue;
+      const series = new Map(points.map((p) => [p.ts, p.price]));
+      const livePriceAtEntry = nearestPrice(series, s.refEntryMs!);
+      if (livePriceAtEntry === null) continue;
+      liveFetched.push({ ...s, livePriceAtEntry, gap: s.smartPct - livePriceAtEntry });
+    }
+    console.log(`${liveFetched.length} additional markets matched via live fetch`);
+  }
 
   // Fold into the persisted history — resolved markets already recorded stay as-is (their outcome and
   // matched price are fixed historical facts), new ones from this run get added. This is what makes
   // the sample actually grow across runs instead of shifting with wallet_closed_positions' rolling window.
-  const history = loadHistory();
   const before = history.size;
   const now = new Date().toISOString();
-  for (const s of matched) {
+  for (const s of [...matched, ...liveFetched]) {
     if (history.has(s.conditionId)) continue;
     history.set(s.conditionId, {
       conditionId: s.conditionId,

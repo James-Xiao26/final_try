@@ -168,5 +168,1725 @@
     "daysEarly": 33.22089020705894,
     "recordedAt": "2026-07-01T19:31:21.994Z",
     "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xaeea5f917fc5746387b5f9c0a4263dba035dbb3f0ac6ad72bf92183d21e26739",
+    "smartPct": 0.41823566762415465,
+    "livePriceAtEntry": 0.315,
+    "actual": 1,
+    "gap": 0.10323566762415465,
+    "daysEarly": 3.5163714011693883,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x649bd3dc845f647aa8c9a739ad8de245b853224961afd01127de0071c13f84b3",
+    "smartPct": 0.6553784089129088,
+    "livePriceAtEntry": 0.825,
+    "actual": 1,
+    "gap": -0.16962159108709118,
+    "daysEarly": 1.3134163600526032,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x2a7a6ab8f4984f1ae82eacd7fb408832a50e63162ac6b98fff1fe094b8e9d3b5",
+    "smartPct": 0.6401864066723497,
+    "livePriceAtEntry": 0.645,
+    "actual": 1,
+    "gap": -0.004813593327650301,
+    "daysEarly": 0.13193685302169234,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x04b6d6630d49e6513355ff045c96439c929335cb0d18da7792dea6c2fc717ead",
+    "smartPct": 0.6386883691125442,
+    "livePriceAtEntry": 0.665,
+    "actual": 1,
+    "gap": -0.026311630887455806,
+    "daysEarly": 0.9143561422729493,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xd90bf5f45f24c5de7881707cb5374f3d991388a2d220fa7e0fe2be912cd7642a",
+    "smartPct": 0.37388733939479324,
+    "livePriceAtEntry": 0.355,
+    "actual": 1,
+    "gap": 0.018887339394793257,
+    "daysEarly": 5.206610051797938,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x26c10c27cde58e2d6214d65ab562d8142d34723b3b6ec3f40836d24f6d22dfc9",
+    "smartPct": 0.4821715237383856,
+    "livePriceAtEntry": 0.495,
+    "actual": 1,
+    "gap": -0.012828476261614374,
+    "daysEarly": 1.2521371312657108,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x4cd77d456c83e7d8c569a8fb8f6396c3f40154f657e6d970733e2b1b6a7110ff",
+    "smartPct": 0.7067628631604134,
+    "livePriceAtEntry": 0.685,
+    "actual": 1,
+    "gap": 0.021762863160413315,
+    "daysEarly": 0.9990482577147307,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xcc5ffe6f0dd2ebbdae948dff2ebb541c17fb03eecd9e152bd0c91646d4e0049a",
+    "smartPct": 0.5776872798640721,
+    "livePriceAtEntry": 0.465,
+    "actual": 0,
+    "gap": 0.11268727986407207,
+    "daysEarly": 0.884695850120827,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x7d9a8b8c29c55a7b5dce59aa1556be274bb5c6fb2ee431237c3f656603c96583",
+    "smartPct": 0.29947925990398744,
+    "livePriceAtEntry": 0.375,
+    "actual": 0,
+    "gap": -0.07552074009601256,
+    "daysEarly": 0.31199074074074074,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xbee2cd40473495f713c69b9dfbce9fc2837fa4011568222c83c83bb773e35053",
+    "smartPct": 0.6191710403828482,
+    "livePriceAtEntry": 0.305,
+    "actual": 1,
+    "gap": 0.3141710403828482,
+    "daysEarly": 3.618668927157367,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xd86a816093fcd0a0e1ca440bc5ce199bd3c5a8d6139e044b076958164f8c5423",
+    "smartPct": 0.5961456544216527,
+    "livePriceAtEntry": 0.175,
+    "actual": 1,
+    "gap": 0.4211456544216527,
+    "daysEarly": 5.458951728990343,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x6619036865c2d27f1b1c00cd565ce74f6aa72ef93be29c315be36941d3559c59",
+    "smartPct": 0.8209758320263566,
+    "livePriceAtEntry": 0.695,
+    "actual": 1,
+    "gap": 0.12597583202635665,
+    "daysEarly": 1.314525689202768,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x0e4a0c937b8934c2475613b6322b3f8edc8dedc24762e01e42b0e6f87424a089",
+    "smartPct": 0.16037156683651574,
+    "livePriceAtEntry": 0.075,
+    "actual": 0,
+    "gap": 0.08537156683651574,
+    "daysEarly": 14.156988300495854,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x3733a1b647e7364095736ab0966465d896a84cf3b6bc1695ca1f26c3239b3868",
+    "smartPct": 0.18199519872102107,
+    "livePriceAtEntry": 0.1165,
+    "actual": 0,
+    "gap": 0.06549519872102107,
+    "daysEarly": 7.691361794427943,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x22e7b5e35423e76842dd3a5e1a21d13793811080d5e7b2896d0c001bd5e97d54",
+    "smartPct": 0.46166240678949216,
+    "livePriceAtEntry": 0.575,
+    "actual": 0,
+    "gap": -0.11333759321050779,
+    "daysEarly": 3.6631545285260234,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x421bc1929df1429cf2cb94f80c1ce6a3ed0d1f0b7a2749b9890075f94eb549e9",
+    "smartPct": 0.1266681901280507,
+    "livePriceAtEntry": 0.095,
+    "actual": 0,
+    "gap": 0.031668190128050694,
+    "daysEarly": 2.756739392259386,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x4ba348328e4d4ddee9e6734c9a369b2e8138611651f9f6dc8f59dea51df6c734",
+    "smartPct": 0.46757981940860266,
+    "livePriceAtEntry": 0.145,
+    "actual": 0,
+    "gap": 0.3225798194086027,
+    "daysEarly": 5.104957139237015,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xa743ce4a2a42aa232c2caa41aa27837ff1cde07781a1e9a726342065c3d86ba6",
+    "smartPct": 0.0931663504365329,
+    "livePriceAtEntry": 0.9545,
+    "actual": 0,
+    "gap": -0.8613336495634671,
+    "daysEarly": 1.5199421296324553,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xdb22a7749b831aa07a52cbc83213e6c8ceb88226b224a831512f4460011bb0a1",
+    "smartPct": 0.6238072292250364,
+    "livePriceAtEntry": 0.976,
+    "actual": 0,
+    "gap": -0.3521927707749636,
+    "daysEarly": 8.223929262511643,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x652002aa13ba253abd033a6a7d06457fe2a08309c7c5324598d677624cdabec3",
+    "smartPct": 0.5896724098549168,
+    "livePriceAtEntry": 0.9995,
+    "actual": 1,
+    "gap": -0.4098275901450833,
+    "daysEarly": 20.38576388888889,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xe3033b163d0e0e30cb3154049f28295dada348030e5c6cdfe58ed0d4e393c7e9",
+    "smartPct": 0.38846432667630837,
+    "livePriceAtEntry": 0.385,
+    "actual": 0,
+    "gap": 0.0034643266763083602,
+    "daysEarly": 12.681284722225048,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xb7dd41c16cd5b59e543ffcdab6a0d876f5ccef5329ea42ef1798d80c9a2b8499",
+    "smartPct": 0.36445859409824977,
+    "livePriceAtEntry": 0.275,
+    "actual": 0,
+    "gap": 0.08945859409824974,
+    "daysEarly": 30.155947716844345,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xbcacd5a055f5a9ced6f69f122216c073dd6987d08253fc07bbcc168fa5b81d55",
+    "smartPct": 0.12255966960071725,
+    "livePriceAtEntry": 0.0075,
+    "actual": 0,
+    "gap": 0.11505966960071726,
+    "daysEarly": 8.523884320797391,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x924a2942747dd75703321a7c8d809c68f6a514c3b0f2a2e64274e02310634669",
+    "smartPct": 0.23347148915607158,
+    "livePriceAtEntry": 0.385,
+    "actual": 0,
+    "gap": -0.15152851084392843,
+    "daysEarly": 30.355716695404052,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x518a5b030b205706b8ffe6bbad9bd3de59548348e5c0471827f5de21e513333c",
+    "smartPct": 0.1838642410932095,
+    "livePriceAtEntry": 0.065,
+    "actual": 0,
+    "gap": 0.1188642410932095,
+    "daysEarly": 21.50394774639836,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x6747bae2269c348786d0c0c0f4286ac006f13f16325d4dcbab954b46de029f19",
+    "smartPct": 0.891682001904194,
+    "livePriceAtEntry": 0.9845,
+    "actual": 1,
+    "gap": -0.09281799809580604,
+    "daysEarly": 3.093935185185185,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xfa59099fbda1e0f0058ed3cbd57e939fe90ab6d9b57d53bd488bcadf75c191d4",
+    "smartPct": 0.16820895292236335,
+    "livePriceAtEntry": 0.0285,
+    "actual": 0,
+    "gap": 0.13970895292236335,
+    "daysEarly": 3.062708333333333,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x1d2787cb8aed975d092b2799ed6f4083e9445f7420cdc09e9d47e7d54356c6cd",
+    "smartPct": 0.103045228483306,
+    "livePriceAtEntry": 0.0005,
+    "actual": 0,
+    "gap": 0.102545228483306,
+    "daysEarly": 6.2334998203023275,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xceb6dfaa2cf5abc9d47ebc867b984a7715104944249274e8a483a2e17473e5f5",
+    "smartPct": 0.15467172722498226,
+    "livePriceAtEntry": 0.275,
+    "actual": 0,
+    "gap": -0.12032827277501776,
+    "daysEarly": 19.204759606741447,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xbbc6689d0f6d57ea42168836712237c7308b3e0118c8914d31b6126d0f3254c5",
+    "smartPct": 0.15654976275888516,
+    "livePriceAtEntry": 0.009,
+    "actual": 0,
+    "gap": 0.14754976275888515,
+    "daysEarly": 7.245393518518519,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xc0be7b1f19f9b658778c2be7e6bc67596a00f347ab64392d0f5d387534c7c3b4",
+    "smartPct": 0.515868872598124,
+    "livePriceAtEntry": 0.175,
+    "actual": 0,
+    "gap": 0.340868872598124,
+    "daysEarly": 19.034721750697383,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x52bda1b8d68c469eb3176f2052f4da7cacc65a814c51f53294637d124af6afde",
+    "smartPct": 0.6140962008277807,
+    "livePriceAtEntry": 0.53,
+    "actual": 0,
+    "gap": 0.08409620082778069,
+    "daysEarly": 15.300324074074075,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x8183a221622f2d5d2b46da86c80d55a61f43d35829589e03c1efae9d072638c5",
+    "smartPct": 0.6072808750206463,
+    "livePriceAtEntry": 0.4625,
+    "actual": 1,
+    "gap": 0.1447808750206463,
+    "daysEarly": 25.40792824074074,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x68beecc857017df8663fa36c0c86310dec7305aa88fe830c94651391314afc1c",
+    "smartPct": 0.1701273952083007,
+    "livePriceAtEntry": 0.105,
+    "actual": 0,
+    "gap": 0.0651273952083007,
+    "daysEarly": 14.36462962962963,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x4c5701bcde0b8fb7d7f48c8e9d20245a6caa58c61a77f981fad98f2bfa0b1bc7",
+    "smartPct": 0.686314223026752,
+    "livePriceAtEntry": 0.9945,
+    "actual": 1,
+    "gap": -0.308185776973248,
+    "daysEarly": 8.157222222222222,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x858071dbcd97be6e31f8467cba92fcb09d1d767d46da407e4434438a188b04a2",
+    "smartPct": 0.13172991396826064,
+    "livePriceAtEntry": 0.335,
+    "actual": 0,
+    "gap": -0.20327008603173938,
+    "daysEarly": 21.615069444444444,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x6d0e09d0f04572d9b1adad84703458b0297bc5603b69dccbde93147ee4443246",
+    "smartPct": 0.856096295481898,
+    "livePriceAtEntry": 0.915,
+    "actual": 1,
+    "gap": -0.05890370451810201,
+    "daysEarly": 12.74566909443043,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x80059ff4e694f878c0498f6f3a067ee7ca62dc2fc46251a4287b58355ce47bc5",
+    "smartPct": 0.40219499612051596,
+    "livePriceAtEntry": 0.455,
+    "actual": 1,
+    "gap": -0.05280500387948406,
+    "daysEarly": 16.550520833333334,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x306d10d4a4d51b41910dbc779ca00908bd917c131541c5c42bbbc736258d2d56",
+    "smartPct": 0.14114934372928453,
+    "livePriceAtEntry": 0.175,
+    "actual": 0,
+    "gap": -0.03385065627071546,
+    "daysEarly": 15.858715277777778,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xffff6c984d7adab19e799c46d1a478d5ab6483479b41f9639d04617f07a8bab0",
+    "smartPct": 0.06612009599316411,
+    "livePriceAtEntry": 0.4675,
+    "actual": 0,
+    "gap": -0.40137990400683593,
+    "daysEarly": 16.906631944444445,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x7cb525e831729325d651017f81cbcb6f1adde5011c7b2283babea00b4ae93ae7",
+    "smartPct": 0.03148220626462456,
+    "livePriceAtEntry": 0.036,
+    "actual": 0,
+    "gap": -0.00451779373537544,
+    "daysEarly": 27.78884259259259,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x3c6bcb7da14ea576e5af25547dbd96f2bb24ac34e748e76aecff2ee9195dd1ac",
+    "smartPct": 0.1867141725057466,
+    "livePriceAtEntry": 0.065,
+    "actual": 0,
+    "gap": 0.12171417250574659,
+    "daysEarly": 8.627696759259258,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x676e7cda423f5826bcbb3c141e808ad7c66bc2d055e4d0aca79c26779712062c",
+    "smartPct": 0.26001329542295315,
+    "livePriceAtEntry": 0.095,
+    "actual": 0,
+    "gap": 0.16501329542295315,
+    "daysEarly": 11.658896256312618,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x2de8d7b9d103366e37f3a448db8289c5c571dec5c0b9eeddbc673546d4bd9322",
+    "smartPct": 0.6242772783481909,
+    "livePriceAtEntry": 0.9975,
+    "actual": 1,
+    "gap": -0.37322272165180914,
+    "daysEarly": 2.197406262303105,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x5efa976ebe94080bbda7e45605333ff8f30156cc91604d66c41eb52fd3e25f3e",
+    "smartPct": 0.10648305030703206,
+    "livePriceAtEntry": 0.033,
+    "actual": 0,
+    "gap": 0.07348305030703206,
+    "daysEarly": -1.0732235731167263,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x16608c4fdd7cb41292f6d42c1c02b43ac22593f1c198a104847a3479848d7abe",
+    "smartPct": 0.4625918547416308,
+    "livePriceAtEntry": 0.3,
+    "actual": 1,
+    "gap": 0.1625918547416308,
+    "daysEarly": 2.475999830932617,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xd8664606498aba2a8ccab56656860cb3f02d74de80e974ab87a9f940e65d4d5e",
+    "smartPct": 0.2760685253615417,
+    "livePriceAtEntry": 0.065,
+    "actual": 0,
+    "gap": 0.2110685253615417,
+    "daysEarly": 7.785991008521186,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xab1209b73e1ce9ebb4905dad781496385b5102c048889502b174ed733de1506a",
+    "smartPct": 0.49601581768560454,
+    "livePriceAtEntry": 0.24,
+    "actual": 1,
+    "gap": 0.25601581768560455,
+    "daysEarly": 2.31010913998074,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xfedc055699e34eac5f8cd6a1fb1d19e40d87c8e6920b59e741edcb41f8bbdf7d",
+    "smartPct": 0.3625819382832646,
+    "livePriceAtEntry": 0.0295,
+    "actual": 0,
+    "gap": 0.3330819382832646,
+    "daysEarly": 1.2489608963832148,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x724a93f3e0ed0a6c83d2b4f2bc60839b39a92cc2c7cbac0169447f48d72537ab",
+    "smartPct": 0.755999007898197,
+    "livePriceAtEntry": 0.645,
+    "actual": 1,
+    "gap": 0.11099900789819694,
+    "daysEarly": 2.754661044571488,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x1600d32f2f6c318c11436529c522bc3004164d997a4657feb02541d34e09423e",
+    "smartPct": 0.6468456737863314,
+    "livePriceAtEntry": 0.34,
+    "actual": 1,
+    "gap": 0.3068456737863314,
+    "daysEarly": 1.9701582229840313,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x51a7c8afb7a0e09b8b47643171d90f400de23a176c4ea06f6552d6e53213839c",
+    "smartPct": 0.4537139079027289,
+    "livePriceAtEntry": 0.3625,
+    "actual": 1,
+    "gap": 0.09121390790272893,
+    "daysEarly": 21.837125374456335,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xd9933a54c518e773050255ea9dba01a71e1a41f49311ed078ae4a6f7e76b1625",
+    "smartPct": 0.4456078891384235,
+    "livePriceAtEntry": 0.174,
+    "actual": 1,
+    "gap": 0.2716078891384235,
+    "daysEarly": 13.459223669877229,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x339727bd072a1756e1ff56b4512702e28ed0e30818fc28e0c9e39fafea56a578",
+    "smartPct": 0.13499385332700028,
+    "livePriceAtEntry": 0.0475,
+    "actual": 0,
+    "gap": 0.08749385332700028,
+    "daysEarly": 3.878839262435348,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x876047c0df88886ddbe468fe811bc75a667da45a552d798e626ecfc5c60d52d9",
+    "smartPct": 0.12496828178449869,
+    "livePriceAtEntry": 0.0805,
+    "actual": 0,
+    "gap": 0.04446828178449869,
+    "daysEarly": 4.52966590898867,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x5c0e75027a5561ea72a0776b00086be32fb4af8e758d26be217ac6c9efcdadf9",
+    "smartPct": 0.07035008736801342,
+    "livePriceAtEntry": 0.095,
+    "actual": 0,
+    "gap": -0.024649912631986584,
+    "daysEarly": 5.500610826975505,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x3094a2b925483a06aa72945a1472e311e5eb6be75284f61e0c008e279508ddf6",
+    "smartPct": 0.2864570013928531,
+    "livePriceAtEntry": 0.215,
+    "actual": 1,
+    "gap": 0.07145700139285308,
+    "daysEarly": 12.81199992433336,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xc88e812beb27442554b9231273f6cdda7c96022afc1a5b2a841f03c17dbceaaf",
+    "smartPct": 0.7176512270026582,
+    "livePriceAtEntry": 0.072,
+    "actual": 1,
+    "gap": 0.6456512270026582,
+    "daysEarly": 2.488881844821506,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x27182c8b13f2a6284754660cbb3c6350a04f7aa4afe04d24dad481947014d90d",
+    "smartPct": 0.2527677268766264,
+    "livePriceAtEntry": 0.335,
+    "actual": 0,
+    "gap": -0.08223227312337361,
+    "daysEarly": 14.61269966559516,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x366f89649caea042c96ee741b185461ec7faa408a2664ec44469a0061924b537",
+    "smartPct": 0.10203167614107825,
+    "livePriceAtEntry": 0.065,
+    "actual": 0,
+    "gap": 0.037031676141078246,
+    "daysEarly": 15.08801426836367,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xf526b2fbff94ae996818e76c8b54cc99ffbfa0a1a9972a48253ada65e32786f7",
+    "smartPct": 0.28260284272337166,
+    "livePriceAtEntry": 0.325,
+    "actual": 0,
+    "gap": -0.04239715727662835,
+    "daysEarly": 8.734525462962964,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xa1d97efb8a19de58d995edf58b882c4f99ef356c8a564af8daf888a7610edea1",
+    "smartPct": 0.05537995655742626,
+    "livePriceAtEntry": 0.047,
+    "actual": 0,
+    "gap": 0.008379956557426259,
+    "daysEarly": 14.661232437950417,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x2f6a547524c1d290f8a2bbff80be2b0e8ca1b3b716dd3a0e74bf8ddb3e3fd6b7",
+    "smartPct": 0.09024277232460454,
+    "livePriceAtEntry": 0.065,
+    "actual": 0,
+    "gap": 0.025242772324604534,
+    "daysEarly": 7.0115622143611205,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x6a8cfe84d17693425f27831db5949d7511f3393d4624b182ac6956164cd32b10",
+    "smartPct": 0.3139056836969769,
+    "livePriceAtEntry": 0.375,
+    "actual": 0,
+    "gap": -0.06109431630302309,
+    "daysEarly": 4.991555530582004,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xd39905267d79b715f078279ef41f311b791c6e2c7361fea38011492b632212ef",
+    "smartPct": 0.17025704859057006,
+    "livePriceAtEntry": 0.0965,
+    "actual": 0,
+    "gap": 0.07375704859057006,
+    "daysEarly": 6.296637949636954,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xfef657b2f9ed83dd3db24c61d115203e836f9967289cd3281b6b91dcd7338104",
+    "smartPct": 0.05240401086578652,
+    "livePriceAtEntry": 0.395,
+    "actual": 0,
+    "gap": -0.3425959891342135,
+    "daysEarly": 4.119837962962963,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x4d0c4865bdecc5f7971dbab47bb6c069d93909dec75bdff52fb766ae6094a6d6",
+    "smartPct": 0.5014340863258651,
+    "livePriceAtEntry": 0.605,
+    "actual": 1,
+    "gap": -0.10356591367413492,
+    "daysEarly": 12.880984621452049,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xbeab83146920be8f52b52fdbcb3464b24dc553f7b47eb4249243385b0faad271",
+    "smartPct": 0.19804822549499415,
+    "livePriceAtEntry": 0.1475,
+    "actual": 0,
+    "gap": 0.05054822549499416,
+    "daysEarly": 7.786977756245931,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x8b369e10358094a99ffe7f85a81a8e8ca68c611eee0fe63a2efa790ad045bcd6",
+    "smartPct": 0.48138615859679856,
+    "livePriceAtEntry": 0.405,
+    "actual": 0,
+    "gap": 0.07638615859679854,
+    "daysEarly": 30.544749943505746,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xa70fc3695a65833b91b45df6db6015096f3e1471b70352ca411b4209010e7633",
+    "smartPct": 0.4326407044837691,
+    "livePriceAtEntry": 0.185,
+    "actual": 1,
+    "gap": 0.24764070448376913,
+    "daysEarly": 6.744995945420442,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xb2e7dd21dd889b9b56447857f03ea6188ebcef50599c3c1556c2f9141772d7bb",
+    "smartPct": 0.1310116287470016,
+    "livePriceAtEntry": 0.055,
+    "actual": 0,
+    "gap": 0.0760116287470016,
+    "daysEarly": 0.7806597222222222,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x71c49500d051a9b32b9aa5bc22e0a6925a8b2282840c3e62e0a3afcd0403ba03",
+    "smartPct": 0.22752968218509023,
+    "livePriceAtEntry": 0.085,
+    "actual": 0,
+    "gap": 0.1425296821850902,
+    "daysEarly": 1.6394293231625028,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x656ee3fe28d2f23b12f3e5616161274a1456dc5e355fd97d3ad1d07c7c972f48",
+    "smartPct": 0.40943382478576407,
+    "livePriceAtEntry": 0.895,
+    "actual": 0,
+    "gap": -0.48556617521423595,
+    "daysEarly": 1.3592708333333334,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xf7ad79d04f2dc95740b512d657957bf16b521342ae41be894fa44c56b8b1d1ab",
+    "smartPct": 0.13250490799314635,
+    "livePriceAtEntry": 0.1,
+    "actual": 0,
+    "gap": 0.03250490799314634,
+    "daysEarly": 1.3720898553466796,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x92485347d2c139beb425df7bee78b98805d0eab1eb0cc953cf000e9a287eab7e",
+    "smartPct": 0.12113306872482205,
+    "livePriceAtEntry": 0.925,
+    "actual": 0,
+    "gap": -0.803866931275178,
+    "daysEarly": 1.0850810185185185,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xd7540d64e03b1894ececcbb54c02b88d9c5c0e854ba66ec4e1ece20477994ac5",
+    "smartPct": 0.9055803123146581,
+    "livePriceAtEntry": 0.845,
+    "actual": 1,
+    "gap": 0.0605803123146581,
+    "daysEarly": 12.880415911913271,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x4997c22d314ed5e9f3712e46eb4847441b51fa730d10ad26240afa85f5d902be",
+    "smartPct": 0.9271022167989829,
+    "livePriceAtEntry": 0.895,
+    "actual": 1,
+    "gap": 0.03210221679898284,
+    "daysEarly": 4.423664041442871,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x1eeb910620bfa52c348ca5b166c33230a0b142bec858d4fa46df18aeecbcecc0",
+    "smartPct": 0.9174521923436786,
+    "livePriceAtEntry": 0.71,
+    "actual": 1,
+    "gap": 0.20745219234367862,
+    "daysEarly": 2.2565856481481483,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x53098776eb95dbbd2e899c4fcd787a043ba725f55433948da2fbd00abdfcd3ae",
+    "smartPct": 0.04934325178158757,
+    "livePriceAtEntry": 0.055,
+    "actual": 0,
+    "gap": -0.00565674821841243,
+    "daysEarly": 2.8873148148148147,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x789c947a9415600d30d56a4aae88d4111996679b0caed166d0c96242fdce92a2",
+    "smartPct": 0.03097444408940945,
+    "livePriceAtEntry": 0.0365,
+    "actual": 0,
+    "gap": -0.005525555910590549,
+    "daysEarly": 37.308935185185184,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xb4067f81957ef1458e9712000807a4525c595f3c25a0c933ec2f69c0efb2e878",
+    "smartPct": 0.040954659578627484,
+    "livePriceAtEntry": 0.043,
+    "actual": 0,
+    "gap": -0.002045340421372513,
+    "daysEarly": 44.965463668057474,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xe546672750517f62c45a5a00067481981e62b9c20fa8220203232c9dc8fd2093",
+    "smartPct": 0.42560994751334824,
+    "livePriceAtEntry": 0.075,
+    "actual": 1,
+    "gap": 0.35060994751334823,
+    "daysEarly": 21.244935821533204,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xa93b28a6384aefff4e7d5adb2061c444e4a0e95b8ad17755f9cee123c7099b35",
+    "smartPct": 0.4674895957962962,
+    "livePriceAtEntry": 0.0525,
+    "actual": 1,
+    "gap": 0.4149895957962962,
+    "daysEarly": 30.81513888888889,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x7434b22007745d99095c102119fdb6b975d34869212e9dda4c6c5c48db0683a7",
+    "smartPct": 0.032217067528947325,
+    "livePriceAtEntry": 0.0205,
+    "actual": 0,
+    "gap": 0.011717067528947325,
+    "daysEarly": 22.940046296299123,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x02f8dd15d4c674a75fccbd0e00f0cf1256101c45ef41f6d0c5dfde9c36d4141e",
+    "smartPct": 0.5369210915351427,
+    "livePriceAtEntry": 0.18,
+    "actual": 1,
+    "gap": 0.3569210915351427,
+    "daysEarly": 13.282971827898379,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xb412664463bbfe21be44b1963291205ab332afd4f7f6e0d027aec1ba7a9e6793",
+    "smartPct": 0.15970574760943765,
+    "livePriceAtEntry": 0.115,
+    "actual": 0,
+    "gap": 0.04470574760943764,
+    "daysEarly": 30.528171296296296,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xffe381a80c1e36f9e0b03a542aa8fe56e74a67d2566a4e29396d4427aa4244c9",
+    "smartPct": 0.09123826255963198,
+    "livePriceAtEntry": 0.135,
+    "actual": 0,
+    "gap": -0.04376173744036803,
+    "daysEarly": 35.68134259259259,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xe31a6c763685129123cb6a0f729bfce04b768c5a22cb09c5610406df1a302465",
+    "smartPct": 0.3033614303990441,
+    "livePriceAtEntry": 0.5,
+    "actual": 0,
+    "gap": -0.19663856960095588,
+    "daysEarly": 15.228026318314164,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xd839785e6d4e4fdd44ef0e90f315eecccde47578924491e6ae74499e9f62d29e",
+    "smartPct": 0.23172581627809546,
+    "livePriceAtEntry": 0.245,
+    "actual": 0,
+    "gap": -0.013274183721904531,
+    "daysEarly": 3.7951620370398627,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x6897736d782ce70f47126dfcec6669073f563d6e757e60bc61c0367370d6f73e",
+    "smartPct": 0.08842523659233673,
+    "livePriceAtEntry": 0.0085,
+    "actual": 0,
+    "gap": 0.07992523659233672,
+    "daysEarly": 11.713253871338456,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x23408daff185f6c89d91bd279ce97142c573454277d72ae882a9d9fd1ae79af4",
+    "smartPct": 0.9006102656421823,
+    "livePriceAtEntry": 0.925,
+    "actual": 1,
+    "gap": -0.02438973435781777,
+    "daysEarly": 26.52762731481764,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x1480b819d03d4b6388d70e848b0384adf38c38d955cb783cdbcf6d4a436dee14",
+    "smartPct": 0.6673528022092261,
+    "livePriceAtEntry": 0.9865,
+    "actual": 1,
+    "gap": -0.31914719779077394,
+    "daysEarly": 27.01273644716616,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xfcde02af15efe40e336d67f0ef9aa49e9d40c37b92961fb890afc4afdbfe54d6",
+    "smartPct": 0.7697283956907308,
+    "livePriceAtEntry": 0.73,
+    "actual": 1,
+    "gap": 0.03972839569073083,
+    "daysEarly": 3.1158449074074075,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x773abaa5fe55e5cde51a261f444b7921652a4e059ead6b3be9fe56499c2d4609",
+    "smartPct": 0.3560548532501896,
+    "livePriceAtEntry": 0.185,
+    "actual": 1,
+    "gap": 0.1710548532501896,
+    "daysEarly": 13.366660528394911,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x6e9f90a6f471b52d03499a81586ca478519474eb152f1327c8c767f020d62529",
+    "smartPct": 0.40495892069645006,
+    "livePriceAtEntry": 0.575,
+    "actual": 1,
+    "gap": -0.1700410793035499,
+    "daysEarly": 0.9547106481481481,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xac084d6558622409fda664dc5446a50a880900f311a4d1e8ff2c4ad8f0fb6f93",
+    "smartPct": 0.489738562289862,
+    "livePriceAtEntry": 0.86,
+    "actual": 1,
+    "gap": -0.370261437710138,
+    "daysEarly": 6.630150312887121,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x1c60f9adb1d786b6fe78d63fd9f82dbb293fa06241532fb5ba43f8d8411cde1e",
+    "smartPct": 0.687572649152318,
+    "livePriceAtEntry": 0.615,
+    "actual": 1,
+    "gap": 0.07257264915231798,
+    "daysEarly": 12.734716717088487,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x99a0fdc1bb6308873bf87eb75a47e21c8340fe20fb6b033444c1d21392da10a9",
+    "smartPct": 0.3733946452187632,
+    "livePriceAtEntry": 0.685,
+    "actual": 1,
+    "gap": -0.31160535478123685,
+    "daysEarly": 69.30893518518519,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x23dbb60ade08c2664ac29488325afbc0136735bc7beb9180d9c0cb72620b0b13",
+    "smartPct": 0.8332942486785433,
+    "livePriceAtEntry": 0.942,
+    "actual": 1,
+    "gap": -0.10870575132145666,
+    "daysEarly": 58.298348265516495,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x94a2b2a1b9227e44fc464614e63dfca6d4082310291c35623c3d34b70aa53693",
+    "smartPct": 0.41590905689039054,
+    "livePriceAtEntry": 0.395,
+    "actual": 0,
+    "gap": 0.02090905689039052,
+    "daysEarly": 1.7798842592564335,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x6509c26f04acbe80e73144486933fff507901867925f165421d66155193fce55",
+    "smartPct": 0.6205702539711283,
+    "livePriceAtEntry": 0.705,
+    "actual": 1,
+    "gap": -0.08442974602887166,
+    "daysEarly": 1.5784143518518519,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xa6e388d87a81a17dd8f2046479e11c50bf32bcf475ce75a3506c5cf19a09613c",
+    "smartPct": 0.2964396754802209,
+    "livePriceAtEntry": 0.841,
+    "actual": 0,
+    "gap": -0.5445603245197791,
+    "daysEarly": 1.859816641800492,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x3088733a3d7f03d026035f6dd7df44a82c59eeb95545dda3889b65baa9a36e82",
+    "smartPct": 0.4476006922633252,
+    "livePriceAtEntry": 0.8785,
+    "actual": 1,
+    "gap": -0.43089930773667473,
+    "daysEarly": 3.8662124956371167,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x865303ccb9a48341d1bae33b3b4379ca86d5abbff3ce1e132716631cc0af3cce",
+    "smartPct": 0.11021016149900209,
+    "livePriceAtEntry": 0.0365,
+    "actual": 0,
+    "gap": 0.07371016149900209,
+    "daysEarly": 17.374236111108285,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x43272c02b8407ed3f8d5b04fb4cb132d7a59c5df6ecc423afcf66f1c778d1887",
+    "smartPct": 0.0802838130700789,
+    "livePriceAtEntry": 0.008,
+    "actual": 0,
+    "gap": 0.07228381307007889,
+    "daysEarly": 6.164586911022045,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x5a965e943de13a4bdef4fb568d94341a751f02a2f652fa4fb8377d8b02f84606",
+    "smartPct": 0.18078723214578862,
+    "livePriceAtEntry": 0.0055,
+    "actual": 0,
+    "gap": 0.17528723214578862,
+    "daysEarly": 4.78713477114077,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xf471786ca9608b18a61e1f555681428c80ad2a2695fdd2df69e796defff9f897",
+    "smartPct": 0.30552743123622883,
+    "livePriceAtEntry": 0.245,
+    "actual": 0,
+    "gap": 0.060527431236228835,
+    "daysEarly": 2.7064358024936253,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xd4d841659e8b1fe050980ec9b7deae31accc10e529082fe9468ef9699d11aec2",
+    "smartPct": 0.899872385697147,
+    "livePriceAtEntry": 0.84,
+    "actual": 1,
+    "gap": 0.059872385697147035,
+    "daysEarly": 3.3443837058766683,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xed25d03a2589af03a7a603e7c07c36d53baf38c148e50cc1f5a6a6f285d68862",
+    "smartPct": 0.46298178973647675,
+    "livePriceAtEntry": 0.555,
+    "actual": 1,
+    "gap": -0.0920182102635233,
+    "daysEarly": 5.643688461563675,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x93f2e17cfd239c4667eb3d41ff04e2cd1ae6f3f663210cbc42ec1296ff880805",
+    "smartPct": 0.48034245683065546,
+    "livePriceAtEntry": 0.445,
+    "actual": 0,
+    "gap": 0.035342456830655455,
+    "daysEarly": 2.9821940786799677,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x35c73eb41a0ee54b49358c523a2d3335e9df5ee21bba9e526813a6fbaa0f70b6",
+    "smartPct": 0.4196707088489794,
+    "livePriceAtEntry": 0.115,
+    "actual": 0,
+    "gap": 0.3046707088489794,
+    "daysEarly": 3.479911774964509,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xa96e71186507bf493bd1fb8101418c369c6296a29b49514fdec3f7bfe7197909",
+    "smartPct": 0.30650313285480374,
+    "livePriceAtEntry": 0.325,
+    "actual": 0,
+    "gap": -0.018496867145196272,
+    "daysEarly": 12.61368467757331,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x36f665053a7ca5c102f2db15cfc49b1b9f38fa820a5f2bb4bde87bf9fbd9a2ab",
+    "smartPct": 0.18307444495299782,
+    "livePriceAtEntry": 0.385,
+    "actual": 0,
+    "gap": -0.2019255550470022,
+    "daysEarly": 34.681342592589765,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x65f204a8ebbaa472d668cc4fdbe4dd45249405a7e0acea43b7930a216e5bfdc7",
+    "smartPct": 0.8666590361460581,
+    "livePriceAtEntry": 0.635,
+    "actual": 1,
+    "gap": 0.2316590361460581,
+    "daysEarly": 17.934666270921497,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x2135ffcb43ba9103bb6acf7116d2d5aa98bef6d9eb3dc9c85ea00cb79513f3ec",
+    "smartPct": 0.1680685066462914,
+    "livePriceAtEntry": 0.215,
+    "actual": 0,
+    "gap": -0.04693149335370861,
+    "daysEarly": 12.152163240429914,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x14fd8ab261d14215058b77a9541a5013ccc3d3eb677276a9de54445a31acd194",
+    "smartPct": 0.015633866824475616,
+    "livePriceAtEntry": 0.0185,
+    "actual": 0,
+    "gap": -0.002866133175524383,
+    "daysEarly": 21.98559604986403,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x1db02ba50e2312a62b4104de691cc7a76065d8d0da40decf93eb1b914a3217b7",
+    "smartPct": 0.08874235990651937,
+    "livePriceAtEntry": 0.0475,
+    "actual": 0,
+    "gap": 0.041242359906519366,
+    "daysEarly": 38.041747685185186,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x2226a3e40300238a813bddccb7cadef078ffce4c83e237d85a135e685f0b81b5",
+    "smartPct": 0.054574802035760185,
+    "livePriceAtEntry": 0.115,
+    "actual": 0,
+    "gap": -0.06042519796423982,
+    "daysEarly": 17.556944444444444,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x7eceae72d7d7b3e175fa872c728526e6fec4714288a4bda91fe818e298e69a6f",
+    "smartPct": 0.13729013079646868,
+    "livePriceAtEntry": 0.135,
+    "actual": 0,
+    "gap": 0.00229013079646867,
+    "daysEarly": 16.474584202278987,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x5d37825716832a4a54f89450932e89510f26cf4be59aeec3149d2c49e5fdf44d",
+    "smartPct": 0.3135938042296828,
+    "livePriceAtEntry": 0.4765,
+    "actual": 0,
+    "gap": -0.16290619577031717,
+    "daysEarly": 12.50375,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xf9f0965a3bd704ad9c184851242606ad35a4ffe733febf5074d4fbcc59d52eb8",
+    "smartPct": 0.4282806633507856,
+    "livePriceAtEntry": 0.605,
+    "actual": 0,
+    "gap": -0.1767193366492144,
+    "daysEarly": 14.407696759262086,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x0fa5d80f8f8fec384b629d60a47c8c669ff7e6ea469edb9f91ccfd030b7f56d7",
+    "smartPct": 0.16553043555861985,
+    "livePriceAtEntry": 0.115,
+    "actual": 0,
+    "gap": 0.05053043555861984,
+    "daysEarly": 48.00432312947026,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xe208a07bd71069b04e3b89de92f71da8b155d45dc2e527dc46c3ceb2a63b307b",
+    "smartPct": 0.36340320313580926,
+    "livePriceAtEntry": 0.465,
+    "actual": 0,
+    "gap": -0.10159679686419076,
+    "daysEarly": 5.676527777777777,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x8f6e71601903224dc29c69b886a63f248c8051be259e7db299850708f1f86dd6",
+    "smartPct": 0.3833543180597795,
+    "livePriceAtEntry": 0.435,
+    "actual": 0,
+    "gap": -0.05164568194022051,
+    "daysEarly": 1.4134849902682833,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x65414628f108533d689721c6b2576dd83da43644bcfd62506444f1591ef32c31",
+    "smartPct": 0.5646314775797153,
+    "livePriceAtEntry": 0.335,
+    "actual": 1,
+    "gap": 0.2296314775797153,
+    "daysEarly": 11.530439814814814,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xa573400b588079857899fce1e5a68da2d086f63fd35cbdd626df397e19e9995e",
+    "smartPct": 0.5980211958618677,
+    "livePriceAtEntry": 0.0205,
+    "actual": 0,
+    "gap": 0.5775211958618678,
+    "daysEarly": 15.085516932008531,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xf64f880b571d7a70d858649d30f0843aa57307e304aeb617349df74ce34d044e",
+    "smartPct": 0.13821863593576303,
+    "livePriceAtEntry": 0.0345,
+    "actual": 0,
+    "gap": 0.10371863593576303,
+    "daysEarly": 7.7574652777777775,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xb6b3d7a2037b3faa7e1306d741840d453432902d73cc9a146a035e40271eae73",
+    "smartPct": 0.3410434665073841,
+    "livePriceAtEntry": 0.155,
+    "actual": 0,
+    "gap": 0.1860434665073841,
+    "daysEarly": -36.05819729841161,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x713641f745d71f6ec61f906237ffca3c8583f251e49384429a63ceb0ccdb2d37",
+    "smartPct": 0.32812632482369425,
+    "livePriceAtEntry": 0.7855,
+    "actual": 1,
+    "gap": -0.4573736751763057,
+    "daysEarly": -8.31509890008997,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x9bb9f7c70674e2043580bf634753858eded9b360252c06f891688b95a542ac46",
+    "smartPct": 0.3065715128342332,
+    "livePriceAtEntry": 0.355,
+    "actual": 1,
+    "gap": -0.04842848716576681,
+    "daysEarly": 3.447922424610279,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x215be7e1cbc744ce1a85fb891db92b53f933712b5a556e556657c3254f63d260",
+    "smartPct": 0.5372283662412793,
+    "livePriceAtEntry": 0.425,
+    "actual": 1,
+    "gap": 0.11222836624127935,
+    "daysEarly": 1.1768506787957085,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x6b44bd667fad6cb5b3b68d8bd1055a038c77d9176dbd51f123879797cc3368a7",
+    "smartPct": 0.038709271369978406,
+    "livePriceAtEntry": 0.046,
+    "actual": 0,
+    "gap": -0.007290728630021594,
+    "daysEarly": 35.97780150708234,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x89389a6b1439856a8d366234c795d72865c927a1aa3cf9d4cc04a3a400defde1",
+    "smartPct": 0.1791333704218007,
+    "livePriceAtEntry": 0.1165,
+    "actual": 0,
+    "gap": 0.06263337042180069,
+    "daysEarly": 40.432147834710015,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x5376e032a8f5a389b55aeafb39b6985bfb323f8392e304bc48b1b01e9cd39850",
+    "smartPct": 0.3909666468838542,
+    "livePriceAtEntry": 0.385,
+    "actual": 1,
+    "gap": 0.005966646883854176,
+    "daysEarly": 0.41577546296296297,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x434719e5e807306706d17205f2bc15e4901184084c4e8ea472127f47a365bbdf",
+    "smartPct": 0.2134709222870176,
+    "livePriceAtEntry": 0.155,
+    "actual": 1,
+    "gap": 0.05847092228701761,
+    "daysEarly": 1.5984208018126311,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x5159f1aeb43719d812fd7bdde72da589fafe0ab0cff7a861d9a20b2511571d96",
+    "smartPct": 0.4680831575742258,
+    "livePriceAtEntry": 0.275,
+    "actual": 1,
+    "gap": 0.19308315757422578,
+    "daysEarly": 7.824201388888889,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xeb4b5d1390278a728cea8024a464c2ed8f69c615e60325f1735ad961b0b6ed51",
+    "smartPct": 0.609711481436989,
+    "livePriceAtEntry": 0.515,
+    "actual": 0,
+    "gap": 0.09471148143698893,
+    "daysEarly": 0.8997453703703704,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xf105ea1a83605540617366526881a245bd0fb586e0cfe15c1582d0d3ee579558",
+    "smartPct": 0.07853143190806523,
+    "livePriceAtEntry": 0.195,
+    "actual": 0,
+    "gap": -0.11646856809193477,
+    "daysEarly": 20.199089733095523,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x0fb006e0c06caa4db12f7e30ec8c2483d658f83eb57b2ee8eb478e39beca3dfd",
+    "smartPct": 0.33790076859115964,
+    "livePriceAtEntry": 0.365,
+    "actual": 0,
+    "gap": -0.027099231408840352,
+    "daysEarly": 65.9785656842041,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x46f19d5bedd6d601d597d308d86814245974014d8a108395a7690d7a099cacdd",
+    "smartPct": 0.27542585288963334,
+    "livePriceAtEntry": 0.3175,
+    "actual": 0,
+    "gap": -0.042074147110366666,
+    "daysEarly": 19.97500170533922,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x2bef40a1f62d045527228e699990d1bd1f97906b2458a6f3e4a0daf11124060c",
+    "smartPct": 0.24352155755744942,
+    "livePriceAtEntry": 0.44,
+    "actual": 0,
+    "gap": -0.19647844244255058,
+    "daysEarly": 48.58487268518518,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x6fa13f31cceaf10ed3190df6e2aca0a93ab0d6fb46fd279003f17d4cdccee164",
+    "smartPct": 0.5121145048869346,
+    "livePriceAtEntry": 0.37,
+    "actual": 1,
+    "gap": 0.14211450488693456,
+    "daysEarly": 9.717159333371763,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x70d706fe084905dbafb95dfff13b727e4073efc3ef590adc8330562bac5d26de",
+    "smartPct": 0.2548835984857228,
+    "livePriceAtEntry": 0.055,
+    "actual": 0,
+    "gap": 0.1998835984857228,
+    "daysEarly": 5.457326388886063,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xa2b9c5b881902c57a3ce9c8fe68848592136a728448b601bf09b4be6304394e5",
+    "smartPct": 0.5467274608108168,
+    "livePriceAtEntry": 0.67,
+    "actual": 1,
+    "gap": -0.12327253918918324,
+    "daysEarly": 6.4798916221505625,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x1e25feaca6587256a7d830023b797279561de33ceb29845186f3d29d3569743d",
+    "smartPct": 0.33133024022926244,
+    "livePriceAtEntry": 0.54,
+    "actual": 0,
+    "gap": -0.2086697597707376,
+    "daysEarly": 3.33287037037037,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x9967297556e4fd7f7e1e688a2e44d6fdbc42b0700576a1e4e67aa37764ac640a",
+    "smartPct": 0.37560546326788896,
+    "livePriceAtEntry": 0.515,
+    "actual": 0,
+    "gap": -0.13939453673211105,
+    "daysEarly": 1.9442592592564336,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x18dccc229331c63d8360d1400ece2355627637547d8dcd54aa5f7f1b5580686e",
+    "smartPct": 0.9850693722170929,
+    "livePriceAtEntry": 0.413,
+    "actual": 1,
+    "gap": 0.5720693722170929,
+    "daysEarly": 49.20868055555273,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xc5675bc58c8117391cc243780c1b709ce1ef744aa27779c78ee82f3dc974ca1b",
+    "smartPct": 0.16003164104766568,
+    "livePriceAtEntry": 0.23,
+    "actual": 0,
+    "gap": -0.06996835895233433,
+    "daysEarly": 25.510277777774952,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x48fbf70c1713e71a405052bc4641e26dbba435fa557672c4040763c901cbf606",
+    "smartPct": 0.09760294811255668,
+    "livePriceAtEntry": 0.0435,
+    "actual": 0,
+    "gap": 0.054102948112556684,
+    "daysEarly": 36.31275462962963,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x36e8ca24d2a13435f519f15580d42b45cdbe3bc425fb39a7c2733260357af0fa",
+    "smartPct": 0.9277500230079981,
+    "livePriceAtEntry": 0.9805,
+    "actual": 1,
+    "gap": -0.0527499769920019,
+    "daysEarly": 22.523025421846178,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x1d54eb5eac2cee8f595f3097c65da7d07f8ab5dee63d7c0c6883eb70e1e9af30",
+    "smartPct": 0.046654861174578226,
+    "livePriceAtEntry": 0.145,
+    "actual": 0,
+    "gap": -0.09834513882542176,
+    "daysEarly": 62.84149305555555,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xb196a122933da9aff6cb8b0f3764d0dc5db1859f46c0481c711521eee8524291",
+    "smartPct": 0.12679096105936402,
+    "livePriceAtEntry": 0.0405,
+    "actual": 0,
+    "gap": 0.08629096105936401,
+    "daysEarly": 22.208761000295567,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x68fbeb8d823552abf9d35f3ebdb8619a1a1d51b650da9101be62f09308fd18d2",
+    "smartPct": 0.16414764338166768,
+    "livePriceAtEntry": 0.135,
+    "actual": 0,
+    "gap": 0.02914764338166767,
+    "daysEarly": 5.627572263418127,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x053d22e12bfe8dd73b12fc1cf89858ecc0de76aede10fea3eca5c7877d8db40c",
+    "smartPct": 0.0729924490126655,
+    "livePriceAtEntry": 0.085,
+    "actual": 0,
+    "gap": -0.012007550987334512,
+    "daysEarly": 17.39853160830745,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x57165bc68af588cf16e499eecd6c040e458c939e0fb0dd4b193744a9d21aa5f2",
+    "smartPct": 0.12673278311917824,
+    "livePriceAtEntry": 0.014,
+    "actual": 0,
+    "gap": 0.11273278311917824,
+    "daysEarly": 6.6331134259231,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x46f15cb064fb468e39de360f14f5847898ef9b1489d15e9df702b92f1836598d",
+    "smartPct": 0.20201923908895186,
+    "livePriceAtEntry": 0.21,
+    "actual": 0,
+    "gap": -0.00798076091104813,
+    "daysEarly": 2.0941203703703706,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x0189df05ed7bf84d799213b01a79571e305c03b2ac5359cfbb3a323448ba20fa",
+    "smartPct": 0.01843989453060448,
+    "livePriceAtEntry": 0.0185,
+    "actual": 0,
+    "gap": -0.00006010546939552025,
+    "daysEarly": 34.463255318270086,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x8e7a03cb1970e2ad6533b01892403516b6b3f5b5fa90ed7d104c28b27e40ba00",
+    "smartPct": 0.6986253674230971,
+    "livePriceAtEntry": 0.6655,
+    "actual": 1,
+    "gap": 0.03312536742309713,
+    "daysEarly": 12.543790660883586,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xdb7886829f415e00ab97b695a28b5747c6bce1f8ab09635a51ec6480e5d50314",
+    "smartPct": 0.2291958692989688,
+    "livePriceAtEntry": 0.065,
+    "actual": 0,
+    "gap": 0.1641958692989688,
+    "daysEarly": 5.645578703700878,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x5f879a52e5349db7f66d386ca75f1a9bb608fdd6a738a1582681613730b23281",
+    "smartPct": 0.08140403755738161,
+    "livePriceAtEntry": 0.0085,
+    "actual": 0,
+    "gap": 0.07290403755738162,
+    "daysEarly": 13.17939221739875,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x0443a503a38b90446c8a3826db5ee1323144197ef2b4ed09bcdf545ac104dfcb",
+    "smartPct": 0.10326094651741989,
+    "livePriceAtEntry": 0.0085,
+    "actual": 0,
+    "gap": 0.0947609465174199,
+    "daysEarly": 0.5075347222222222,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xa37173a88dc5622e1c42e9f8f5a9d20d70b9b99e52cb76e64fb0ad95503fcaef",
+    "smartPct": 0.35387109913377174,
+    "livePriceAtEntry": 0.165,
+    "actual": 0,
+    "gap": 0.18887109913377173,
+    "daysEarly": 20.586643518518517,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x9a8757bf4ecee8ba364603c3195d63c37c4d2700b69f8e4c5f751850bc330c9a",
+    "smartPct": 0.1881864829274361,
+    "livePriceAtEntry": 0.35,
+    "actual": 0,
+    "gap": -0.1618135170725639,
+    "daysEarly": 26.591540562837388,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x5a27ddbd2965784c01ef0a53d440a9cfc08e815f63f0d923ed8734af36872add",
+    "smartPct": 0.1055344163933167,
+    "livePriceAtEntry": 0.0365,
+    "actual": 0,
+    "gap": 0.0690344163933167,
+    "daysEarly": 3.204764641946863,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x1ab70741c263b8374fd08b4cfb2cc5af0537d787e27e40a39d08a83dd67f06b4",
+    "smartPct": 0.27179364895143016,
+    "livePriceAtEntry": 0.0055,
+    "actual": 0,
+    "gap": 0.26629364895143015,
+    "daysEarly": 0.6806365740740741,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x8b9176d24ac65c3ec55f5113c290b7ce97dc026dc506db9f1444879ffcdadd6d",
+    "smartPct": 0.613167009420866,
+    "livePriceAtEntry": 0.705,
+    "actual": 0,
+    "gap": -0.09183299057913397,
+    "daysEarly": 1.9454745370398627,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x1b1a75d6305f5edee255b3f368cca945bde401fea4b2a7e34f2fcca3b3e56cf0",
+    "smartPct": 0.6070903291616794,
+    "livePriceAtEntry": 0.905,
+    "actual": 1,
+    "gap": -0.29790967083832065,
+    "daysEarly": 25.504490740740742,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x17e2f3347e34d8a13572baf10c9b4eb3291217868a0fb84b37f36c80f8e2105a",
+    "smartPct": 0.38155894399959983,
+    "livePriceAtEntry": 0.335,
+    "actual": 1,
+    "gap": 0.04655894399959981,
+    "daysEarly": 1.835938695791739,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xeda0e0633f131b761cbe6c6e5e16ae347c48d9448a08c5826bfc2c794b63758e",
+    "smartPct": 0.0772330377605345,
+    "livePriceAtEntry": 0.0065,
+    "actual": 0,
+    "gap": 0.0707330377605345,
+    "daysEarly": 10.59727624965809,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xbdb44ce1624dbf80fe70a96e7cb027b854aa44c52cf87a6bd0bc9ea2c332c3dc",
+    "smartPct": 0.4717991822986145,
+    "livePriceAtEntry": 0.555,
+    "actual": 1,
+    "gap": -0.08320081770138554,
+    "daysEarly": 16.630017058300442,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0x0619980a29b1022ba9cbdcb7da731be0be8799ecf9ff2eb5c1ee9137235b0770",
+    "smartPct": 0.2806889850573375,
+    "livePriceAtEntry": 0.18,
+    "actual": 1,
+    "gap": 0.10068898505733753,
+    "daysEarly": 5.309538221268831,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
+  },
+  {
+    "conditionId": "0xb37e5f6ece2db9165517b62e3257e0da5d3e79713883cb71c74013fe912e8a4d",
+    "smartPct": 0.0424145205497597,
+    "livePriceAtEntry": 0.0365,
+    "actual": 0,
+    "gap": 0.0059145205497597025,
+    "daysEarly": 37.707156252271865,
+    "recordedAt": "2026-07-01T19:50:19.834Z",
+    "methodologyVersion": "v1-2026-07-01"
   }
 ]

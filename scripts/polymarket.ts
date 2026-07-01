@@ -580,6 +580,18 @@ export class PolymarketClient {
     return Array.isArray(history) ? history.filter(isRecord).map((point) => ({ t: readNumber(point, ["t"]), p: readNumber(point, ["p"]) })) : [];
   }
 
+  // Resolves a condition_id to its YES outcome token id (clobTokenIds[0] — same index-0-is-YES
+  // convention as pickLeadingOutcome), for backtest tooling that needs price history for a market no
+  // wallet_positions/wallet_closed_positions row retains a token id for. closed=true since this is
+  // only ever called for already-resolved markets — Gamma hides them by default otherwise.
+  async getYesTokenId(conditionId: string): Promise<string | null> {
+    const params = new URLSearchParams({ condition_ids: conditionId, closed: "true" });
+    const response = await fetchJson("/markets", params, "general", CONFIG.GAMMA_API_BASE);
+    const first = asArray(response).filter(isRecord)[0];
+    if (!first) return null;
+    return parseJsonArray(first.clobTokenIds).map((entry) => String(entry))[0] || null;
+  }
+
   async getActivity(address: string, limit = CONFIG.ACTIVITY_LIMIT): Promise<TradeActivity[]> {
     const params = new URLSearchParams({
       user: address,
