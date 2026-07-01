@@ -46,6 +46,20 @@ function requiredEnv(name: string): string {
 
 const supabase = createClient(requiredEnv("NEXT_PUBLIC_SUPABASE_URL"), requiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"));
 
+// ── Locked methodology ───────────────────────────────────────────────────────────────────────────
+// Frozen 2026-07-01, after v3 first ran successfully (17 matched markets). DO NOT edit these values
+// in place as more data comes in — that's exactly the overfitting risk this is guarding against
+// (quietly tuning thresholds until the backtest you're running says what you want it to say). If the
+// methodology genuinely needs to change, bump METHODOLOGY_VERSION and treat results under the new
+// version as a fresh, separate track record — never silently blend them with what came before.
+const METHODOLOGY_VERSION = "v1-2026-07-01";
+const DUST_FLOOR_USD = 10; // same as web/lib/trendingMarkets.ts — evaluate the population the live feature actually shows
+const MIN_PARTICIPANTS = 5; // same as web/lib/trendingMarkets.ts
+const RESOLVE_EPSILON = 0.03; // same as web/lib/resolvedMarkets.ts
+const PRICE_MATCH_TOLERANCE_DAYS = 10; // max distance from smart money's entry date to an available price point
+const GAP_THRESHOLDS = [0, 0.05, 0.1, 0.2]; // profit-simulation buckets, probability points
+const LEAD_TIME_THRESHOLDS_DAYS = [0, 3, 7, 14, 30]; // conviction-vs-lead-time buckets
+
 // Persisted, ever-growing record of matched results — see the v4 note at the top of the file for why
 // this exists (wallet_closed_positions is a rolling window, not an archive).
 const HISTORY_FILE = join(dirname(fileURLToPath(import.meta.url)), "backtestSmartMoneyHistory.json");
@@ -58,6 +72,7 @@ interface HistoryEntry {
   gap: number;
   daysEarly: number | null;
   recordedAt: string; // when this run first captured it
+  methodologyVersion: string;
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -70,12 +85,6 @@ function saveHistory(history: Map<string, HistoryEntry>): void {
   const entries = [...history.values()].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt));
   writeFileSync(HISTORY_FILE, JSON.stringify(entries, null, 2) + "\n");
 }
-
-// Same thresholds the live feature uses (web/lib/trendingMarkets.ts) — the backtest should evaluate
-// exactly the population the feature would actually have shown.
-const DUST_FLOOR_USD = 10;
-const MIN_PARTICIPANTS = 5;
-const RESOLVE_EPSILON = 0.03; // same as web/lib/resolvedMarkets.ts
 
 interface ClosedRow {
   address: string;
@@ -209,7 +218,7 @@ function buildYesPriceSeries(priceRows: PriceRow[], actual: number): Map<string,
 
 // Nearest available day within `toleranceDays` — daily cache rows aren't guaranteed for every single
 // day (gaps happen), so exact-day lookups would drop too many otherwise-usable markets.
-function nearestPrice(series: Map<string, number>, targetMs: number, toleranceDays = 10): number | null {
+function nearestPrice(series: Map<string, number>, targetMs: number, toleranceDays = PRICE_MATCH_TOLERANCE_DAYS): number | null {
   let best: { price: number; diffDays: number } | null = null;
   for (const [day, price] of series) {
     const diffDays = Math.abs(Date.parse(day) - targetMs) / 86_400_000;
@@ -368,7 +377,7 @@ async function main(): Promise<void> {
   // smart money saw something early rather than just piling on late.
   console.log("\nHigh-conviction (>=25pt) accuracy by minimum lead time before resolution:");
   const highConviction = samples.filter((s) => Math.abs(s.smartPct - 0.5) >= 0.25 && s.daysEarly !== null);
-  for (const minDays of [0, 3, 7, 14, 30]) {
+  for (const minDays of LEAD_TIME_THRESHOLDS_DAYS) {
     const bucket = highConviction.filter((s) => s.daysEarly! >= minDays);
     if (bucket.length === 0) {
       console.log(`  >=${minDays}d early: n=0`);
@@ -410,7 +419,7 @@ async function main(): Promise<void> {
     matched.push({ ...s, livePriceAtEntry, gap: s.smartPct - livePriceAtEntry });
   }
 
-  console.log(`${matched.length} markets matched to a live price within 10 days of smart money's entry this run`);
+  console.log(`${matched.length} markets matched to a live price within ${PRICE_MATCH_TOLERANCE_DAYS} days of smart money's entry this run`);
 
   // Fold into the persisted history — resolved markets already recorded stay as-is (their outcome and
   // matched price are fixed historical facts), new ones from this run get added. This is what makes
@@ -427,7 +436,8 @@ async function main(): Promise<void> {
       actual: s.actual,
       gap: s.gap,
       daysEarly: s.daysEarly,
-      recordedAt: now
+      recordedAt: now,
+      methodologyVersion: METHODOLOGY_VERSION
     });
   }
   saveHistory(history);
@@ -439,9 +449,24 @@ async function main(): Promise<void> {
     return;
   }
 
-  const smartBrierM = mean(all.map((s) => brier(s.smartPct, s.actual)));
-  const liveBrierM = mean(all.map((s) => brier(s.livePriceAtEntry, s.actual)));
-  console.log(`Mean Brier score, all recorded (smart money vs. the live price at the SAME time), n=${all.length}:`);
+  // Guard against silently blending results computed under a different locked methodology — if the
+  // formula/thresholds above are ever changed, old entries stay in the file (they're still valid
+  // history) but must not be averaged in with the new version as if nothing changed.
+  const otherVersions = new Set(all.filter((s) => s.methodologyVersion !== METHODOLOGY_VERSION).map((s) => s.methodologyVersion));
+  if (otherVersions.size > 0) {
+    console.log(
+      `\n⚠ ${all.length - all.filter((s) => s.methodologyVersion === METHODOLOGY_VERSION).length} recorded entries use a different methodology version (${[...otherVersions].join(", ")}) than the current one (${METHODOLOGY_VERSION}). Scoring below is CURRENT-VERSION ONLY — mixing would make the numbers meaningless.`
+    );
+  }
+  const currentVersionAll = all.filter((s) => s.methodologyVersion === METHODOLOGY_VERSION);
+  if (currentVersionAll.length === 0) {
+    console.log("No entries recorded under the current methodology version.");
+    return;
+  }
+
+  const smartBrierM = mean(currentVersionAll.map((s) => brier(s.smartPct, s.actual)));
+  const liveBrierM = mean(currentVersionAll.map((s) => brier(s.livePriceAtEntry, s.actual)));
+  console.log(`Mean Brier score, current-version recorded (smart money vs. the live price at the SAME time), n=${currentVersionAll.length}:`);
   console.log(`  smart money:         ${smartBrierM.toFixed(4)}`);
   console.log(`  live price at entry: ${liveBrierM.toFixed(4)}`);
   console.log(smartBrierM < liveBrierM ? "  -> smart money forecast BETTER than the contemporaneous market." : "  -> the contemporaneous market forecast at least as well as smart money.");
@@ -450,8 +475,8 @@ async function main(): Promise<void> {
   // price at that time, only when the gap clears a threshold — across increasing thresholds, since
   // the original question was specifically about the BIGGEST divergences.
   console.log("\nSimulated return per $1 staked, buying smart money's tilt at the live price (min gap):");
-  for (const minGap of [0, 0.05, 0.1, 0.2]) {
-    const trades = all.filter((s) => Math.abs(s.gap) >= minGap);
+  for (const minGap of GAP_THRESHOLDS) {
+    const trades = currentVersionAll.filter((s) => Math.abs(s.gap) >= minGap);
     if (trades.length === 0) {
       console.log(`  >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
       continue;

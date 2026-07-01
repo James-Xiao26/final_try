@@ -6,7 +6,8 @@
     "actual": 1,
     "gap": 0.19684587567973866,
     "daysEarly": 8.037644962440773,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0x6114a8a3f9ac214f48a7e20d169f1c7a5c84082cb6f7058ed9fe1137b11fd0e7",
@@ -15,7 +16,8 @@
     "actual": 1,
     "gap": 0.4124916900879272,
     "daysEarly": 11.515336517528958,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0x9352c559e9648ab4cab236087b64ca85c5b7123a4c7d9d7d4efde4a39c18056f",
@@ -24,7 +26,8 @@
     "actual": 0,
     "gap": 0.1312184781388304,
     "daysEarly": 16.564219292724044,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0x20af55ab35186377b81219db6cb8615240cba42cea41731091be9484a5f5b122",
@@ -33,7 +36,8 @@
     "actual": 1,
     "gap": 0.2681526679279244,
     "daysEarly": 6.504712706338388,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0x9769f78cbc95a5ed11895e6064bac471d8fd8f930b260cf581b68d3f58630d27",
@@ -42,7 +46,8 @@
     "actual": 1,
     "gap": 0.15818000324497383,
     "daysEarly": 9.814175716710974,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0xda519921a7090298cbdc56ee838a403a5193c2b3f637aef3e154e52de7b5e79c",
@@ -51,7 +56,8 @@
     "actual": 1,
     "gap": 0.08806716238721779,
     "daysEarly": 5.124030045120804,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0xa48ee32a0cbe5bc1a48844bd14e1691701d3bf8f45f4dd8cb8d1d304561393b6",
@@ -60,7 +66,8 @@
     "actual": 1,
     "gap": 0.2846525845125494,
     "daysEarly": 7.109565212444729,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0x348cd9adf4f6855f58bd9c6dbf9ff251c4142ef77233a5dc95c65b4b61cd2187",
@@ -69,7 +76,8 @@
     "actual": 0,
     "gap": 0.1480856866771219,
     "daysEarly": 21.611788261958935,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0xc4c3dbcc37a957a817599b0bf9fb5bd6b62b19210b0f527fec57cb75c7ed150a",
@@ -78,7 +86,8 @@
     "actual": 1,
     "gap": -0.023959676415589493,
     "daysEarly": 18.88289765162998,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0x46666ceb4c63814f38a8c83784ae10e1c2e1ef52e2db648372bd86dea521cf64",
@@ -87,7 +96,8 @@
     "actual": 0,
     "gap": 0.05167946455203813,
     "daysEarly": 13.994986399253563,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0x291ff8aa0b7439389820e49584499d6dc65cf617dde1a47c4b84d05f42c85639",
@@ -96,7 +106,8 @@
     "actual": 1,
     "gap": -0.11409041007809706,
     "daysEarly": 5.29210106493632,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0xdfd4d487d004c266493bdf32551d7f018c7eb4b9325f42ac368dd5075eec36a9",
@@ -105,7 +116,8 @@
     "actual": 1,
     "gap": 0.36438394181745026,
     "daysEarly": 13.939919150252166,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0xfbe85201ab2b4acff01cd5a3639039fc813d3448c64db081f70926bd9b9e74e9",
@@ -114,7 +126,8 @@
     "actual": 1,
     "gap": 0.3670543810043416,
     "daysEarly": 45.37337037604438,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0x0c38dd9305e3205557885183f0730270779e7e426b0ec3e7743f23963b6d6e4a",
@@ -123,7 +136,8 @@
     "actual": 0,
     "gap": 0.04378460497426996,
     "daysEarly": 4.377112098221955,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0x1723b7ee4118dee6ae6be8802cb7b6e239c37d199997b20a8191e32553a5bd68",
@@ -132,7 +146,8 @@
     "actual": 0,
     "gap": 0.05232336350361905,
     "daysEarly": 16.90111452794393,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0x258031a51215d328eac2db15bdf45abdee1a23d38d66e12462a83c34cf31b5c8",
@@ -141,7 +156,8 @@
     "actual": 1,
     "gap": -0.049219291652378816,
     "daysEarly": 9.171337554812961,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   },
   {
     "conditionId": "0x0b4cc3b739e1dfe5d73274740e7308b6fb389c5af040c3a174923d928d134bee",
@@ -150,6 +166,7 @@
     "actual": 0,
     "gap": -0.0035782191656020604,
     "daysEarly": 33.22089020705894,
-    "recordedAt": "2026-07-01T19:31:21.994Z"
+    "recordedAt": "2026-07-01T19:31:21.994Z",
+    "methodologyVersion": "v1-2026-07-01"
   }
 ]
