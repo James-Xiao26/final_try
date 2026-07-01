@@ -20,8 +20,20 @@
 // which token is index 0 (YES) without needing any external token-id mapping. Then: look up the
 // price nearest smart money's weighted entry date, compare, and simulate "buy the side smart money
 // diverges from the market on, at the market's price" across all qualifying markets.
+//
+// v4: persists every matched result to backtestSmartMoneyHistory.json (committed) instead of only
+// ever looking at whatever's live in wallet_closed_positions right now. That table is wiped and
+// rebuilt on every full ingest, scoped to the *current* leaderboard, and Polymarket's
+// /closed-positions fetch only covers roughly the trailing 90 days per wallet — it's a rolling
+// window, not a growing archive, so a market that resolved months ago quietly disappears once its
+// positioned wallets roll off the board. Snapshotting each run's computed results (fixed historical
+// facts once computed — a resolved market's outcome and matched price never change) is what actually
+// makes the sample grow across repeated runs instead of just shifting.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -33,6 +45,31 @@ function requiredEnv(name: string): string {
 }
 
 const supabase = createClient(requiredEnv("NEXT_PUBLIC_SUPABASE_URL"), requiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"));
+
+// Persisted, ever-growing record of matched results — see the v4 note at the top of the file for why
+// this exists (wallet_closed_positions is a rolling window, not an archive).
+const HISTORY_FILE = join(dirname(fileURLToPath(import.meta.url)), "backtestSmartMoneyHistory.json");
+
+interface HistoryEntry {
+  conditionId: string;
+  smartPct: number;
+  livePriceAtEntry: number;
+  actual: number;
+  gap: number;
+  daysEarly: number | null;
+  recordedAt: string; // when this run first captured it
+}
+
+function loadHistory(): Map<string, HistoryEntry> {
+  if (!existsSync(HISTORY_FILE)) return new Map();
+  const entries = JSON.parse(readFileSync(HISTORY_FILE, "utf8")) as HistoryEntry[];
+  return new Map(entries.map((e) => [e.conditionId, e]));
+}
+
+function saveHistory(history: Map<string, HistoryEntry>): void {
+  const entries = [...history.values()].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt));
+  writeFileSync(HISTORY_FILE, JSON.stringify(entries, null, 2) + "\n");
+}
 
 // Same thresholds the live feature uses (web/lib/trendingMarkets.ts) — the backtest should evaluate
 // exactly the population the feature would actually have shown.
@@ -373,16 +410,39 @@ async function main(): Promise<void> {
     matched.push({ ...s, livePriceAtEntry, gap: s.smartPct - livePriceAtEntry });
   }
 
-  console.log(`\n${matched.length} markets matched to a live price within 10 days of smart money's entry`);
-  if (matched.length === 0) {
-    console.log("Nothing to score for the point-in-time comparison.");
+  console.log(`${matched.length} markets matched to a live price within 10 days of smart money's entry this run`);
+
+  // Fold into the persisted history — resolved markets already recorded stay as-is (their outcome and
+  // matched price are fixed historical facts), new ones from this run get added. This is what makes
+  // the sample actually grow across runs instead of shifting with wallet_closed_positions' rolling window.
+  const history = loadHistory();
+  const before = history.size;
+  const now = new Date().toISOString();
+  for (const s of matched) {
+    if (history.has(s.conditionId)) continue;
+    history.set(s.conditionId, {
+      conditionId: s.conditionId,
+      smartPct: s.smartPct,
+      livePriceAtEntry: s.livePriceAtEntry,
+      actual: s.actual,
+      gap: s.gap,
+      daysEarly: s.daysEarly,
+      recordedAt: now
+    });
+  }
+  saveHistory(history);
+  console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)\n`);
+
+  const all = [...history.values()];
+  if (all.length === 0) {
+    console.log("Nothing recorded yet to score for the point-in-time comparison.");
     return;
   }
 
-  const smartBrierM = mean(matched.map((s) => brier(s.smartPct, s.actual)));
-  const liveBrierM = mean(matched.map((s) => brier(s.livePriceAtEntry, s.actual)));
-  console.log("\nMean Brier score, matched subset (smart money vs. the live price at the SAME time):");
-  console.log(`  smart money:        ${smartBrierM.toFixed(4)}`);
+  const smartBrierM = mean(all.map((s) => brier(s.smartPct, s.actual)));
+  const liveBrierM = mean(all.map((s) => brier(s.livePriceAtEntry, s.actual)));
+  console.log(`Mean Brier score, all recorded (smart money vs. the live price at the SAME time), n=${all.length}:`);
+  console.log(`  smart money:         ${smartBrierM.toFixed(4)}`);
   console.log(`  live price at entry: ${liveBrierM.toFixed(4)}`);
   console.log(smartBrierM < liveBrierM ? "  -> smart money forecast BETTER than the contemporaneous market." : "  -> the contemporaneous market forecast at least as well as smart money.");
 
@@ -391,7 +451,7 @@ async function main(): Promise<void> {
   // the original question was specifically about the BIGGEST divergences.
   console.log("\nSimulated return per $1 staked, buying smart money's tilt at the live price (min gap):");
   for (const minGap of [0, 0.05, 0.1, 0.2]) {
-    const trades = matched.filter((s) => Math.abs(s.gap) >= minGap);
+    const trades = all.filter((s) => Math.abs(s.gap) >= minGap);
     if (trades.length === 0) {
       console.log(`  >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
       continue;
