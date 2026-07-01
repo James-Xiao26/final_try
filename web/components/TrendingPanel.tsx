@@ -36,26 +36,33 @@ function startsIn(iso: string | null): string | null {
   return `starts in ${Math.floor(h / 24)}d`;
 }
 
-function LeanBar({ lean }: { lean: NonNullable<TrendingMarket["lean"]> }) {
-  const total = lean.yesCapital + lean.noCapital;
-  const yesShare = total > 0 ? (lean.yesCapital / total) * 100 : 50;
+// What smart money's track record implies the odds should be, vs. the live price already shown
+// above this in the card — the gap is the headline, not a money-distribution bar.
+function ConsensusRow({ consensus }: { consensus: NonNullable<TrendingMarket["consensus"]> }) {
+  const gapPts = consensus.gapPts;
+  const gapLabel =
+    gapPts === null
+      ? null
+      : Math.abs(gapPts) < 0.005
+        ? "in line with live odds"
+        : `${gapPts > 0 ? "+" : ""}${(gapPts * 100).toFixed(1)}pt vs live`;
 
   return (
-    <div className="tr-lean">
-      <div className="tr-lean-head">
-        <span className={`tr-lean-label ${lean.label === "YES" ? "yes" : lean.label === "NO" ? "no" : ""}`}>
-          {lean.label === "SPLIT" ? "SPLIT" : `${lean.label} leaning`}
+    <div className="tr-consensus">
+      <div className="tr-consensus-head">
+        <span className={`tr-consensus-label ${consensus.label === "YES" ? "yes" : consensus.label === "NO" ? "no" : ""}`}>
+          Smart Money {formatPercent(consensus.smartMoneyPct)}
         </span>
-        {lean.topRank !== null ? <span className="tr-lean-rank">Rank #{lean.topRank}</span> : null}
+        {consensus.topRank !== null ? <span className="tr-consensus-rank">Rank #{consensus.topRank}</span> : null}
       </div>
-      <div className="tr-lean-bar">
-        <i style={{ width: `${yesShare.toFixed(0)}%` }} />
-      </div>
-      <div className="tr-lean-amounts">
-        <span className="yes">{formatCompactUsd(lean.yesCapital)} YES</span>
-        <span className="no">{formatCompactUsd(lean.noCapital)} NO</span>
-      </div>
-      <span className="tr-lean-count">{lean.positionedCount} contact{lean.positionedCount !== 1 ? "s" : ""} positioned</span>
+      {gapLabel ? (
+        <span className={`tr-gap ${gapPts !== null && gapPts > 0 ? "up" : gapPts !== null && gapPts < 0 ? "down" : ""}`}>
+          {gapLabel}
+        </span>
+      ) : null}
+      <span className="tr-consensus-count">
+        {consensus.positionedCount} contact{consensus.positionedCount !== 1 ? "s" : ""} positioned
+      </span>
     </div>
   );
 }
@@ -79,7 +86,7 @@ function TrendingCard({ row }: { row: TrendingMarket }) {
         </div>
       ) : null}
       <div className="tr-vol">{row.volume24hrUsd !== null ? `${formatCompactUsd(row.volume24hrUsd)} vol · 24h` : null}</div>
-      {row.lean ? <LeanBar lean={row.lean} /> : <div className="tr-nolean muted">No tracked positioning yet</div>}
+      {row.consensus ? <ConsensusRow consensus={row.consensus} /> : <div className="tr-nolean muted">No tracked positioning yet</div>}
     </>
   );
 

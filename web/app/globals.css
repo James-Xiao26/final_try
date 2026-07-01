@@ -1852,15 +1852,13 @@ input:focus { border-color: var(--green) !important; }
 .tr-probar i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--bio-d), var(--green)); }
 .tr-vol { font-size: 10.5px; color: var(--muted); margin-bottom: 12px; }
 .tr-nolean { font-size: 11px; padding-top: 10px; border-top: 1px solid var(--line); }
-.tr-lean { padding-top: 10px; border-top: 1px solid var(--line); }
-.tr-lean-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.tr-lean-label { font-family: var(--font-plex-mono); font-weight: 700; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.tr-lean-label.yes { color: var(--green); }
-.tr-lean-label.no { color: var(--red); }
-.tr-lean-rank { font-size: 9.5px; color: var(--muted-d); }
-.tr-lean-bar { display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: rgba(255,122,89,0.25); margin-bottom: 6px; }
-.tr-lean-bar i { display: block; height: 100%; background: var(--green); }
-.tr-lean-amounts { display: flex; justify-content: space-between; font-family: var(--font-plex-mono); font-size: 10.5px; font-weight: 600; margin-bottom: 3px; }
-.tr-lean-amounts .yes { color: var(--green); }
-.tr-lean-amounts .no { color: var(--red); }
-.tr-lean-count { font-size: 9.5px; color: var(--muted-d); }
+.tr-consensus { padding-top: 10px; border-top: 1px solid var(--line); }
+.tr-consensus-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.tr-consensus-label { font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--muted); }
+.tr-consensus-label.yes { color: var(--green); }
+.tr-consensus-label.no { color: var(--red); }
+.tr-consensus-rank { font-size: 9.5px; color: var(--muted-d); white-space: nowrap; }
+.tr-gap { display: block; font-family: var(--font-plex-mono); font-size: 10.5px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.tr-gap.up { color: var(--green); }
+.tr-gap.down { color: var(--red); }
+.tr-consensus-count { font-size: 9.5px; color: var(--muted-d); }

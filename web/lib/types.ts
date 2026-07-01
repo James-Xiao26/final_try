@@ -365,13 +365,13 @@ export interface CrowdMarketDetail {
 
 // ── Trending markets (home page) ────────────────────────────────────────────
 
-// Dollar-weighted leaderboard lean on a trending market — open positions only, cost basis under
-// $10 excluded (a throwaway bet isn't "positioning"). Deliberately distinct from smartMoneyLean's
-// skill-weighted label: see web/lib/trendingMarkets.ts.
-export interface TrendingLean {
-  yesCapital: number;
-  noCapital: number;
-  label: "YES" | "NO" | "SPLIT";
+// What smart money's track record implies the odds should be, vs. the market's live price. Weighted
+// by skill score (dampened by sqrt(position size)) across open, non-dust (>= $10) positions — not a
+// dollar tally. See web/lib/trendingMarkets.ts.
+export interface TrendingConsensus {
+  smartMoneyPct: number; // 0-1, smart-money-weighted implied YES probability
+  gapPts: number | null; // smartMoneyPct - currentPrice (probability points, 0-1 scale); null if currentPrice unknown
+  label: "YES" | "NO" | "SPLIT"; // which side smart money's implied price leans, relative to 0.5
   topRank: number | null; // best (lowest) rank among the wallets counted
   positionedCount: number; // wallets counted (open, cost basis >= $10)
 }
@@ -388,7 +388,7 @@ export interface TrendingMarket {
   topOutcome: string | null;
   endDate: string | null;
   gameStartTime: string | null; // sports/esports only
-  lean: TrendingLean | null; // null = no tracked leaderboard positioning on this market
+  consensus: TrendingConsensus | null; // null = no tracked leaderboard positioning on this market
 }
 
 // ── Decision Engine ───────────────────────────────────────────────────────────

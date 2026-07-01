@@ -1,12 +1,13 @@
 import type { CrowdLookups, CrowdOpenPosition } from "./marketCrowd";
-import type { MarketRow, TrendingLean, TrendingMarket } from "./types";
+import type { MarketRow, TrendingConsensus, TrendingMarket } from "./types";
 
 // Home-page Trending panel. Selection is leaderboard-driven, not volume-driven: a market only
 // qualifies with TRENDING_MIN_PARTICIPANTS+ distinct wallets holding a real (non-dust) position, then
-// the qualifying set is ranked by how *actionable* it is right now (resolving soon, still near the
-// leaderboard's entry, and — sports/esports only — starting soon). All inputs are already scoped to
-// leaderboard wallets by the caller. Operates directly on CrowdOpenPosition — Trending only ever cares
-// about currently-open holdings, so it skips buildCrowdMarketDetail's open+closed+fills merge entirely.
+// the qualifying set is ranked by how *actionable* it is right now (resolving soon, still near what
+// smart money's track record implies, and — sports/esports only — starting soon). All inputs are
+// already scoped to leaderboard wallets by the caller. Operates directly on CrowdOpenPosition —
+// Trending only ever cares about currently-open holdings, so it skips buildCrowdMarketDetail's
+// open+closed+fills merge entirely.
 
 export const TRENDING_DUST_FLOOR_USD = 10;
 export const TRENDING_MIN_PARTICIPANTS = 5;
@@ -56,7 +57,8 @@ function groupByCondition(positions: CrowdOpenPosition[]): Map<string, CrowdOpen
 }
 
 // Markets with at least `minParticipants` distinct wallets holding a non-dust position — the hard gate
-// before any ranking happens.
+// before any ranking happens. Headcount-based on purpose (a separate concern from how those wallets
+// are weighted once a market qualifies).
 export function qualifyingConditionIds(
   positions: CrowdOpenPosition[],
   minParticipants = TRENDING_MIN_PARTICIPANTS
@@ -69,20 +71,31 @@ export function qualifyingConditionIds(
   return qualifying;
 }
 
-// Dollar-weighted mean YES-equivalent entry price across non-dust positions — "where did the
-// leaderboard actually get in?" Null only if nothing clears the dust floor (shouldn't happen for an
-// already-qualifying market).
-function weightedAvgEntry(rows: CrowdOpenPosition[]): number | null {
+// Weight a positioned wallet by proven skill, dampened by position size (sqrt, not linear) — a
+// highly-skilled trader's smaller conviction bet can outweigh a big bet from a middling one, but a
+// bigger bet from an equally-skilled trader still counts for a bit more. Pure $-weighting (v1) let an
+// unskilled whale dominate; pure skill-weighting ignores conviction size entirely — this splits the
+// difference. Only ever called on dust-floored rows.
+function smartMoneyWeight(p: CrowdOpenPosition, lookups: CrowdLookups): number {
+  const skill = Math.max(0, lookups.skillByAddress.get(p.address) ?? 0);
+  return skill * Math.sqrt(cost(p));
+}
+
+// Smart-money-weighted mean YES-equivalent entry price across non-dust positions — "what does the
+// leaderboard's track record imply the odds should be?", directly comparable to the market's live
+// price. Null only if nothing clears the dust floor (shouldn't happen for an already-qualifying
+// market) or every included wallet's weight rounds to 0.
+function smartMoneyImpliedPrice(rows: CrowdOpenPosition[], lookups: CrowdLookups): number | null {
   const positioned = rows.filter(isDustFloored);
   if (positioned.length === 0) return null;
-  let totalCost = 0;
+  let totalWeight = 0;
   let weighted = 0;
   for (const p of positioned) {
-    const c = cost(p);
-    totalCost += c;
-    weighted += c * yesEquivalentEntry(p);
+    const w = smartMoneyWeight(p, lookups);
+    totalWeight += w;
+    weighted += w * yesEquivalentEntry(p);
   }
-  return totalCost > 0 ? weighted / totalCost : null;
+  return totalWeight > 0 ? weighted / totalWeight : null;
 }
 
 // Decays 1 -> 0 as `days` grows; already-due (days <= 0) scores 1.
@@ -98,7 +111,12 @@ function daysUntil(iso: string, now: number): number {
 // terms, each only ever adds — a market missing one signal (no endDate, no gameStartTime) just scores
 // 0 on that term rather than being penalized, so non-sports markets aren't docked for lacking a
 // scheduled start time nobody has for them.
-export function scoreTrendingMarket(market: MarketRow, rows: CrowdOpenPosition[], now = Date.now()): number {
+export function scoreTrendingMarket(
+  market: MarketRow,
+  rows: CrowdOpenPosition[],
+  lookups: CrowdLookups,
+  now = Date.now()
+): number {
   let score = 0;
 
   if (market.endDate) {
@@ -106,9 +124,9 @@ export function scoreTrendingMarket(market: MarketRow, rows: CrowdOpenPosition[]
     if (Number.isFinite(days) && days > 0) score += proximityScore(days, RESOLVE_SOON_HALFLIFE_DAYS);
   }
 
-  const avgEntry = weightedAvgEntry(rows);
-  if (avgEntry !== null && market.currentPrice !== null) {
-    const gap = Math.abs(market.currentPrice - avgEntry);
+  const impliedPrice = smartMoneyImpliedPrice(rows, lookups);
+  if (impliedPrice !== null && market.currentPrice !== null) {
+    const gap = Math.abs(market.currentPrice - impliedPrice);
     score += Math.max(0, 1 - gap / NEAR_ENTRY_CENTS);
   }
 
@@ -120,24 +138,27 @@ export function scoreTrendingMarket(market: MarketRow, rows: CrowdOpenPosition[]
   return score;
 }
 
-function deriveLean(rows: CrowdOpenPosition[], lookups: CrowdLookups): TrendingLean | null {
+function deriveConsensus(
+  rows: CrowdOpenPosition[],
+  lookups: CrowdLookups,
+  currentPrice: number | null
+): TrendingConsensus | null {
   const positioned = rows.filter(isDustFloored);
   if (positioned.length === 0) return null;
 
-  let yesCapital = 0;
-  let noCapital = 0;
+  const smartMoneyPct = smartMoneyImpliedPrice(rows, lookups);
+  if (smartMoneyPct === null) return null;
+
   let topRank: number | null = null;
   for (const p of positioned) {
-    const c = cost(p);
-    if (p.outcomeIndex === 0) yesCapital += c;
-    else if (p.outcomeIndex === 1) noCapital += c;
     const rank = lookups.rankByAddress.get(p.address) ?? null;
     if (rank !== null && (topRank === null || rank < topRank)) topRank = rank;
   }
 
-  const label: TrendingLean["label"] = yesCapital > noCapital ? "YES" : noCapital > yesCapital ? "NO" : "SPLIT";
+  const label: TrendingConsensus["label"] = smartMoneyPct > 0.5 ? "YES" : smartMoneyPct < 0.5 ? "NO" : "SPLIT";
+  const gapPts = currentPrice !== null ? smartMoneyPct - currentPrice : null;
 
-  return { yesCapital, noCapital, label, topRank, positionedCount: positioned.length };
+  return { smartMoneyPct, gapPts, label, topRank, positionedCount: positioned.length };
 }
 
 // `markets` should already be the qualifying set (see qualifyingConditionIds) — this scores, sorts by
@@ -153,7 +174,7 @@ export function buildTrendingMarkets(
 
   const scored = markets.map((market) => {
     const rows = market.conditionId ? byCondition.get(market.conditionId) ?? [] : [];
-    return { market, rows, score: scoreTrendingMarket(market, rows, now) };
+    return { market, rows, score: scoreTrendingMarket(market, rows, lookups, now) };
   });
 
   scored.sort((a, b) => b.score - a.score);
@@ -170,6 +191,6 @@ export function buildTrendingMarkets(
     topOutcome: market.topOutcome,
     endDate: market.endDate,
     gameStartTime: market.gameStartTime,
-    lean: deriveLean(rows, lookups)
+    consensus: deriveConsensus(rows, lookups, market.currentPrice)
   }));
 }
