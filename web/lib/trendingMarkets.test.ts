@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildTrendingMarkets, TRENDING_DUST_FLOOR_USD } from "./trendingMarkets";
-import type { CrowdClosedPosition, CrowdLookups, CrowdOpenPosition } from "./marketCrowd";
+import {
+  buildTrendingMarkets,
+  qualifyingConditionIds,
+  scoreTrendingMarket,
+  TRENDING_DUST_FLOOR_USD
+} from "./trendingMarkets";
+import type { CrowdLookups, CrowdOpenPosition } from "./marketCrowd";
 import type { MarketRow } from "./types";
 
 function market(p: Partial<MarketRow>): MarketRow {
@@ -19,6 +24,7 @@ function market(p: Partial<MarketRow>): MarketRow {
     topOutcome: "Yes",
     oneDayPriceChange: null,
     endDate: null,
+    gameStartTime: null,
     image: null,
     ...p
   };
@@ -42,87 +48,143 @@ function open(p: Partial<CrowdOpenPosition>): CrowdOpenPosition {
   };
 }
 
-function closed(p: Partial<CrowdClosedPosition>): CrowdClosedPosition {
-  return {
-    address: "0xa",
-    conditionId: "c1",
-    outcomeIndex: 1,
-    market: "Will it rain?",
-    avgPrice: 0.3,
-    realizedPnl: 15,
-    size: 100,
-    closeTime: "2026-02-01T00:00:00.000Z",
-    firstTradedAt: null,
-    ...p
-  };
-}
-
 const lookups: CrowdLookups = {
-  rankByAddress: new Map([["0xa", 3], ["0xb", 1]]),
-  handleByAddress: new Map([["0xa", "alpha"], ["0xb", "beta"]]),
-  skillByAddress: new Map([["0xa", 9], ["0xb", 1]])
+  rankByAddress: new Map([["0xa", 1], ["0xb", 2], ["0xc", 3], ["0xd", 4], ["0xe", 5]]),
+  handleByAddress: new Map(),
+  skillByAddress: new Map()
 };
 
-test("a market with zero tracked participants still appears, with lean null", () => {
-  const [row] = buildTrendingMarkets([market({})], [], [], [], lookups);
-  assert.ok(row);
-  assert.equal(row.conditionId, "c1");
-  assert.equal(row.lean, null);
+// Five distinct wallets, each with a non-dust position on c1.
+function fiveWallets(overrides: Partial<CrowdOpenPosition> = {}): CrowdOpenPosition[] {
+  return ["0xa", "0xb", "0xc", "0xd", "0xe"].map((address) =>
+    open({ address, outcomeIndex: 0, size: 100, avgPrice: 0.5, ...overrides })
+  );
+}
+
+test("qualifyingConditionIds: 4 distinct wallets does not qualify, 5 does", () => {
+  const four = ["0xa", "0xb", "0xc", "0xd"].map((address) => open({ address }));
+  assert.equal(qualifyingConditionIds(four).size, 0);
+
+  const five = fiveWallets();
+  assert.deepEqual([...qualifyingConditionIds(five)], ["c1"]);
 });
 
-test("a sub-$10 position is excluded from the lean tally", () => {
-  // 20 shares @ 0.10 = $2, well under the floor.
-  const positions = [open({ address: "0xa", outcomeIndex: 0, size: 20, avgPrice: 0.1 })];
-  const [row] = buildTrendingMarkets([market({})], positions, [], [], lookups);
-  assert.equal(row?.lean, null);
-});
-
-test("a closed position is excluded even when well above the dust floor", () => {
-  const closedRows = [closed({ address: "0xa", outcomeIndex: 0, size: 1000, avgPrice: 0.5 })]; // $500
-  const [row] = buildTrendingMarkets([market({})], [], closedRows, [], lookups);
-  assert.equal(row?.lean, null);
-});
-
-test("dollar-weighted lean disagrees with skill-weighted: equal capital, mismatched skill -> SPLIT", () => {
+test("qualifyingConditionIds: dust positions don't count toward the participant floor", () => {
   const positions = [
-    open({ address: "0xa", outcomeIndex: 0, size: 1000, avgPrice: 0.5 }), // YES, skill 9, $500
-    open({ address: "0xb", outcomeIndex: 1, size: 1000, avgPrice: 0.5 })  // NO, skill 1, $500
+    ...fiveWallets(),
+    open({ address: "0xf", size: 5, avgPrice: 0.1 }) // $0.50, dust
   ];
-  const [row] = buildTrendingMarkets([market({})], positions, [], [], lookups);
-  assert.ok(row?.lean);
-  assert.equal(row.lean.yesCapital, 500);
-  assert.equal(row.lean.noCapital, 500);
-  assert.equal(row.lean.label, "SPLIT");
+  // Still exactly 5 qualifying wallets on c1 (the dust wallet doesn't push it to 6, but doesn't hurt either).
+  assert.deepEqual([...qualifyingConditionIds(positions)], ["c1"]);
+
+  // A market with only dust positions from 5 wallets doesn't qualify at all.
+  const allDust = ["0xa", "0xb", "0xc", "0xd", "0xe"].map((address) =>
+    open({ address, conditionId: "c2", size: 5, avgPrice: 0.1 })
+  );
+  assert.equal(qualifyingConditionIds(allDust).size, 0);
 });
 
-test("a position at exactly the dust floor is included (>= not >)", () => {
-  // 20 shares @ 0.50 = $10.00 exactly.
-  const positions = [open({ address: "0xa", outcomeIndex: 0, size: 20, avgPrice: 0.5 })];
-  const [row] = buildTrendingMarkets([market({})], positions, [], [], lookups);
-  assert.ok(row?.lean);
-  assert.equal(row.lean.yesCapital, TRENDING_DUST_FLOOR_USD);
-  assert.equal(row.lean.positionedCount, 1);
-});
-
-test("output order matches input market order, not re-sorted by lean or trader count", () => {
-  const markets = [
-    market({ id: "m1", conditionId: "c1", question: "First" }),
-    market({ id: "m2", conditionId: "c2", question: "Second" }),
-    market({ id: "m3", conditionId: "c3", question: "Third" })
+test("weightedAvgEntry (via scoreTrendingMarket's near-entry term) normalizes NO entries to YES-equivalent", () => {
+  // YES @ 0.60 ($60) and NO @ 0.60 ($60) -> YES-equivalent entries 0.60 and 0.40, blended = 0.50.
+  const rows = [
+    open({ address: "0xa", outcomeIndex: 0, size: 100, avgPrice: 0.6 }),
+    open({ address: "0xb", outcomeIndex: 1, size: 100, avgPrice: 0.6 })
   ];
-  // Give c3 the biggest leaderboard lean, c1 none — order should still be First, Second, Third.
-  const positions = [open({ address: "0xa", conditionId: "c3", outcomeIndex: 0, size: 10000, avgPrice: 0.9 })];
-  const rows = buildTrendingMarkets(markets, positions, [], [], lookups);
-  assert.deepEqual(rows.map((r) => r.market), ["First", "Second", "Third"]);
+  const atEntry = scoreTrendingMarket(market({ currentPrice: 0.5 }), rows);
+  const farFromEntry = scoreTrendingMarket(market({ currentPrice: 0.95 }), rows);
+  assert.ok(atEntry > farFromEntry);
+  // Current price exactly at the blended entry -> full near-entry credit (score == 1, no other terms set).
+  assert.equal(atEntry, 1);
 });
 
-test("topRank picks the best (lowest) rank among positioned wallets, ignoring dusted-out ones", () => {
+test("near-entry score decays to 0 by a 5c gap", () => {
+  const rows = fiveWallets({ outcomeIndex: 0, avgPrice: 0.5 });
+  const zeroGap = scoreTrendingMarket(market({ currentPrice: 0.5 }), rows);
+  const bigGap = scoreTrendingMarket(market({ currentPrice: 0.9 }), rows);
+  assert.equal(zeroGap, 1);
+  assert.equal(bigGap, 0);
+});
+
+test("resolve-soon score is high for an imminent endDate, ~0 for a far one, 0 for none", () => {
+  const now = Date.parse("2026-01-01T00:00:00.000Z");
+  const rows: CrowdOpenPosition[] = []; // isolate the resolve-soon term
+  const soon = scoreTrendingMarket(market({ endDate: "2026-01-01T01:00:00.000Z", currentPrice: null }), rows, now);
+  const far = scoreTrendingMarket(market({ endDate: "2026-02-01T00:00:00.000Z", currentPrice: null }), rows, now);
+  const none = scoreTrendingMarket(market({ endDate: null, currentPrice: null }), rows, now);
+  assert.ok(soon > 0.9);
+  assert.ok(far < 0.1);
+  assert.equal(none, 0);
+});
+
+test("start-soon score only applies to markets with a gameStartTime, doesn't penalize its absence", () => {
+  const now = Date.parse("2026-01-01T00:00:00.000Z");
+  const rows: CrowdOpenPosition[] = [];
+  const startsSoon = scoreTrendingMarket(
+    market({ endDate: null, currentPrice: null, gameStartTime: "2026-01-01T06:00:00.000Z" }),
+    rows,
+    now
+  );
+  const noGameStart = scoreTrendingMarket(market({ endDate: null, currentPrice: null, gameStartTime: null }), rows, now);
+  assert.ok(startsSoon > 0.5);
+  assert.equal(noGameStart, 0);
+});
+
+test("buildTrendingMarkets ranks by composite score, not volume", () => {
+  const now = Date.parse("2026-01-01T00:00:00.000Z");
+  const highVolumeButDecided = market({
+    id: "big",
+    conditionId: "big",
+    question: "Big but decided",
+    volume24hrUsd: 1_000_000,
+    currentPrice: 0.99,
+    endDate: "2026-06-01T00:00:00.000Z" // far off
+  });
+  const smallButActionable = market({
+    id: "small",
+    conditionId: "small",
+    question: "Small but hot",
+    volume24hrUsd: 100,
+    currentPrice: 0.5,
+    endDate: "2026-01-01T06:00:00.000Z" // resolves in hours
+  });
   const positions = [
-    open({ address: "0xa", outcomeIndex: 0, size: 1000, avgPrice: 0.5 }), // rank 3, $500
-    open({ address: "0xb", outcomeIndex: 0, size: 5, avgPrice: 0.1 })     // rank 1, $0.50 (dusted out)
+    ...fiveWallets({ conditionId: "big", outcomeIndex: 0, avgPrice: 0.99 }),
+    ...fiveWallets({ conditionId: "small", outcomeIndex: 0, avgPrice: 0.5 })
   ];
-  const [row] = buildTrendingMarkets([market({})], positions, [], [], lookups);
+  const rows = buildTrendingMarkets([highVolumeButDecided, smallButActionable], positions, lookups, 12, now);
+  assert.deepEqual(rows.map((r) => r.market), ["Small but hot", "Big but decided"]);
+});
+
+test("buildTrendingMarkets respects the limit after sorting", () => {
+  const markets = [market({ id: "a", conditionId: "a" }), market({ id: "b", conditionId: "b" }), market({ id: "c", conditionId: "c" })];
+  const positions = [
+    ...fiveWallets({ conditionId: "a" }),
+    ...fiveWallets({ conditionId: "b" }),
+    ...fiveWallets({ conditionId: "c" })
+  ];
+  const rows = buildTrendingMarkets(markets, positions, lookups, 2);
+  assert.equal(rows.length, 2);
+});
+
+test("lean is dollar-weighted and dust-floored, with topRank among positioned wallets only", () => {
+  const positions = [
+    ...fiveWallets({ outcomeIndex: 0, size: 100, avgPrice: 0.5 }), // $50 each, ranks 1-5
+    open({ address: "0xf", outcomeIndex: 1, size: 5, avgPrice: 0.1 }) // dust, NO side, unranked
+  ];
+  const [row] = buildTrendingMarkets([market({})], positions, lookups, 12);
   assert.ok(row?.lean);
-  assert.equal(row.lean.positionedCount, 1);
-  assert.equal(row.lean.topRank, 3);
+  assert.equal(row.lean.yesCapital, 250);
+  assert.equal(row.lean.noCapital, 0); // dust NO position excluded
+  assert.equal(row.lean.label, "YES");
+  assert.equal(row.lean.positionedCount, 5);
+  assert.equal(row.lean.topRank, 1);
+});
+
+test("a position at exactly the dust floor counts (>= not >)", () => {
+  const positions = ["0xa", "0xb", "0xc", "0xd", "0xe"].map((address) =>
+    open({ address, outcomeIndex: 0, size: 20, avgPrice: 0.5 }) // $10.00 exactly
+  );
+  assert.equal(positions[0]!.size * positions[0]!.avgPrice, TRENDING_DUST_FLOOR_USD);
+  const [row] = buildTrendingMarkets([market({})], positions, lookups, 12);
+  assert.equal(row?.lean?.positionedCount, 5);
 });

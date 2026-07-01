@@ -144,6 +144,9 @@ export interface MarketRow {
   topOutcome: string | null;
   oneDayPriceChange: number | null;
   endDate: string | null;
+  // Scheduled real-world start time — sports/esports only, null everywhere else (Polymarket has no
+  // equivalent for other categories). Powers the Trending panel's "starts soon" signal.
+  gameStartTime: string | null;
   image: string | null;
 }
 
@@ -384,6 +387,7 @@ export interface TrendingMarket {
   currentPrice: number | null;
   topOutcome: string | null;
   endDate: string | null;
+  gameStartTime: string | null; // sports/esports only
   lean: TrendingLean | null; // null = no tracked leaderboard positioning on this market
 }
 
@@ -718,6 +722,7 @@ export interface Database {
           outcomes: string[] | null;
           outcome_prices: number[] | null;
           end_date: string | null;
+          game_start_time: string | null;
           image: string | null;
           active: boolean;
           closed: boolean;
@@ -740,6 +745,7 @@ export interface Database {
           outcomes?: string[] | null;
           outcome_prices?: number[] | null;
           end_date?: string | null;
+          game_start_time?: string | null;
           image?: string | null;
           active?: boolean;
           closed?: boolean;
@@ -761,6 +767,7 @@ export interface Database {
           outcomes?: string[] | null;
           outcome_prices?: number[] | null;
           end_date?: string | null;
+          game_start_time?: string | null;
           image?: string | null;
           active?: boolean;
           closed?: boolean;

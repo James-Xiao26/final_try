@@ -283,6 +283,7 @@ interface Database {
           outcomes: string[] | null;
           outcome_prices: number[] | null;
           end_date: string | null;
+          game_start_time: string | null;
           image: string | null;
           active: boolean;
           closed: boolean;
@@ -305,6 +306,7 @@ interface Database {
           outcomes?: string[] | null;
           outcome_prices?: number[] | null;
           end_date?: string | null;
+          game_start_time?: string | null;
           image?: string | null;
           active?: boolean;
           closed?: boolean;
@@ -326,6 +328,7 @@ interface Database {
           outcomes?: string[] | null;
           outcome_prices?: number[] | null;
           end_date?: string | null;
+          game_start_time?: string | null;
           image?: string | null;
           active?: boolean;
           closed?: boolean;
@@ -1001,6 +1004,7 @@ async function ingestMarkets(supabase: SupabaseClient, client: PolymarketClient)
       last_trade_price: event.currentPrice,
       top_outcome: event.topOutcome,
       end_date: event.endDate,
+      game_start_time: event.gameStartTime,
       image: event.image,
       active: event.active,
       closed: event.closed,

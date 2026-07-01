@@ -10,7 +10,7 @@ import { buildCrowdMarketDetail, type CrowdClosedPosition, type CrowdLookups, ty
 import type { MarketAnalytics, MarketMeta, PriceLine, PricePoint, WhaleFillInput } from "./marketAnalytics";
 import { fetchEventCandidates, fetchLiveMarket, fetchLivePriceSeries, fetchLiveWalletDetail, type LiveMarket } from "./polymarketLive";
 import { summarizeResolvedMarkets } from "./resolvedMarkets";
-import { buildTrendingMarkets } from "./trendingMarkets";
+import { buildTrendingMarkets, qualifyingConditionIds, TRENDING_MIN_PARTICIPANTS } from "./trendingMarkets";
 
 type WalletRow = Database["public"]["Tables"]["wallets"]["Row"];
 type WalletStatsRow = Database["public"]["Tables"]["wallet_stats"]["Row"];
@@ -64,6 +64,7 @@ type MarketSelectRow = Pick<
   | "top_outcome"
   | "one_day_price_change"
   | "end_date"
+  | "game_start_time"
   | "image"
 >;
 
@@ -426,6 +427,29 @@ const MARKET_SORT_COLUMNS: Record<MarketSort, keyof MarketSelectRow> = {
   change: "one_day_price_change"
 };
 
+const MARKET_COLUMNS =
+  "id, condition_id, question, slug, category, liquidity_usd, volume_usd, volume_24hr_usd, volume_1wk_usd, last_trade_price, top_outcome, one_day_price_change, end_date, game_start_time, image";
+
+function mapMarketRow(row: MarketSelectRow): MarketRow {
+  return {
+    id: row.id,
+    conditionId: row.condition_id,
+    question: row.question,
+    slug: row.slug ?? "",
+    category: row.category,
+    liquidityUsd: toNumber(row.liquidity_usd),
+    volumeUsd: toNumber(row.volume_usd),
+    volume24hrUsd: toNumber(row.volume_24hr_usd),
+    volume1wkUsd: toNumber(row.volume_1wk_usd),
+    currentPrice: row.last_trade_price,
+    topOutcome: row.top_outcome,
+    oneDayPriceChange: row.one_day_price_change,
+    endDate: row.end_date,
+    gameStartTime: row.game_start_time,
+    image: row.image
+  };
+}
+
 export async function getMarkets(
   opts: { sort?: MarketSort; category?: string | null; limit?: number } = {}
 ): Promise<MarketRow[]> {
@@ -435,7 +459,7 @@ export async function getMarkets(
 
   let query = supabase
     .from("markets")
-    .select("id, condition_id, question, slug, category, liquidity_usd, volume_usd, volume_24hr_usd, volume_1wk_usd, last_trade_price, top_outcome, one_day_price_change, end_date, image")
+    .select(MARKET_COLUMNS)
     .eq("active", true)
     .eq("closed", false)
     .order(column, { ascending: false, nullsFirst: false })
@@ -456,22 +480,7 @@ export async function getMarkets(
   }
 
   const rows = (data ?? []) as unknown as MarketSelectRow[];
-  return rows.map((row) => ({
-    id: row.id,
-    conditionId: row.condition_id,
-    question: row.question,
-    slug: row.slug ?? "",
-    category: row.category,
-    liquidityUsd: toNumber(row.liquidity_usd),
-    volumeUsd: toNumber(row.volume_usd),
-    volume24hrUsd: toNumber(row.volume_24hr_usd),
-    volume1wkUsd: toNumber(row.volume_1wk_usd),
-    currentPrice: row.last_trade_price,
-    topOutcome: row.top_outcome,
-    oneDayPriceChange: row.one_day_price_change,
-    endDate: row.end_date,
-    image: row.image
-  }));
+  return rows.map(mapMarketRow);
 }
 
 function mapMetric(row: Database["public"]["Tables"]["wallet_stats"]["Row"]): WalletMetrics {
@@ -1220,38 +1229,57 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
 // exception getMarketAnalytics already relies on for one market, just fanned out to `limit` of them.
 export async function getTrendingMarkets(limit = 12): Promise<TrendingMarket[]> {
   const supabase = createSupabaseReadClient();
-  const markets = await getMarkets({ sort: "volume_24hr", limit });
+
+  // Wave 1: leaderboard addresses only — same reasoning as getDecisionEngineData (below):
+  // wallet_positions accumulates stale rows from wallets that have since fallen off the board (the
+  // ingest wipe-and-replace only deletes the *current* board's addresses before reinserting), so an
+  // unfiltered scan would silently pull in former wallets' holdings.
+  const { data: cacheData, error: cacheError } = await supabase.from("leaderboard_cache").select("address");
+  if (cacheError) {
+    if (isMissingSchemaError(cacheError)) return [];
+    throw cacheError;
+  }
+  const leaderboardAddresses = [...new Set((cacheData ?? []).map((row) => (row as { address: string }).address))];
+  if (leaderboardAddresses.length === 0) return [];
+
+  // Wave 2: every currently-open leaderboard position, board-scoped (bounded — ~100-200 wallets ×
+  // ~30 positions, not a table scan). One read backs everything downstream: which markets qualify
+  // (5+ non-dust wallets), how they're scored (resolve/near-entry/start timing), and the lean shown
+  // on each card.
+  const { rows: posRows, missing } = await fetchAllPaged((from, to) =>
+    supabase.from("wallet_positions").select(OPEN_POSITION_COLUMNS).in("address", leaderboardAddresses).range(from, to)
+  );
+  if (missing) return [];
+  const positions = (posRows as unknown as OpenPositionRowDb[]).map(toOpenPosition);
+
+  const qualifying = [...qualifyingConditionIds(positions, TRENDING_MIN_PARTICIPANTS)];
+  if (qualifying.length === 0) return [];
+
+  // Chunk the condition_id list (same CONDITION_ID_CHUNK pattern as getRecentLeaderboardTrades) —
+  // the qualifying-market count isn't bounded by anything we control, so keep each .in() URL well
+  // under PostgREST's header-length limit.
+  const CONDITION_ID_CHUNK = 60;
+  const marketRows: MarketSelectRow[] = [];
+  for (let i = 0; i < qualifying.length; i += CONDITION_ID_CHUNK) {
+    const chunk = qualifying.slice(i, i + CONDITION_ID_CHUNK);
+    const { rows } = await fetchAllPaged((from, to) =>
+      supabase
+        .from("markets")
+        .select(MARKET_COLUMNS)
+        .in("condition_id", chunk)
+        .eq("active", true)
+        .eq("closed", false)
+        .range(from, to)
+    );
+    marketRows.push(...(rows as unknown as MarketSelectRow[]));
+  }
+  const markets = marketRows.map(mapMarketRow);
   if (markets.length === 0) return [];
 
-  const conditionIds = [...new Set(markets.map((m) => m.conditionId).filter((id): id is string => id !== null))];
-  if (conditionIds.length === 0) {
-    return buildTrendingMarkets(markets, [], [], [], { rankByAddress: new Map(), handleByAddress: new Map(), skillByAddress: new Map() });
-  }
-
-  // Board-wallet rows across `limit` markets can exceed PostgREST's 1000-row cap, which truncates
-  // silently rather than erroring — page every one of these, same as getResolvedMarkets.
-  const [openRes, closedRes, fillsRes] = await Promise.all([
-    fetchAllPaged((from, to) =>
-      supabase.from("wallet_positions").select(OPEN_POSITION_COLUMNS).in("condition_id", conditionIds).range(from, to)
-    ),
-    fetchAllPaged((from, to) =>
-      supabase.from("wallet_closed_positions").select(CLOSED_POSITION_COLUMNS).in("condition_id", conditionIds).range(from, to)
-    ),
-    fetchAllPaged((from, to) =>
-      supabase.from("wallet_trades").select(CROWD_FILL_COLUMNS).in("condition_id", conditionIds).range(from, to)
-    )
-  ]);
-
-  const positions = (openRes.rows as unknown as OpenPositionRowDb[]).map(toOpenPosition);
-  const closed = (closedRes.rows as unknown as ClosedPositionRowDb[]).map(toClosedPosition);
-  const fills = (fillsRes.rows as unknown as CrowdFillRowDb[]).map(toCrowdFill);
-
-  const addresses = [
-    ...new Set([...positions.map((p) => p.address), ...closed.map((p) => p.address), ...fills.map((f) => f.address)])
-  ];
+  const addresses = [...new Set(positions.map((p) => p.address))];
   const lookups = await buildCrowdLookups(supabase, addresses);
 
-  return buildTrendingMarkets(markets, positions, closed, fills, lookups);
+  return buildTrendingMarkets(markets, positions, lookups, limit);
 }
 
 // ── Decision Engine data assembly ────────────────────────────────────────────

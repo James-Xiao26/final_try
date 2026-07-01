@@ -22,6 +22,19 @@ function resolvesIn(iso: string | null): string | null {
   return `resolves in ${d}d`;
 }
 
+// Relative time to a future scheduled game start (sports/esports only) — hour-granularity, since
+// these are always near-term when they show up at all.
+function startsIn(iso: string | null): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso) - Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const h = Math.floor(ms / 3_600_000);
+  if (h < 1) return "starts <1h";
+  if (h === 1) return "starts in 1h";
+  if (h < 24) return `starts in ${h}h`;
+  return `starts in ${Math.floor(h / 24)}d`;
+}
+
 function LeanBar({ lean }: { lean: NonNullable<TrendingMarket["lean"]> }) {
   const total = lean.yesCapital + lean.noCapital;
   const yesShare = total > 0 ? (lean.yesCapital / total) * 100 : 50;
@@ -52,10 +65,9 @@ function TrendingCard({ row }: { row: TrendingMarket }) {
       {row.image ? <img className="tr-img" src={row.image} alt="" /> : null}
       <div className="tr-cardhead">
         {row.category ? <span className="tr-cat">{row.category}</span> : null}
-        {(() => {
-          const soon = resolvesIn(row.endDate);
-          return soon ? <span className="tr-resolves">{soon}</span> : null;
-        })()}
+        <span className="tr-timing">
+          {startsIn(row.gameStartTime) ?? resolvesIn(row.endDate)}
+        </span>
       </div>
       <div className="tr-q">{row.market ?? "—"}</div>
       {row.currentPrice !== null ? (
@@ -85,6 +97,7 @@ function TrendingCard({ row }: { row: TrendingMarket }) {
 
 export default function TrendingPanel({ rows: initialRows }: TrendingPanelProps) {
   const [rows, setRows] = useState(initialRows);
+  const [loaded, setLoaded] = useState(initialRows.length > 0);
 
   // Self-heal empty/stale SSR data (e.g. a cold-Supabase-connection timeout baked into the ISR
   // cache), same pattern as RecentTradesFeed/ResolvedMarketsPanel.
@@ -95,7 +108,10 @@ export default function TrendingPanel({ rows: initialRows }: TrendingPanelProps)
       fetch("/api/trending")
         .then((response) => (response.ok ? (response.json() as Promise<TrendingMarket[]>) : Promise.reject(new Error("Trending request failed"))))
         .then((data) => {
-          if (active) setRows(data);
+          if (active) {
+            setRows(data);
+            setLoaded(true);
+          }
         })
         .catch(() => {
           /* keep last good data */
@@ -118,10 +134,14 @@ export default function TrendingPanel({ rows: initialRows }: TrendingPanelProps)
     <section className="act-feed tr-feed">
       <div className="act-feed-head">
         <h2>Trending <span className="g">Markets</span></h2>
-        <span className="meta">by 24h volume · leaderboard positioning</span>
+        <span className="meta">5+ board contacts · ranked by timing &amp; entry proximity</span>
       </div>
       {rows.length === 0 ? (
-        <p className="muted tr-empty">Loading trending markets…</p>
+        <p className="muted tr-empty">
+          {loaded
+            ? "No markets currently clear the 5+ leaderboard-participant bar — check back soon."
+            : "Loading trending markets…"}
+        </p>
       ) : (
         <div className="tr-strip">
           {rows.map((row, i) => (
