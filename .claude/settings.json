@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm --filter edgeboard-web test)",
+      "Bash(pnpm --filter edgeboard-scripts test)",
+      "Bash(pnpm --filter edgeboard-web typecheck)",
+      "Bash(pnpm --filter edgeboard-scripts typecheck)",
+      "Bash(pnpm --filter edgeboard-web exec tsc --noEmit)",
+      "Bash(heroku logs *)",
+      "Bash(heroku ps *)",
+      "Bash(heroku config:get *)",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__evaluate_script",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__list_console_messages",
+      "mcp__chrome-devtools__take_snapshot"
+    ]
+  }
+}
