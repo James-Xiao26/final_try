@@ -10,15 +10,15 @@ import type { ClosedPosition } from "./polymarket.js";
 // condition_id→category map from Gamma tags during ingest:markets and look up by conditionId,
 // falling back to keywords. Only worth it if title classification misfires on real data.
 
-export type Specialty = "Politics" | "Crypto" | "Sports" | "Economy" | "Geopolitics" | "Culture";
+export type Specialty = "Crypto" | "Sports" | "Economy" | "Geopolitics" | "Culture";
 
-// Ordered most-distinctive-first so an ambiguous title lands in the more specific bucket. Politics
-// is checked before Sports so "Trump vs Biden" is Politics (not matched by Sports' generic "vs"),
-// and before Geopolitics so a domestic-politics title isn't stolen by a stray country name.
+// Ordered most-distinctive-first so an ambiguous title lands in the more specific bucket.
+// Geopolitics (formerly split Politics/Geopolitics, merged since domestic and international
+// politics overlap too much to score separately) is checked before Sports so "Trump vs Biden"
+// lands in Geopolitics, not matched by Sports' generic "vs".
 const CATEGORY_KEYWORDS: ReadonlyArray<readonly [Specialty, readonly string[]]> = [
   ["Crypto", ["bitcoin", "btc", "ethereum", "eth", "solana", "sol", "crypto", "dogecoin", "doge", "xrp", "ripple", "binance", "coinbase", "nft", "memecoin", "altcoin", "blockchain", "stablecoin", "cardano"]],
-  ["Politics", ["trump", "biden", "harris", "election", "senate", "congress", "president", "presidential", "governor", "primary", "republican", "democrat", "gop", "ballot", "nominee", "impeach", "parliament", "prime minister", "referendum", "mayor", "cabinet"]],
-  ["Geopolitics", ["russia", "ukraine", "putin", "israel", "gaza", "hamas", "palestine", "iran", "china", "taiwan", "north korea", "war", "ceasefire", "nato", "invasion", "nuclear", "missile", "sanctions", "venezuela", "syria"]],
+  ["Geopolitics", ["trump", "biden", "harris", "election", "senate", "congress", "president", "presidential", "governor", "primary", "republican", "democrat", "gop", "ballot", "nominee", "impeach", "parliament", "prime minister", "referendum", "mayor", "cabinet", "russia", "ukraine", "putin", "israel", "gaza", "hamas", "palestine", "iran", "china", "taiwan", "north korea", "war", "ceasefire", "nato", "invasion", "nuclear", "missile", "sanctions", "venezuela", "syria"]],
   ["Economy", ["fed", "interest rate", "rate cut", "rate hike", "cpi", "inflation", "gdp", "recession", "jobs report", "unemployment", "treasury", "s&p", "nasdaq", "dow jones", "earnings", "tariff", "powell", "jerome powell"]],
   ["Sports", ["nba", "nfl", "nhl", "mlb", "ufc", "premier league", "world cup", "super bowl", "champions league", "playoff", "championship", "vs", "finals", "grand slam", "formula 1", "f1", "wnba", "la liga", "the masters"]],
   ["Culture", ["oscar", "oscars", "grammy", "emmy", "box office", "movie", "album", "time person", "elon", "taylor swift", "kanye", "celebrity", "tiktok", "rotten tomatoes", "pope", "royal", "netflix", "billboard"]]

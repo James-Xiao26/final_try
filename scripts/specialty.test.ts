@@ -35,7 +35,7 @@ function many(n: number, make: () => ClosedPosition): ClosedPosition[] {
 }
 
 test("classifyMarket buckets titles by keyword, null for unclassifiable", () => {
-  assert.equal(classifyMarket("Will Trump win Pennsylvania in the election?"), "Politics");
+  assert.equal(classifyMarket("Will Trump win Pennsylvania in the election?"), "Geopolitics");
   assert.equal(classifyMarket("Bitcoin above $100k by year end?"), "Crypto");
   assert.equal(classifyMarket("Lakers vs Celtics — who wins Game 7?"), "Sports");
   assert.equal(classifyMarket("Will the Fed cut the interest rate in March?"), "Economy");
@@ -46,24 +46,24 @@ test("classifyMarket buckets titles by keyword, null for unclassifiable", () => 
 
 test("word boundaries prevent substring false positives", () => {
   // "eth" must not match inside "ethics"; "vs" must not match inside "vsync".
-  assert.equal(classifyMarket("Senate ethics committee ruling?"), "Politics");
+  assert.equal(classifyMarket("Senate ethics committee ruling?"), "Geopolitics");
   assert.notEqual(classifyMarket("vsync display standard adopted?"), "Sports");
 });
 
-test("Politics is matched before Sports' generic 'vs'", () => {
-  assert.equal(classifyMarket("Trump vs Biden: who wins the debate?"), "Politics");
+test("Geopolitics is matched before Sports' generic 'vs'", () => {
+  assert.equal(classifyMarket("Trump vs Biden: who wins the debate?"), "Geopolitics");
 });
 
 test("walletSpecialty picks the strongest qualifying category", () => {
   const positions = [...many(10, () => winning("Trump 2024 election")), ...many(10, () => losing("Lakers vs Celtics"))];
-  // Politics: +edge, n=10 ≥ MIN; Sports: −edge, disqualified.
-  assert.equal(walletSpecialty(positions, CONFIG), "Politics");
+  // Geopolitics: +edge, n=10 ≥ MIN; Sports: −edge, disqualified.
+  assert.equal(walletSpecialty(positions, CONFIG), "Geopolitics");
 });
 
 test("walletSpecialty ranks by shrunk edge when multiple qualify", () => {
-  const politics = many(10, () => position({ market: "Senate race 2024", outcome: 1, avgPrice: 0.7 })); // +0.3
+  const geopolitics = many(10, () => position({ market: "Senate race 2024", outcome: 1, avgPrice: 0.7 })); // +0.3
   const crypto = many(10, () => position({ market: "Bitcoin to $100k", outcome: 1, avgPrice: 0.5 })); // +0.5
-  assert.equal(walletSpecialty([...politics, ...crypto], CONFIG), "Crypto");
+  assert.equal(walletSpecialty([...geopolitics, ...crypto], CONFIG), "Crypto");
 });
 
 test("walletSpecialty returns null below the sample floor", () => {
