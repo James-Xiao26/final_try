@@ -199,7 +199,6 @@ test("consensus is dust-floored, with topRank among positioned wallets only", ()
   assert.equal(row.consensus.label, "SPLIT"); // exactly 0.5
   assert.equal(row.consensus.positionedCount, 5);
   assert.equal(row.consensus.topRank, 1);
-  assert.equal(row.consensus.gapPts, 0); // implied price == live price
 });
 
 test("a position at exactly the dust floor counts (>= not >)", () => {
@@ -231,12 +230,10 @@ test("skill*sqrt(cost) weighting: a highly-skilled small position outweighs a bi
   assert.ok(row.consensus.smartMoneyPct < 0.7, `expected dampened pct < 0.7, got ${row.consensus.smartMoneyPct}`);
 });
 
-test("gapPts is null when the market has no live price, and signed vs. currentPrice otherwise", () => {
+test("smartMoneyPct is independent of the market's live price -- it's the leaderboard's own implied number, not a delta", () => {
   const positions = fiveWallets({ outcomeIndex: 0, avgPrice: 0.7 }); // smartMoneyPct == 0.7
   const noPriceRow = buildTrendingMarkets([market({ currentPrice: null })], positions, lookups, 12)[0];
-  assert.equal(noPriceRow?.consensus?.gapPts, null);
-
-  const bullishGap = buildTrendingMarkets([market({ currentPrice: 0.5 })], positions, lookups, 12)[0];
-  assert.ok(bullishGap?.consensus);
-  assert.ok(Math.abs(bullishGap.consensus.gapPts! - 0.2) < 1e-9); // smart money more bullish than the market
+  const withPriceRow = buildTrendingMarkets([market({ currentPrice: 0.2 })], positions, lookups, 12)[0];
+  assert.equal(noPriceRow?.consensus?.smartMoneyPct, 0.7);
+  assert.equal(withPriceRow?.consensus?.smartMoneyPct, 0.7);
 });

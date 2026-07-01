@@ -1858,7 +1858,4 @@ input:focus { border-color: var(--green) !important; }
 .tr-consensus-label.yes { color: var(--green); }
 .tr-consensus-label.no { color: var(--red); }
 .tr-consensus-rank { font-size: 9.5px; color: var(--muted-d); white-space: nowrap; }
-.tr-gap { display: block; font-family: var(--font-plex-mono); font-size: 10.5px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
-.tr-gap.up { color: var(--green); }
-.tr-gap.down { color: var(--red); }
 .tr-consensus-count { font-size: 9.5px; color: var(--muted-d); }

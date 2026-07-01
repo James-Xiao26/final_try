@@ -138,11 +138,7 @@ export function scoreTrendingMarket(
   return score;
 }
 
-function deriveConsensus(
-  rows: CrowdOpenPosition[],
-  lookups: CrowdLookups,
-  currentPrice: number | null
-): TrendingConsensus | null {
+function deriveConsensus(rows: CrowdOpenPosition[], lookups: CrowdLookups): TrendingConsensus | null {
   const positioned = rows.filter(isDustFloored);
   if (positioned.length === 0) return null;
 
@@ -156,9 +152,8 @@ function deriveConsensus(
   }
 
   const label: TrendingConsensus["label"] = smartMoneyPct > 0.5 ? "YES" : smartMoneyPct < 0.5 ? "NO" : "SPLIT";
-  const gapPts = currentPrice !== null ? smartMoneyPct - currentPrice : null;
 
-  return { smartMoneyPct, gapPts, label, topRank, positionedCount: positioned.length };
+  return { smartMoneyPct, label, topRank, positionedCount: positioned.length };
 }
 
 // `markets` should already be the qualifying set (see qualifyingConditionIds) — this scores, sorts by
@@ -191,6 +186,6 @@ export function buildTrendingMarkets(
     topOutcome: market.topOutcome,
     endDate: market.endDate,
     gameStartTime: market.gameStartTime,
-    consensus: deriveConsensus(rows, lookups, market.currentPrice)
+    consensus: deriveConsensus(rows, lookups)
   }));
 }

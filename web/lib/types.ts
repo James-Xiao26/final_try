@@ -370,7 +370,6 @@ export interface CrowdMarketDetail {
 // dollar tally. See web/lib/trendingMarkets.ts.
 export interface TrendingConsensus {
   smartMoneyPct: number; // 0-1, smart-money-weighted implied YES probability
-  gapPts: number | null; // smartMoneyPct - currentPrice (probability points, 0-1 scale); null if currentPrice unknown
   label: "YES" | "NO" | "SPLIT"; // which side smart money's implied price leans, relative to 0.5
   topRank: number | null; // best (lowest) rank among the wallets counted
   positionedCount: number; // wallets counted (open, cost basis >= $10)

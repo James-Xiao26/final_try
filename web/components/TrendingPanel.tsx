@@ -36,17 +36,10 @@ function startsIn(iso: string | null): string | null {
   return `starts in ${Math.floor(h / 24)}d`;
 }
 
-// What smart money's track record implies the odds should be, vs. the live price already shown
-// above this in the card — the gap is the headline, not a money-distribution bar.
+// What smart money's track record implies the odds should be — the live price is already shown
+// above this in the card, so the two numbers sit close together for an at-a-glance comparison
+// rather than a computed delta line.
 function ConsensusRow({ consensus }: { consensus: NonNullable<TrendingMarket["consensus"]> }) {
-  const gapPts = consensus.gapPts;
-  const gapLabel =
-    gapPts === null
-      ? null
-      : Math.abs(gapPts) < 0.005
-        ? "in line with live odds"
-        : `${gapPts > 0 ? "+" : ""}${(gapPts * 100).toFixed(1)}pt vs live`;
-
   return (
     <div className="tr-consensus">
       <div className="tr-consensus-head">
@@ -55,11 +48,6 @@ function ConsensusRow({ consensus }: { consensus: NonNullable<TrendingMarket["co
         </span>
         {consensus.topRank !== null ? <span className="tr-consensus-rank">Rank #{consensus.topRank}</span> : null}
       </div>
-      {gapLabel ? (
-        <span className={`tr-gap ${gapPts !== null && gapPts > 0 ? "up" : gapPts !== null && gapPts < 0 ? "down" : ""}`}>
-          {gapLabel}
-        </span>
-      ) : null}
       <span className="tr-consensus-count">
         {consensus.positionedCount} contact{consensus.positionedCount !== 1 ? "s" : ""} positioned
       </span>
