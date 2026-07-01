@@ -45,7 +45,18 @@
 // noisier than the classifier). Reported side by side with locked-v1 on the exact same markets for a
 // direct comparison. The locked smartPct/livePriceAtEntry/actual/gap fields are never touched by
 // this — if the experimental version doesn't measurably beat v1, nothing about the live feature
-// needs to change.
+// needs to change. RESULT: no measurable improvement (Brier 0.1177 -> 0.1175, noise-level) — kept
+// for the record, not shipped.
+//
+// v7: EXPERIMENTAL, isolated from v6 (one change at a time, so any effect is attributable). Tests
+// "conviction relative to the wallet's own norm" — a wallet that usually stakes $50 suddenly staking
+// $500 is a stronger signal than the same $500 from someone who always bets that big, since it's an
+// outlier *for them specifically*, not just a big number in isolation. confidenceMultiplier =
+// max(1, sqrt(thisBetCost / theirAvgDustFlooredCost)) — floored at 1 so a below-average bet is never
+// penalized, only above-average conviction is rewarded, and sqrt-dampened for the same reason the
+// base formula dampens raw cost (one outlier bet shouldn't run away with the number). Their average
+// is computed from their own dust-floored closed positions across the whole dataset, not just this
+// market.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -98,6 +109,7 @@ interface HistoryEntry {
   recordedAt: string; // when this run first captured it
   methodologyVersion: string;
   smartPctSpecialty?: number; // EXPERIMENTAL (v6) — not locked, may be absent on older entries
+  smartPctConfidence?: number; // EXPERIMENTAL (v7) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -276,6 +288,22 @@ async function main(): Promise<void> {
   ]);
   console.log(`${allClosed.length} closed-position rows, ${skillByAddress.size} leaderboard wallets, ${specialtyByAddress.size} with a specialty\n`);
 
+  // EXPERIMENTAL (v7): each wallet's own average dust-floored bet size, across their whole recorded
+  // history — the baseline "this bet is bigger than usual FOR THEM" is measured against. Dust-floored
+  // so a pile of $2 noise trades doesn't drag the average down and make every real bet look outsized.
+  const costSumByAddress = new Map<string, number>();
+  const costCountByAddress = new Map<string, number>();
+  for (const row of allClosed) {
+    const c = cost(row);
+    if (c < DUST_FLOOR_USD) continue;
+    costSumByAddress.set(row.address, (costSumByAddress.get(row.address) ?? 0) + c);
+    costCountByAddress.set(row.address, (costCountByAddress.get(row.address) ?? 0) + 1);
+  }
+  const avgCostByAddress = new Map<string, number>();
+  for (const [address, sum] of costSumByAddress) {
+    avgCostByAddress.set(address, sum / costCountByAddress.get(address)!);
+  }
+
   const byCondition = new Map<string, ClosedRow[]>();
   for (const row of allClosed) {
     if (!row.condition_id) continue;
@@ -289,6 +317,7 @@ async function main(): Promise<void> {
     smartPct: number;
     dollarPct: number;
     smartPctSpecialty: number; // EXPERIMENTAL (v6) — equals smartPct when no positioned wallet has a specialty match
+    smartPctConfidence: number; // EXPERIMENTAL (v7) — equals smartPct when no bet exceeds its wallet's own average
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -340,6 +369,8 @@ async function main(): Promise<void> {
     let dollarWeighted = 0;
     let specialtyWeight = 0;
     let specialtyWeighted = 0;
+    let confidenceWeight = 0;
+    let confidenceWeighted = 0;
     let dateWeight = 0;
     let dateWeighted = 0; // sum(weight * entry epoch ms) -> weighted-average entry date
     for (const row of positioned) {
@@ -355,6 +386,13 @@ async function main(): Promise<void> {
       const wSpecialty = isSpecialtyMatch ? w * SPECIALTY_BOOST : w;
       specialtyWeight += wSpecialty;
       specialtyWeighted += wSpecialty * yesEq;
+      // EXPERIMENTAL (v7): floored at 1 (below-average bets aren't penalized), sqrt-dampened (one
+      // outlier bet shouldn't run away with it) — see the header note.
+      const theirAvg = avgCostByAddress.get(row.address);
+      const confidenceMultiplier = theirAvg && theirAvg > 0 ? Math.max(1, Math.sqrt(c / theirAvg)) : 1;
+      const wConfidence = w * confidenceMultiplier;
+      confidenceWeight += wConfidence;
+      confidenceWeighted += wConfidence * yesEq;
       const entryMs = row.first_traded_at ? Date.parse(row.first_traded_at) : NaN;
       if (Number.isFinite(entryMs)) {
         dateWeight += w;
@@ -377,6 +415,7 @@ async function main(): Promise<void> {
       smartPct: smartWeighted / smartWeight,
       dollarPct: dollarWeighted / dollarWeight,
       smartPctSpecialty: specialtyWeight > 0 ? specialtyWeighted / specialtyWeight : smartWeighted / smartWeight,
+      smartPctConfidence: confidenceWeight > 0 ? confidenceWeighted / confidenceWeight : smartWeighted / smartWeight,
       actual,
       daysEarly,
       refEntryMs
@@ -522,29 +561,37 @@ async function main(): Promise<void> {
       daysEarly: s.daysEarly,
       recordedAt: now,
       methodologyVersion: METHODOLOGY_VERSION,
-      smartPctSpecialty: s.smartPctSpecialty
+      smartPctSpecialty: s.smartPctSpecialty,
+      smartPctConfidence: s.smartPctConfidence
     });
   }
   saveHistory(history);
   console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
 
-  // EXPERIMENTAL (v6) backfill: existing entries never got smartPctSpecialty (the field didn't exist
-  // yet). It doesn't touch any locked field, so it's safe to add retroactively for any entry whose
-  // underlying market is still represented in this run's samples (older ones may have aged out of
+  // EXPERIMENTAL (v6/v7) backfill: existing entries never got these fields (they didn't exist yet).
+  // Neither touches any locked field, so it's safe to add retroactively for any entry whose underlying
+  // market is still represented in this run's samples (older ones may have aged out of
   // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
-  // simply excluded from the experimental comparison below until/unless re-derivable).
+  // simply excluded from the experimental comparisons below until/unless re-derivable).
   const samplesByCondition = new Map(samples.map((s) => [s.conditionId, s]));
   let backfilled = 0;
   for (const entry of history.values()) {
-    if (entry.smartPctSpecialty !== undefined) continue;
     const sample = samplesByCondition.get(entry.conditionId);
     if (!sample) continue;
-    entry.smartPctSpecialty = sample.smartPctSpecialty;
-    backfilled += 1;
+    let changed = false;
+    if (entry.smartPctSpecialty === undefined) {
+      entry.smartPctSpecialty = sample.smartPctSpecialty;
+      changed = true;
+    }
+    if (entry.smartPctConfidence === undefined) {
+      entry.smartPctConfidence = sample.smartPctConfidence;
+      changed = true;
+    }
+    if (changed) backfilled += 1;
   }
   if (backfilled > 0) {
     saveHistory(history);
-    console.log(`${backfilled} existing entries backfilled with smartPctSpecialty`);
+    console.log(`${backfilled} existing entries backfilled with experimental fields`);
   }
   console.log();
 
@@ -624,6 +671,41 @@ async function main(): Promise<void> {
         continue;
       }
       const profits = trades.map((s) => (s.gapSpecialty >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  // ── EXPERIMENTAL (v7): bet-size-relative-to-the-wallet's-own-average weighted, compared head-to-
+  // head against locked v1 on the exact same entries — isolated from v6, one change at a time. ──
+  const withConfidence = currentVersionAll.filter((s) => s.smartPctConfidence !== undefined);
+  console.log(`\nEXPERIMENTAL: bet-size-vs-own-average weighted (sqrt-dampened, floored at 1x), n=${withConfidence.length}:`);
+  if (withConfidence.length === 0) {
+    console.log("  No entries have smartPctConfidence yet.");
+  } else {
+    const v1BrierSub = mean(withConfidence.map((s) => brier(s.smartPct, s.actual)));
+    const confidenceBrier = mean(withConfidence.map((s) => brier(s.smartPctConfidence!, s.actual)));
+    console.log(`  locked v1 Brier (same ${withConfidence.length} entries): ${v1BrierSub.toFixed(4)}`);
+    console.log(`  confidence-weighted Brier:                    ${confidenceBrier.toFixed(4)}`);
+    console.log(
+      confidenceBrier < v1BrierSub
+        ? "  -> confidence weighting improves on locked v1 on this sample."
+        : "  -> confidence weighting does NOT improve on locked v1 on this sample — not worth shipping as-is."
+    );
+
+    console.log("\n  Simulated return per $1 staked using the confidence-weighted tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withConfidence
+        .map((s) => ({ ...s, gapConfidence: s.smartPctConfidence! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapConfidence) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapConfidence >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
       const avgProfit = mean(profits);
       const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
       console.log(
