@@ -270,7 +270,7 @@ export interface Concentration {
   count: number;
 }
 
-function committedOf(p: CrowdParticipant): number {
+export function committedOf(p: CrowdParticipant): number {
   if (p.avgEntry !== null && p.size > 0) return p.avgEntry * p.size;
   if (p.value !== null) return Math.abs(p.value);
   return 0;

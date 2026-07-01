@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import type { ClosedTrade, CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, FreshEntrySummary, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, ResolvedMarket, WalletMetrics, WalletPosition, WalletProfile, WorldCupRow } from "./types";
+import type { ClosedTrade, CrowdedMarketSummary, CrowdMarketDetail, Database, EquityPoint, FreshEntrySummary, HorizonDays, LeaderboardRow, MarketRow, MarketSort, RecentTrade, RecentTradesFeed, ResolvedMarket, TrendingMarket, WalletMetrics, WalletPosition, WalletProfile, WorldCupRow } from "./types";
 import type { DELeaderboardEntry, DEMarket, DEPosition, DecisionEngineInputs } from "./decisionEngine";
 import { HORIZONS } from "./types";
 import { groupWalletTrades, applyClosedBasis } from "./walletTrades";
@@ -10,6 +10,7 @@ import { buildCrowdMarketDetail, type CrowdClosedPosition, type CrowdLookups, ty
 import type { MarketAnalytics, MarketMeta, PriceLine, PricePoint, WhaleFillInput } from "./marketAnalytics";
 import { fetchEventCandidates, fetchLiveMarket, fetchLivePriceSeries, fetchLiveWalletDetail, type LiveMarket } from "./polymarketLive";
 import { summarizeResolvedMarkets } from "./resolvedMarkets";
+import { buildTrendingMarkets } from "./trendingMarkets";
 
 type WalletRow = Database["public"]["Tables"]["wallets"]["Row"];
 type WalletStatsRow = Database["public"]["Tables"]["wallet_stats"]["Row"];
@@ -989,6 +990,43 @@ interface MarketMetaSelectRow {
 // leaderboard identity (`whaleFills`). The page derives every chart/metric from these via the pure
 // helpers in marketAnalytics.ts. Either of `meta`/`detail` may be null; only an all-empty result (no
 // market row AND no participation) is treated as "not found" by the page.
+// Identity lookups for a set of participating wallets (handle + best rank/skill across horizons).
+// Shared by getMarketAnalytics and getTrendingMarkets — both build CrowdLookups from raw addresses
+// the same way. (getResolvedMarkets has a similarly-shaped block but scopes handles to cache-confirmed
+// addresses only; left separate rather than unified into this, since that's a real behavior difference.)
+async function buildCrowdLookups(
+  supabase: ReturnType<typeof createSupabaseReadClient>,
+  addresses: string[]
+): Promise<CrowdLookups> {
+  const handleByAddress = new Map<string, string | null>();
+  const rankByAddress = new Map<string, number>();
+  const skillByAddress = new Map<string, number | null>();
+  if (addresses.length === 0) {
+    return { handleByAddress, rankByAddress, skillByAddress };
+  }
+
+  const [walletsRes, cacheRes] = await Promise.all([
+    supabase.from("wallets").select("address, handle").in("address", addresses),
+    supabase.from("leaderboard_cache").select("address, rank, skill_score").in("address", addresses)
+  ]);
+  if (walletsRes.error && !isMissingSchemaError(walletsRes.error)) throw walletsRes.error;
+  if (cacheRes.error && !isMissingSchemaError(cacheRes.error)) throw cacheRes.error;
+
+  ((walletsRes.data ?? []) as unknown as { address: string; handle: string | null }[]).forEach((row) =>
+    handleByAddress.set(row.address, row.handle)
+  );
+  ((cacheRes.data ?? []) as unknown as { address: string; rank: number; skill_score: number | null }[]).forEach((row) => {
+    const prevRank = rankByAddress.get(row.address);
+    if (prevRank === undefined || row.rank < prevRank) rankByAddress.set(row.address, row.rank);
+    const prevSkill = skillByAddress.get(row.address);
+    if (prevSkill === undefined || (row.skill_score !== null && (prevSkill === null || row.skill_score > prevSkill))) {
+      skillByAddress.set(row.address, row.skill_score);
+    }
+  });
+
+  return { handleByAddress, rankByAddress, skillByAddress };
+}
+
 export async function getMarketAnalytics(conditionId: string): Promise<MarketAnalytics> {
   const supabase = createSupabaseReadClient();
 
@@ -1044,30 +1082,7 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
     ...new Set([...positions.map((p) => p.address), ...closed.map((p) => p.address), ...fills.map((f) => f.address)])
   ];
 
-  // Identity lookups for the participating wallets (handle + best rank/skill across horizons).
-  const handleByAddress = new Map<string, string | null>();
-  const rankByAddress = new Map<string, number>();
-  const skillByAddress = new Map<string, number | null>();
-  if (addresses.length > 0) {
-    const [walletsRes, cacheRes] = await Promise.all([
-      supabase.from("wallets").select("address, handle").in("address", addresses),
-      supabase.from("leaderboard_cache").select("address, rank, skill_score").in("address", addresses)
-    ]);
-    if (walletsRes.error && !isMissingSchemaError(walletsRes.error)) throw walletsRes.error;
-    if (cacheRes.error && !isMissingSchemaError(cacheRes.error)) throw cacheRes.error;
-
-    ((walletsRes.data ?? []) as unknown as { address: string; handle: string | null }[]).forEach((row) =>
-      handleByAddress.set(row.address, row.handle)
-    );
-    ((cacheRes.data ?? []) as unknown as { address: string; rank: number; skill_score: number | null }[]).forEach((row) => {
-      const prevRank = rankByAddress.get(row.address);
-      if (prevRank === undefined || row.rank < prevRank) rankByAddress.set(row.address, row.rank);
-      const prevSkill = skillByAddress.get(row.address);
-      if (prevSkill === undefined || (row.skill_score !== null && (prevSkill === null || row.skill_score > prevSkill))) {
-        skillByAddress.set(row.address, row.skill_score);
-      }
-    });
-  }
+  const { handleByAddress, rankByAddress, skillByAddress } = await buildCrowdLookups(supabase, addresses);
 
   // Daily YES price series, two sources (best-effort). Preferred: the listed-market series keyed by
   // condition_id (ingest caches the leading market's YES token there, so every Markets-page market has
@@ -1197,6 +1212,46 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
   }));
 
   return { conditionId, meta: resolvedMeta, detail, priceRows, whaleFills, extraLines, primaryLabel };
+}
+
+// Home-page Trending panel: the `limit` currently-hottest markets by 24h volume, plus how the
+// leaderboard is positioned on each (see trendingMarkets.ts). Read-time aggregation scoped to a
+// small, known set of condition_ids (from getMarkets' own indexed order+limit) — the same read-time
+// exception getMarketAnalytics already relies on for one market, just fanned out to `limit` of them.
+export async function getTrendingMarkets(limit = 12): Promise<TrendingMarket[]> {
+  const supabase = createSupabaseReadClient();
+  const markets = await getMarkets({ sort: "volume_24hr", limit });
+  if (markets.length === 0) return [];
+
+  const conditionIds = [...new Set(markets.map((m) => m.conditionId).filter((id): id is string => id !== null))];
+  if (conditionIds.length === 0) {
+    return buildTrendingMarkets(markets, [], [], [], { rankByAddress: new Map(), handleByAddress: new Map(), skillByAddress: new Map() });
+  }
+
+  // Board-wallet rows across `limit` markets can exceed PostgREST's 1000-row cap, which truncates
+  // silently rather than erroring — page every one of these, same as getResolvedMarkets.
+  const [openRes, closedRes, fillsRes] = await Promise.all([
+    fetchAllPaged((from, to) =>
+      supabase.from("wallet_positions").select(OPEN_POSITION_COLUMNS).in("condition_id", conditionIds).range(from, to)
+    ),
+    fetchAllPaged((from, to) =>
+      supabase.from("wallet_closed_positions").select(CLOSED_POSITION_COLUMNS).in("condition_id", conditionIds).range(from, to)
+    ),
+    fetchAllPaged((from, to) =>
+      supabase.from("wallet_trades").select(CROWD_FILL_COLUMNS).in("condition_id", conditionIds).range(from, to)
+    )
+  ]);
+
+  const positions = (openRes.rows as unknown as OpenPositionRowDb[]).map(toOpenPosition);
+  const closed = (closedRes.rows as unknown as ClosedPositionRowDb[]).map(toClosedPosition);
+  const fills = (fillsRes.rows as unknown as CrowdFillRowDb[]).map(toCrowdFill);
+
+  const addresses = [
+    ...new Set([...positions.map((p) => p.address), ...closed.map((p) => p.address), ...fills.map((f) => f.address)])
+  ];
+  const lookups = await buildCrowdLookups(supabase, addresses);
+
+  return buildTrendingMarkets(markets, positions, closed, fills, lookups);
 }
 
 // ── Decision Engine data assembly ────────────────────────────────────────────

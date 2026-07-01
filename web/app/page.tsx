@@ -1,7 +1,8 @@
 import FreshEntriesPanel from "@/components/FreshEntriesPanel";
 import RecentTradesFeed from "@/components/RecentTradesFeed";
 import ResolvedMarketsPanel from "@/components/ResolvedMarketsPanel";
-import { getRecentLeaderboardTrades, getResolvedMarkets, withTimeout } from "@/lib/supabase";
+import TrendingPanel from "@/components/TrendingPanel";
+import { getRecentLeaderboardTrades, getResolvedMarkets, getTrendingMarkets, withTimeout } from "@/lib/supabase";
 
 // 10 min: the feed/resolved data only changes on the ~10-min feed cron and the daily full ingest,
 // and building the feed scans the position cache — regenerating more often just burns Supabase
@@ -15,9 +16,10 @@ export default async function HomePage() {
   // Fresh Contacts is gated (signed-in only), so its data is NOT fetched here — it would otherwise
   // be baked into the public cached HTML. The panel fetches it client-side from the auth-gated API
   // once the user is signed in. (Convergence moved to the /decision "Signals" page.)
-  const [{ positions, traderCount }, resolvedMarkets] = await Promise.all([
+  const [{ positions, traderCount }, resolvedMarkets, trending] = await Promise.all([
     withTimeout(getRecentLeaderboardTrades(), 1500, { positions: [], traderCount: 0 }).catch(() => ({ positions: [], traderCount: 0 })),
-    withTimeout(getResolvedMarkets(), 1500, []).catch(() => [])
+    withTimeout(getResolvedMarkets(), 1500, []).catch(() => []),
+    withTimeout(getTrendingMarkets(), 1500, []).catch(() => [])
   ]);
 
   return (
@@ -31,6 +33,8 @@ export default async function HomePage() {
         </div>
         <span className="act-live"><span className="dot" /> Live · Last 24h</span>
       </div>
+
+      <TrendingPanel rows={trending} />
 
       <RecentTradesFeed initialPositions={positions} initialTraderCount={traderCount} />
 

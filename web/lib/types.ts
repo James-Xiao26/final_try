@@ -360,6 +360,33 @@ export interface CrowdMarketDetail {
   timeline: CrowdTimelinePoint[];
 }
 
+// ── Trending markets (home page) ────────────────────────────────────────────
+
+// Dollar-weighted leaderboard lean on a trending market — open positions only, cost basis under
+// $10 excluded (a throwaway bet isn't "positioning"). Deliberately distinct from smartMoneyLean's
+// skill-weighted label: see web/lib/trendingMarkets.ts.
+export interface TrendingLean {
+  yesCapital: number;
+  noCapital: number;
+  label: "YES" | "NO" | "SPLIT";
+  topRank: number | null; // best (lowest) rank among the wallets counted
+  positionedCount: number; // wallets counted (open, cost basis >= $10)
+}
+
+export interface TrendingMarket {
+  conditionId: string | null;
+  market: string | null; // question
+  slug: string;
+  category: string | null;
+  image: string | null;
+  liquidityUsd: number | null;
+  volume24hrUsd: number | null;
+  currentPrice: number | null;
+  topOutcome: string | null;
+  endDate: string | null;
+  lean: TrendingLean | null; // null = no tracked leaderboard positioning on this market
+}
+
 // ── Decision Engine ───────────────────────────────────────────────────────────
 
 // One of six signals that contribute to a recommendation's confidence.
