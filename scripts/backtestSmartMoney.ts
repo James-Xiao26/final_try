@@ -7,11 +7,19 @@
 //
 // v1 (aggregate Brier score + conviction buckets) found high-conviction predictions 98% accurate —
 // but that's confounded: a position entered the day before resolution on an already-obvious outcome
-// isn't insight, it's just riding a market that already converged. v2 adds a lead-time breakdown
-// (skill*sqrt(cost)-weighted entry date vs. resolution date) to separate "saw it early" from "piled
-// on late" — ponytail: this reuses first_traded_at (already in the table) rather than reconstructing
-// a point-in-time live price from market_price_history, which would need YES/NO token disambiguation
-// closed positions don't retain (a real v3, not a simplest-version one).
+// isn't insight, it's just riding a market that already converged. v2 added a lead-time breakdown to
+// separate "saw it early" from "piled on late" (it held up — accuracy didn't erode with more lead
+// time). Neither v1 nor v2 answers the actual bankroll question though, since both compare smart
+// money's price only to the FINAL outcome, never to what the market was showing at the same moment.
+//
+// v3 does that: pulls market_price_history (daily, keyed by outcome TOKEN not YES/NO side — closed
+// positions don't retain which token they held, so there's no direct join) and disambiguates which
+// token is YES using the market's *already-known* actual outcome as ground truth — whichever token's
+// price ended near 1 represents the outcome that happened; cross-referencing that against the
+// independently-derived winner (from the closed-positions voting, not from price data) tells us
+// which token is index 0 (YES) without needing any external token-id mapping. Then: look up the
+// price nearest smart money's weighted entry date, compare, and simulate "buy the side smart money
+// diverges from the market on, at the market's price" across all qualifying markets.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
@@ -87,6 +95,94 @@ function yesEquivalentEntry(row: ClosedRow): number {
   return row.outcome_index === 1 ? 1 - (row.avg_price ?? 0) : row.avg_price ?? 0;
 }
 
+interface PriceRow {
+  asset: string;
+  condition_id: string | null;
+  ts: string; // UTC calendar day
+  price: number;
+}
+
+// market_price_history has no index on condition_id (only (asset, ts)), so a .in("condition_id", ...)
+// filter forces a full-table scan per chunk and hits Supabase's statement timeout on a table this size
+// (342k+ rows). Sequential unfiltered paging (PK-ordered, cheap) + client-side filtering avoids that —
+// one full read instead of many expensive filtered ones.
+async function fetchPriceHistory(conditionIds: string[]): Promise<PriceRow[]> {
+  const wanted = new Set(conditionIds);
+  const rows: PriceRow[] = [];
+  const PAGE = 1000;
+  let pages = 0;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("market_price_history")
+      .select("asset, condition_id, ts, price")
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as PriceRow[];
+    for (const row of batch) {
+      if (row.condition_id && wanted.has(row.condition_id)) rows.push(row);
+    }
+    pages += 1;
+    if (pages % 50 === 0) console.log(`  ...scanned ${pages * PAGE} price rows`);
+    if (batch.length < PAGE) break;
+  }
+  return rows;
+}
+
+// market_price_history is keyed by outcome TOKEN, not YES/NO side, and there's no token<->outcome_index
+// mapping available for closed positions. Disambiguate using the market's already-known actual outcome
+// (from the closed-positions vote, a separate source): whichever token's price ended near 1 represents
+// whatever *actually happened* — cross-referencing that against `actual` tells us if that token is
+// outcome_index 0 (YES) or 1 (NO), non-circularly. Tokens whose final price never settled near 0 or 1
+// (thin/stale caching) are dropped rather than guessed at.
+function buildYesPriceSeries(priceRows: PriceRow[], actual: number): Map<string, number> | null {
+  const byAsset = new Map<string, PriceRow[]>();
+  for (const row of priceRows) {
+    const group = byAsset.get(row.asset);
+    if (group) group.push(row);
+    else byAsset.set(row.asset, [row]);
+  }
+
+  // day -> [sum of yes-equivalent prices, count] across however many usable tokens exist that day
+  const sums = new Map<string, [number, number]>();
+  for (const assetRows of byAsset.values()) {
+    const sorted = [...assetRows].sort((a, b) => a.ts.localeCompare(b.ts));
+    const finalPrice = sorted[sorted.length - 1]?.price;
+    if (finalPrice === undefined) continue;
+    const tokenWon = finalPrice >= 0.97;
+    const tokenLost = finalPrice <= 0.03;
+    if (!tokenWon && !tokenLost) continue; // never settled — can't tell which side this token was
+    const tokenIsYes = (tokenWon && actual === 1) || (tokenLost && actual === 0);
+    for (const row of sorted) {
+      const yesEquiv = tokenIsYes ? row.price : 1 - row.price;
+      const prev = sums.get(row.ts);
+      if (prev) {
+        prev[0] += yesEquiv;
+        prev[1] += 1;
+      } else {
+        sums.set(row.ts, [yesEquiv, 1]);
+      }
+    }
+  }
+  if (sums.size === 0) return null;
+
+  const series = new Map<string, number>();
+  for (const [day, [sum, count]] of sums) series.set(day, sum / count);
+  return series;
+}
+
+// Nearest available day within `toleranceDays` — daily cache rows aren't guaranteed for every single
+// day (gaps happen), so exact-day lookups would drop too many otherwise-usable markets.
+function nearestPrice(series: Map<string, number>, targetMs: number, toleranceDays = 10): number | null {
+  let best: { price: number; diffDays: number } | null = null;
+  for (const [day, price] of series) {
+    const diffDays = Math.abs(Date.parse(day) - targetMs) / 86_400_000;
+    if (diffDays <= toleranceDays && (best === null || diffDays < best.diffDays)) {
+      best = { price, diffDays };
+    }
+  }
+  return best?.price ?? null;
+}
+
 async function main(): Promise<void> {
   console.log("Fetching closed positions + leaderboard skill scores...");
   const [allClosed, skillByAddress] = await Promise.all([fetchAllClosedPositions(), fetchSkillByAddress()]);
@@ -101,14 +197,16 @@ async function main(): Promise<void> {
   }
 
   interface Sample {
+    conditionId: string;
     smartPct: number;
     dollarPct: number;
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
+    refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
   }
   const samples: Sample[] = [];
 
-  for (const rows of byCondition.values()) {
+  for (const [conditionId, rows] of byCondition.entries()) {
     // Determine the market's actual resolved outcome by majority vote among confirmed exits
     // (same approach as web/lib/resolvedMarkets.ts summarizeResolvedMarkets). Also take the latest
     // close_time among confirmed rows as the resolution date — an early-sold row's close_time is
@@ -168,12 +266,20 @@ async function main(): Promise<void> {
     // Lead time = how many days before resolution smart money's (weighted) entry was — the proxy
     // for "did they see it early" vs. "did they pile onto an already-obvious outcome late."
     let daysEarly: number | null = null;
+    let refEntryMs: number | null = null;
     if (dateWeight > 0 && Number.isFinite(resolutionMs)) {
-      const entryMs = dateWeighted / dateWeight;
-      daysEarly = (resolutionMs - entryMs) / 86_400_000;
+      refEntryMs = dateWeighted / dateWeight;
+      daysEarly = (resolutionMs - refEntryMs) / 86_400_000;
     }
 
-    samples.push({ smartPct: smartWeighted / smartWeight, dollarPct: dollarWeighted / dollarWeight, actual, daysEarly });
+    samples.push({
+      conditionId,
+      smartPct: smartWeighted / smartWeight,
+      dollarPct: dollarWeighted / dollarWeight,
+      actual,
+      daysEarly,
+      refEntryMs
+    });
   }
 
   console.log(`${samples.length} resolved markets clear the 5-participant / $10 floor\n`);
@@ -234,6 +340,71 @@ async function main(): Promise<void> {
     const b = mean(bucket.map((s) => brier(s.smartPct, s.actual)));
     const a = accuracy(bucket.map((s) => s.smartPct), bucket.map((s) => s.actual));
     console.log(`  >=${minDays}d early: n=${bucket.length}, brier=${b.toFixed(4)}, accuracy=${(a * 100).toFixed(1)}%`);
+  }
+
+  // ── v3: the actual bankroll question — compare smart money's price to the LIVE market price at
+  // the same point in time, not to the final outcome. ──────────────────────────────────────────
+  console.log("\nFetching market_price_history for the point-in-time comparison...");
+  const conditionIds = [...new Set(samples.map((s) => s.conditionId))];
+  const priceRows = await fetchPriceHistory(conditionIds);
+  console.log(`${priceRows.length} price rows across ${conditionIds.length} markets`);
+
+  const priceRowsByCondition = new Map<string, PriceRow[]>();
+  for (const row of priceRows) {
+    if (!row.condition_id) continue;
+    const group = priceRowsByCondition.get(row.condition_id);
+    if (group) group.push(row);
+    else priceRowsByCondition.set(row.condition_id, [row]);
+  }
+
+  interface MatchedSample extends Sample {
+    livePriceAtEntry: number;
+    gap: number; // smartPct - livePriceAtEntry
+  }
+  const matched: MatchedSample[] = [];
+  for (const s of samples) {
+    if (s.refEntryMs === null) continue;
+    const rows = priceRowsByCondition.get(s.conditionId);
+    if (!rows) continue;
+    const series = buildYesPriceSeries(rows, s.actual);
+    if (!series) continue;
+    const livePriceAtEntry = nearestPrice(series, s.refEntryMs);
+    if (livePriceAtEntry === null) continue;
+    matched.push({ ...s, livePriceAtEntry, gap: s.smartPct - livePriceAtEntry });
+  }
+
+  console.log(`\n${matched.length} markets matched to a live price within 10 days of smart money's entry`);
+  if (matched.length === 0) {
+    console.log("Nothing to score for the point-in-time comparison.");
+    return;
+  }
+
+  const smartBrierM = mean(matched.map((s) => brier(s.smartPct, s.actual)));
+  const liveBrierM = mean(matched.map((s) => brier(s.livePriceAtEntry, s.actual)));
+  console.log("\nMean Brier score, matched subset (smart money vs. the live price at the SAME time):");
+  console.log(`  smart money:        ${smartBrierM.toFixed(4)}`);
+  console.log(`  live price at entry: ${liveBrierM.toFixed(4)}`);
+  console.log(smartBrierM < liveBrierM ? "  -> smart money forecast BETTER than the contemporaneous market." : "  -> the contemporaneous market forecast at least as well as smart money.");
+
+  // The real test: simulate buying the side smart money diverges from the market on, AT the market's
+  // price at that time, only when the gap clears a threshold — across increasing thresholds, since
+  // the original question was specifically about the BIGGEST divergences.
+  console.log("\nSimulated return per $1 staked, buying smart money's tilt at the live price (min gap):");
+  for (const minGap of [0, 0.05, 0.1, 0.2]) {
+    const trades = matched.filter((s) => Math.abs(s.gap) >= minGap);
+    if (trades.length === 0) {
+      console.log(`  >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+      continue;
+    }
+    const profits = trades.map((s) => {
+      if (s.gap >= 0) return s.actual - s.livePriceAtEntry; // bought YES at livePriceAtEntry
+      return s.livePriceAtEntry - s.actual; // bought NO at (1 - livePriceAtEntry), payout (1-actual)
+    });
+    const avgProfit = mean(profits);
+    const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+    console.log(
+      `  >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+    );
   }
 }
 
