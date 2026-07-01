@@ -1858,4 +1858,5 @@ input:focus { border-color: var(--green) !important; }
 .tr-consensus-label.yes { color: var(--green); }
 .tr-consensus-label.no { color: var(--red); }
 .tr-consensus-rank { font-size: 9.5px; color: var(--muted-d); white-space: nowrap; }
+.tr-consensus-live { display: block; font-size: 10.5px; color: var(--muted); margin-bottom: 4px; }
 .tr-consensus-count { font-size: 9.5px; color: var(--muted-d); }

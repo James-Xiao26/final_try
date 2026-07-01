@@ -36,10 +36,31 @@ function startsIn(iso: string | null): string | null {
   return `starts in ${Math.floor(h / 24)}d`;
 }
 
-// What smart money's track record implies the odds should be — the live price is already shown
-// above this in the card, so the two numbers sit close together for an at-a-glance comparison
-// rather than a computed delta line.
-function ConsensusRow({ consensus }: { consensus: NonNullable<TrendingMarket["consensus"]> }) {
+// smartMoneyPct is always YES-equivalent, but the price row above shows whichever side currently
+// *leads* (topOutcome can be "No", or a grouped event's favored candidate) — Polymarket's own
+// convention, and correct on its own, but not directly comparable to a YES-oriented number. Re-derive
+// a YES-consistent price here so the two percentages in this row are always on the same scale: a
+// plain-binary "No"-leading market gets inverted (1 - currentPrice); "Yes" and grouped-candidate
+// labels (already YES-oriented per how they're computed) pass through unchanged.
+function yesEquivalentLivePrice(currentPrice: number | null, topOutcome: string | null): number | null {
+  if (currentPrice === null) return null;
+  if (topOutcome?.toLowerCase() === "no") return 1 - currentPrice;
+  return currentPrice;
+}
+
+// What smart money's track record implies the odds should be, next to a YES-consistent live price —
+// both on the same scale, so this row alone is a fair comparison regardless of which side the price
+// row above (which keeps Polymarket's own "leading side" framing) happens to be showing.
+function ConsensusRow({
+  consensus,
+  currentPrice,
+  topOutcome
+}: {
+  consensus: NonNullable<TrendingMarket["consensus"]>;
+  currentPrice: number | null;
+  topOutcome: string | null;
+}) {
+  const yesPrice = yesEquivalentLivePrice(currentPrice, topOutcome);
   return (
     <div className="tr-consensus">
       <div className="tr-consensus-head">
@@ -48,6 +69,7 @@ function ConsensusRow({ consensus }: { consensus: NonNullable<TrendingMarket["co
         </span>
         {consensus.topRank !== null ? <span className="tr-consensus-rank">Rank #{consensus.topRank}</span> : null}
       </div>
+      {yesPrice !== null ? <span className="tr-consensus-live">vs. live YES {formatPercent(yesPrice)}</span> : null}
       <span className="tr-consensus-count">
         {consensus.positionedCount} contact{consensus.positionedCount !== 1 ? "s" : ""} positioned
       </span>
@@ -74,7 +96,11 @@ function TrendingCard({ row }: { row: TrendingMarket }) {
         </div>
       ) : null}
       <div className="tr-vol">{row.volume24hrUsd !== null ? `${formatCompactUsd(row.volume24hrUsd)} vol · 24h` : null}</div>
-      {row.consensus ? <ConsensusRow consensus={row.consensus} /> : <div className="tr-nolean muted">No tracked positioning yet</div>}
+      {row.consensus ? (
+        <ConsensusRow consensus={row.consensus} currentPrice={row.currentPrice} topOutcome={row.topOutcome} />
+      ) : (
+        <div className="tr-nolean muted">No tracked positioning yet</div>
+      )}
     </>
   );
 
