@@ -290,6 +290,46 @@
 // baseline). Skill-weighting's problem is NOT a dominant whale distorting the average — forcing
 // markets toward more balanced weight distribution makes it worse, matching the concentration
 // diagnostic exactly. Not shipped.
+//
+// v21: EXPERIMENTAL, isolated — restricts locked v1's weighted average to only wallets whose
+// skill_score clears a floor (tested at 6, 7, 8), dropping everyone below entirely rather than down-
+// weighting them. Directly tests the "does cleaning up the leaderboard help" question: skill_score
+// already has real cleanup behind it (Bayesian shrinkage, bot/arb exclusion, eligibility gates — see
+// CLAUDE.md's Scoring section), so if skill-weighting still loses to dollarPct on this already-filtered
+// leaderboard, restricting further to an "elite-only" subset should reveal whether the problem is
+// "some remaining low-quality wallets are diluting the signal" (in which case the gap to dollarPct
+// should narrow a lot as the floor rises) or something more structural about skill_score itself (in
+// which case it shouldn't move much). A market with zero wallets clearing a given floor falls back to
+// locked v1's own value for that market (same "equals smartPct when the condition doesn't apply"
+// convention as smartPctHeld/smartPctOpenAsOf) — reported population stays the fixed 217 either way,
+// but each threshold's section also reports how many of those markets actually had a qualifying wallet,
+// since a threshold with near-zero real coverage would make its result mostly a locked-v1 echo.
+// RESULT: decisively negative, and it gets WORSE as the floor rises — the opposite of "cleaning up the
+// leaderboard helps." n=217: locked v1 0.1178, dollarPct 0.1128, skill>=6 0.1435, skill>=7 0.1821
+// (worst), skill>=8 0.1723 (coverage drops to 95/217 markets with any qualifying wallet; win rate at
+// skill>=8 falls to 38-46%, WORSE than a coin flip at some gap buckets). Restricting to "elite-only"
+// wallets doesn't isolate a cleaner signal — it reintroduces small-sample noise, since fewer wallets
+// per market means fewer independent opinions, exactly the problem MIN_PARTICIPANTS exists to prevent
+// (just gated by skill instead of headcount here). No evidence that further leaderboard cleanup would
+// help; real evidence it would actively hurt. Not shipped.
+//
+// v22: EXPERIMENTAL, isolated — the opposite extreme from v20's capping: ignore every wallet except
+// whichever single one bet the most dollars in that market, and just use their entry price directly (no
+// skill, no weighting, no averaging with anyone else). Tests whether skill-weighting or dollar-weighting
+// is throwing away useful information by blending multiple wallets together at all, versus just trusting
+// the single largest bet outright. Same locked v1 population (5+, $10 dust floor).
+// RESULT: negative — worse than BOTH baselines (Brier 0.1210 vs. locked v1's 0.1178 and dollarPct's
+// 0.1128, n=217). Blending multiple wallets is net-helpful; discarding everyone but the single biggest
+// bettor loses real information (ordinary wisdom-of-crowds). One nuance: its win rate is actually
+// HIGHER than dollarPct's at most gap thresholds (54.8-64.2% vs. 50.7-63.5%) despite the worse Brier —
+// it calls the right direction more often but is less well-calibrated on magnitude. Not shipped.
+//
+// Taken together, v20/v21/v22 close the loop on the concentration line of inquiry: forcing markets
+// toward MORE balance (v20) hurts, restricting to fewer "better" voices (v21) hurts worse, and reducing
+// to just ONE voice (v22) hurts most of all. The natural, unmodified aggregation structure (many
+// wallets, weighted, none excluded) is already close to optimal structurally — the problem isolated
+// across this whole session isn't how many wallets get a say or how concentrated their say is, it's
+// that skill_score itself doesn't reliably predict who's right on any one specific bet.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -361,6 +401,11 @@ const MIN_PARTICIPANTS_FLOOR = 1;
 // tune against the backtest, not by feel, same discipline as every other experimental constant here.
 const MAX_WALLET_SHARE = 0.4;
 
+// EXPERIMENTAL (v21) — not part of the locked v1 formula, see the header note. Skill scores are 0-10
+// (SCORE_MAX in scripts/config.ts); these span "above average" to "elite" given the top-contributor
+// wallets seen in the concentration diagnostic ranged 5.44-8.05.
+const SKILL_FLOOR_THRESHOLDS = [6, 7, 8];
+
 // Persisted, ever-growing record of matched results — see the v4 note at the top of the file for why
 // this exists (wallet_closed_positions is a rolling window, not an archive).
 const HISTORY_FILE = join(dirname(fileURLToPath(import.meta.url)), "backtestSmartMoneyHistory.json");
@@ -393,6 +438,15 @@ interface HistoryEntry {
   smartPctConvictionOnly?: number; // EXPERIMENTAL (v18c) — not locked, may be absent on older entries
   smartPctSqrtDollar?: number; // EXPERIMENTAL (v19) — not locked, may be absent on older entries
   smartPctCapped?: number; // EXPERIMENTAL (v20) — not locked, may be absent on older entries
+  smartPctSkillFloor?: SkillFloorResult[]; // EXPERIMENTAL (v21) — not locked, may be absent on older entries
+  smartPctBiggestBettor?: number; // EXPERIMENTAL (v22) — not locked, may be absent on older entries
+}
+
+// EXPERIMENTAL (v21): one entry per SKILL_FLOOR_THRESHOLDS value.
+interface SkillFloorResult {
+  threshold: number;
+  value: number;
+  hasQualifying: boolean; // did at least one wallet in this market actually clear the threshold?
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -570,6 +624,33 @@ function cappedSmartPct(positioned: ClosedRow[], skillByAddress: Map<string, num
   return weight > 0 ? weighted / weight : null;
 }
 
+// EXPERIMENTAL (v21): locked v1's weighted average, restricted to wallets whose skill_score clears
+// `threshold` — everyone else is dropped entirely, not down-weighted. Falls back to smartPctFallback
+// (locked v1's own value for this market) when nobody clears the threshold, so every market still
+// produces a usable value; hasQualifying records whether the fallback was actually needed.
+function skillFloorSmartPct(positioned: ClosedRow[], skillByAddress: Map<string, number>, threshold: number, smartPctFallback: number): SkillFloorResult {
+  let weight = 0;
+  let weighted = 0;
+  for (const row of positioned) {
+    const skill = skillByAddress.get(row.address) ?? 0;
+    if (skill < threshold) continue;
+    const w = skill * Math.sqrt(cost(row));
+    weight += w;
+    weighted += w * yesEquivalentEntry(row);
+  }
+  return weight > 0 ? { threshold, value: weighted / weight, hasQualifying: true } : { threshold, value: smartPctFallback, hasQualifying: false };
+}
+
+// EXPERIMENTAL (v22): ignores everyone except whichever single wallet bet the most dollars in this
+// market — their entry price directly, no weighting or averaging with anyone else.
+function biggestBettorEntry(positioned: ClosedRow[]): number {
+  let biggest = positioned[0]!;
+  for (const row of positioned) {
+    if (cost(row) > cost(biggest)) biggest = row;
+  }
+  return yesEquivalentEntry(biggest);
+}
+
 interface PriceRow {
   asset: string;
   condition_id: string | null;
@@ -723,6 +804,8 @@ async function main(): Promise<void> {
     smartPctConvictionOnly: number; // EXPERIMENTAL (v18c) — confidenceMultiplier alone, no dollar/skill base
     smartPctSqrtDollar: number; // EXPERIMENTAL (v19) — sqrt(cost) alone, no skill
     smartPctCapped: number | null; // EXPERIMENTAL (v20) — locked v1 with each wallet's share capped at MAX_WALLET_SHARE
+    smartPctSkillFloor: SkillFloorResult[]; // EXPERIMENTAL (v21) — locked v1 restricted to wallets clearing a skill floor
+    smartPctBiggestBettor: number; // EXPERIMENTAL (v22) — the single largest bettor's entry price, no weighting at all
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -909,6 +992,12 @@ async function main(): Promise<void> {
     }
     if (smartWeight <= 0 || dollarWeight <= 0) continue;
 
+    // EXPERIMENTAL (v21/v22): standalone, computed once locked v1's own value is finalized (v21 needs
+    // it as its no-qualifying-wallet fallback).
+    const smartPctLockedV1 = smartWeighted / smartWeight;
+    const smartPctSkillFloor = SKILL_FLOOR_THRESHOLDS.map((threshold) => skillFloorSmartPct(positioned, skillByAddress, threshold, smartPctLockedV1));
+    const smartPctBiggestBettor = biggestBettorEntry(positioned);
+
     // Lead time = how many days before resolution smart money's (weighted) entry was — the proxy
     // for "did they see it early" vs. "did they pile onto an already-obvious outcome late."
     let daysEarly: number | null = null;
@@ -940,6 +1029,8 @@ async function main(): Promise<void> {
       smartPctConvictionOnly: convictionOnlyWeight > 0 ? convictionOnlyWeighted / convictionOnlyWeight : smartWeighted / smartWeight,
       smartPctSqrtDollar: sqrtDollarWeight > 0 ? sqrtDollarWeighted / sqrtDollarWeight : smartWeighted / smartWeight,
       smartPctCapped,
+      smartPctSkillFloor,
+      smartPctBiggestBettor,
       actual,
       daysEarly,
       refEntryMs
@@ -1085,6 +1176,8 @@ async function main(): Promise<void> {
       smartPctSqrtConviction: s.smartPctSqrtConviction,
       smartPctConvictionOnly: s.smartPctConvictionOnly,
       smartPctSqrtDollar: s.smartPctSqrtDollar,
+      smartPctSkillFloor: s.smartPctSkillFloor,
+      smartPctBiggestBettor: s.smartPctBiggestBettor,
       ...(s.smartPctCapped !== null ? { smartPctCapped: s.smartPctCapped } : {})
     });
   }
@@ -1122,7 +1215,7 @@ async function main(): Promise<void> {
   saveHistory(history);
   console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
 
-  // EXPERIMENTAL (v6-v20) backfill: existing entries never got these fields (they didn't exist
+  // EXPERIMENTAL (v6-v22) backfill: existing entries never got these fields (they didn't exist
   // yet). None touch any locked field, so it's safe to add retroactively for any entry whose
   // underlying market is still represented in this run's samples (older ones may have aged out of
   // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
@@ -1207,6 +1300,14 @@ async function main(): Promise<void> {
     }
     if (entry.smartPctCapped === undefined && sample.smartPctCapped !== null) {
       entry.smartPctCapped = sample.smartPctCapped;
+      changed = true;
+    }
+    if (entry.smartPctSkillFloor === undefined) {
+      entry.smartPctSkillFloor = sample.smartPctSkillFloor;
+      changed = true;
+    }
+    if (entry.smartPctBiggestBettor === undefined) {
+      entry.smartPctBiggestBettor = sample.smartPctBiggestBettor;
       changed = true;
     }
     if (changed) backfilled += 1;
@@ -1909,6 +2010,91 @@ async function main(): Promise<void> {
         continue;
       }
       const profits = trades.map((s) => (s.gapCapped >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  // ── EXPERIMENTAL (v21): skill-floor restriction, one threshold at a time — compared against locked
+  // v1 and dollarPct, all on the same entries. Reports how many markets actually had a qualifying
+  // wallet at each threshold, since a threshold with near-zero coverage is mostly a locked-v1 echo. ──
+  const withSkillFloor = currentVersionAll.filter((s) => s.smartPctSkillFloor !== undefined && s.dollarPct !== undefined);
+  console.log(`\nEXPERIMENTAL: skill-floor restriction (drop wallets below the floor entirely), n=${withSkillFloor.length}:`);
+  if (withSkillFloor.length === 0) {
+    console.log("  No entries have smartPctSkillFloor yet.");
+  } else {
+    const v1BrierSub = mean(withSkillFloor.map((s) => brier(s.smartPct, s.actual)));
+    const dollarBrierSub = mean(withSkillFloor.map((s) => brier(s.dollarPct!, s.actual)));
+    console.log(`  locked v1 (no floor): ${v1BrierSub.toFixed(4)}`);
+    console.log(`  dollarPct:            ${dollarBrierSub.toFixed(4)}`);
+    for (const threshold of SKILL_FLOOR_THRESHOLDS) {
+      const results = withSkillFloor.map((s) => s.smartPctSkillFloor!.find((r) => r.threshold === threshold)).filter((r): r is SkillFloorResult => r !== undefined);
+      if (results.length === 0) continue;
+      const coverage = results.filter((r) => r.hasQualifying).length;
+      const floorBrier = mean(withSkillFloor.map((s, i) => brier(results[i]!.value, s.actual)));
+      console.log(
+        `  skill >= ${threshold}: ${floorBrier.toFixed(4)} (${coverage}/${results.length} markets had a qualifying wallet; rest fell back to locked v1)` +
+          (floorBrier < v1BrierSub ? " -> narrows/closes the gap to locked v1" : " -> does not improve on locked v1")
+      );
+    }
+
+    console.log("\n  Simulated return per $1 staked, skill >= 8 tilt only (min gap):");
+    const strictest = SKILL_FLOOR_THRESHOLDS[SKILL_FLOOR_THRESHOLDS.length - 1]!;
+    const strictestResults = withSkillFloor.map((s) => ({
+      ...s,
+      gapSkillFloor: s.smartPctSkillFloor!.find((r) => r.threshold === strictest)!.value - s.livePriceAtEntry
+    }));
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = strictestResults.filter((s) => Math.abs(s.gapSkillFloor) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapSkillFloor >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  // ── EXPERIMENTAL (v22): the single biggest bettor's price, no weighting or blending at all — the
+  // opposite extreme from v20's capping. ──
+  const withBiggest = currentVersionAll.filter((s) => s.smartPctBiggestBettor !== undefined && s.dollarPct !== undefined);
+  console.log(`\nEXPERIMENTAL: biggest single bettor only (ignore everyone else), n=${withBiggest.length}:`);
+  if (withBiggest.length === 0) {
+    console.log("  No entries have smartPctBiggestBettor yet.");
+  } else {
+    const v1BrierSub = mean(withBiggest.map((s) => brier(s.smartPct, s.actual)));
+    const dollarBrierSub = mean(withBiggest.map((s) => brier(s.dollarPct!, s.actual)));
+    const biggestBrier = mean(withBiggest.map((s) => brier(s.smartPctBiggestBettor!, s.actual)));
+    console.log(`  locked v1:          ${v1BrierSub.toFixed(4)}`);
+    console.log(`  dollarPct:          ${dollarBrierSub.toFixed(4)}`);
+    console.log(`  biggest bettor only: ${biggestBrier.toFixed(4)}`);
+    console.log(
+      biggestBrier < Math.min(v1BrierSub, dollarBrierSub)
+        ? "  -> beats BOTH locked v1 and dollarPct — blending in other wallets is net-harmful."
+        : biggestBrier < dollarBrierSub
+          ? "  -> beats dollarPct but not locked v1 — mixed result."
+          : biggestBrier < v1BrierSub
+            ? "  -> beats locked v1 but not dollarPct — mixed result."
+            : "  -> does NOT beat either baseline — blending in other wallets is net-helpful, not harmful."
+    );
+
+    console.log("\n  Simulated return per $1 staked using the biggest-bettor-only tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withBiggest
+        .map((s) => ({ ...s, gapBiggest: s.smartPctBiggestBettor! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapBiggest) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapBiggest >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
       const avgProfit = mean(profits);
       const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
       console.log(
