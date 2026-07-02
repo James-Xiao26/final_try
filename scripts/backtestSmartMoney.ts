@@ -125,6 +125,22 @@
 // points the same direction, so this doesn't look like it flips with more data. Plausible reason:
 // unanimity discards markets where 4 skilled wallets agreed and 1 mediocre one didn't — exactly what
 // skill-weighting already handles correctly without throwing the data away. Not shipped.
+//
+// v12: EXPERIMENTAL, combines v7 + v8 into one weighting instead of testing them in isolation. Same
+// population/filter as v8 (only positions held to a confirmed resolution count at all — early sells
+// excluded entirely, not just down-weighted), but each surviving position's weight is v7's
+// confidence-multiplied weight (skill*sqrt(cost)*max(1, sqrt(cost/theirOwnAvg))), not v8's plain
+// skill*sqrt(cost). Tests whether v7's "this bet was unusually large for them" signal adds anything on
+// top of v8's much larger "did they actually stick with it to the end" effect, or whether v8 alone
+// already captures everything and stacking v7 on top just adds noise. Reported against locked v1, v7
+// alone, and v8 alone, all on the same entries, so the combination's marginal effect over EACH
+// individual change is visible, not just its effect over the unweighted baseline.
+// RESULT: negative relative to v8 alone. n=217 same-entries comparison: locked v1 0.1178, v7 alone
+// 0.1151, v8 alone 0.0737 (still the best of anything tested), v12 combined 0.0910 — worse than v8 by
+// itself (~24% higher Brier). v8's held-to-resolution filter is carrying the entire effect; stacking
+// v7's confidence multiplier on top of an already-resolution-filtered subset adds size-driven noise
+// rather than signal. Not shipped (and v8 itself remains unshipped per the v9 finding that its effect
+// is retrospective-only).
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -196,6 +212,7 @@ interface HistoryEntry {
   smartPctEqual?: number; // EXPERIMENTAL (v10a) — not locked, may be absent on older entries
   participantCount?: number; // EXPERIMENTAL (v10b) — not locked, may be absent on older entries
   isUnanimous?: boolean; // EXPERIMENTAL (v11) — not locked, may be absent on older entries
+  smartPctHeldConfidence?: number; // EXPERIMENTAL (v12) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -426,6 +443,7 @@ async function main(): Promise<void> {
     smartPctEqual: number; // EXPERIMENTAL (v10a) — equal weight per wallet, 2x bump on an unusually-large-for-them bet
     participantCount: number; // EXPERIMENTAL (v10b) — distinct positioned wallets; markets can be as few as MIN_PARTICIPANTS_LOOSE now
     isUnanimous: boolean; // EXPERIMENTAL (v11) — every non-dust position in the market is on the same outcome_index
+    smartPctHeldConfidence: number; // EXPERIMENTAL (v12) — v8's held-to-resolution filter + v7's confidence multiplier, combined
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -491,6 +509,8 @@ async function main(): Promise<void> {
     let confidenceWeighted = 0;
     let heldWeight = 0;
     let heldWeighted = 0;
+    let heldConfidenceWeight = 0;
+    let heldConfidenceWeighted = 0;
     let openAsOfWeight = 0;
     let openAsOfWeighted = 0;
     let equalWeight = 0;
@@ -522,6 +542,11 @@ async function main(): Promise<void> {
       if (isHeldToResolution(row)) {
         heldWeight += w;
         heldWeighted += w * yesEq;
+        // EXPERIMENTAL (v12): v8's held-to-resolution filter + v7's confidence multiplier, combined —
+        // only a position that survived to resolution counts, weighted by how unusual its size was
+        // for that wallet, not just by skill*sqrt(cost).
+        heldConfidenceWeight += wConfidence;
+        heldConfidenceWeighted += wConfidence * yesEq;
       }
       // EXPERIMENTAL (v9): only positions genuinely still open at the reference lead time count.
       if (Number.isFinite(openAsOfReferenceMs) && isOpenAsOf(row, openAsOfReferenceMs)) {
@@ -561,6 +586,7 @@ async function main(): Promise<void> {
       smartPctEqual: equalWeight > 0 ? equalWeighted / equalWeight : smartWeighted / smartWeight,
       participantCount: distinctWallets.size,
       isUnanimous,
+      smartPctHeldConfidence: heldConfidenceWeight > 0 ? heldConfidenceWeighted / heldConfidenceWeight : smartWeighted / smartWeight,
       actual,
       daysEarly,
       refEntryMs
@@ -719,13 +745,14 @@ async function main(): Promise<void> {
       smartPctOpenAsOf: s.smartPctOpenAsOf,
       smartPctEqual: s.smartPctEqual,
       participantCount: s.participantCount,
-      isUnanimous: s.isUnanimous
+      isUnanimous: s.isUnanimous,
+      smartPctHeldConfidence: s.smartPctHeldConfidence
     });
   }
   saveHistory(history);
   console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
 
-  // EXPERIMENTAL (v6/v7/v8/v9/v10) backfill: existing entries never got these fields (they didn't exist
+  // EXPERIMENTAL (v6-v12) backfill: existing entries never got these fields (they didn't exist
   // yet). None touch any locked field, so it's safe to add retroactively for any entry whose
   // underlying market is still represented in this run's samples (older ones may have aged out of
   // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
@@ -762,6 +789,10 @@ async function main(): Promise<void> {
     }
     if (entry.isUnanimous === undefined) {
       entry.isUnanimous = sample.isUnanimous;
+      changed = true;
+    }
+    if (entry.smartPctHeldConfidence === undefined) {
+      entry.smartPctHeldConfidence = sample.smartPctHeldConfidence;
       changed = true;
     }
     if (changed) backfilled += 1;
@@ -1091,6 +1122,48 @@ async function main(): Promise<void> {
   }
   reportUnanimous(`locked ${MIN_PARTICIPANTS}+`, currentVersionAll, smartBrierM, currentVersionAll.length);
   reportUnanimous(`loosened ${MIN_PARTICIPANTS_LOOSE}+`, currentVersionAllLoose, mean(currentVersionAllLoose.map((s) => brier(s.smartPct, s.actual))), currentVersionAllLoose.length);
+
+  // ── EXPERIMENTAL (v12): v7 + v8 combined — held-to-resolution filter, confidence-multiplied weight
+  // — compared against locked v1, v7 alone, and v8 alone, all on the SAME entries so the combination's
+  // marginal effect over each individual change is visible, not just over the unweighted baseline. ──
+  const withHeldConfidence = currentVersionAll.filter(
+    (s) => s.smartPctHeldConfidence !== undefined && s.smartPctConfidence !== undefined && s.smartPctHeld !== undefined
+  );
+  console.log(`\nEXPERIMENTAL: v7+v8 combined (held-to-resolution filter, confidence-multiplied weight), n=${withHeldConfidence.length}:`);
+  if (withHeldConfidence.length === 0) {
+    console.log("  No entries have smartPctHeldConfidence yet.");
+  } else {
+    const v1BrierSub = mean(withHeldConfidence.map((s) => brier(s.smartPct, s.actual)));
+    const v7BrierSub = mean(withHeldConfidence.map((s) => brier(s.smartPctConfidence!, s.actual)));
+    const v8BrierSub = mean(withHeldConfidence.map((s) => brier(s.smartPctHeld!, s.actual)));
+    const combinedBrier = mean(withHeldConfidence.map((s) => brier(s.smartPctHeldConfidence!, s.actual)));
+    console.log(`  locked v1 Brier (same ${withHeldConfidence.length} entries): ${v1BrierSub.toFixed(4)}`);
+    console.log(`  v7 alone (confidence-weighted):        ${v7BrierSub.toFixed(4)}`);
+    console.log(`  v8 alone (held-to-resolution):          ${v8BrierSub.toFixed(4)}`);
+    console.log(`  v12 combined (v7+v8):                   ${combinedBrier.toFixed(4)}`);
+    console.log(
+      combinedBrier < v8BrierSub
+        ? "  -> combining v7 on top of v8 improves further on v8 alone."
+        : "  -> combining v7 on top of v8 does NOT improve on v8 alone — v8's held-to-resolution filter is carrying all of the effect."
+    );
+
+    console.log("\n  Simulated return per $1 staked using the combined tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withHeldConfidence
+        .map((s) => ({ ...s, gapCombined: s.smartPctHeldConfidence! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapCombined) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapCombined >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
 }
 
 main().catch((error) => {
