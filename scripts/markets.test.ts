@@ -214,3 +214,20 @@ test("mapEventCandidates: candidates with zero liquidity and zero volume are pru
 test("mapEventCandidates: an event with no markets yields no rows", () => {
   assert.deepEqual(mapEventCandidates(eventRecord({ markets: [] })), []);
 });
+
+test("mapEventCandidates: candidates beyond the per-event cap are dropped, keeping the top-N by liquidity", () => {
+  const markets = Array.from({ length: 10 }, (_, i) =>
+    nestedMarket({
+      groupItemTitle: `Candidate${i}`,
+      outcomePrices: "[\"0.10\", \"0.90\"]",
+      conditionId: `0xc${i}`,
+      liquidityNum: 1_000 * (i + 1), // Candidate9 highest, Candidate0 lowest
+      volumeNum: 1_000
+    })
+  );
+  const rows = mapEventCandidates(eventRecord({ markets }));
+  assert.equal(rows.length, 8);
+  assert.equal(rows.every((r) => r.liquidityUsd >= 3_000), true); // top 8 of 10: liquidity 3000..10000
+  assert.equal(rows.some((r) => r.topOutcome === "Candidate0"), false);
+  assert.equal(rows.some((r) => r.topOutcome === "Candidate9"), true);
+});

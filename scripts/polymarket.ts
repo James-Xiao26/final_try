@@ -582,7 +582,10 @@ export function mapEventCandidates(record: JsonRecord): EventSummary[] {
       closed
     });
   }
-  return candidates;
+  // Cap candidates kept per event so one large election/tournament can't crowd out unrelated events
+  // once pooled and sliced to MARKETS_TOP_N in getTopEvents.
+  candidates.sort((a, b) => b.liquidityUsd - a.liquidityUsd);
+  return candidates.slice(0, CONFIG.MARKETS_MAX_CANDIDATES_PER_EVENT);
 }
 
 export class PolymarketClient {

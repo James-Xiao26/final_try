@@ -117,6 +117,10 @@ export const CONFIG = {
   // the read layer re-orders it by volume/24h/volatility, so no per-sort fetch is needed.
   MARKETS_TOP_N: 300,
   MARKETS_PAGE_SIZE: 100,
+  // Per-event cap on mapEventCandidates (top-N by liquidity within one event) — without it, one large
+  // multi-candidate election/tournament can claim dozens of the MARKETS_TOP_N slots and crowd out
+  // unrelated events on the Markets page.
+  MARKETS_MAX_CANDIDATES_PER_EVENT: 8,
   // Floors applied to the Gamma query so dust markets never enter the set.
   MARKETS_MIN_LIQUIDITY: 1000,
   MARKETS_MIN_VOLUME: 1000,
