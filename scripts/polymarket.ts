@@ -427,6 +427,49 @@ interface LeadingOutcome {
   yesTokenId: string | null;
 }
 
+// Per-market outcome extraction, shared by pickLeadingOutcome (which keeps only the single best
+// candidate) and mapEventCandidates (which keeps all of them). null yesPrice means the market has no
+// usable price data (caller decides whether to skip it).
+function extractOutcome(market: JsonRecord): LeadingOutcome & { yesPrice: number | null } {
+  const prices = parseJsonArray(market.outcomePrices)
+    .map((entry) => Number(entry))
+    .filter((value) => Number.isFinite(value));
+  // Implied Yes probability from outcomePrices[0]; fall back to the last trade price.
+  const yesPrice = prices.length > 0 ? prices[0] ?? null : readOptionalNumber(market, ["lastTradePrice"]);
+  if (yesPrice === null) {
+    return { price: null, label: null, spread: null, oneDayPriceChange: null, conditionId: null, gameStartTime: null, yesTokenId: null, yesPrice: null };
+  }
+
+  const outcomes = parseJsonArray(market.outcomes).map((entry) => String(entry));
+  const groupTitle = readString(market, ["groupItemTitle"]);
+  const change = readOptionalNumber(market, ["oneDayPriceChange"]);
+  const spread = readOptionalNumber(market, ["spread"]);
+  const conditionId = readString(market, ["conditionId", "condition_id", "id"]) || null;
+  // Scheduled real-world start time — set on sports/esports games, absent everywhere else.
+  const gameStartTime = readString(market, ["gameStartTime"]) || null;
+  // clobTokenIds is a JSON-string array [yesToken, noToken]; index 0 is the YES outcome token.
+  const yesTokenId = parseJsonArray(market.clobTokenIds).map((entry) => String(entry))[0] || null;
+
+  if (groupTitle) {
+    // Candidate within a multi-outcome event: the candidate *is* the Yes side.
+    return { price: yesPrice, label: groupTitle, spread, oneDayPriceChange: change, conditionId, gameStartTime, yesTokenId, yesPrice };
+  }
+  // Plain binary market: surface whichever leg (Yes/No) is priced higher.
+  const noPrice = prices.length > 1 ? prices[1] ?? null : 1 - yesPrice;
+  const noLeads = noPrice !== null && noPrice > yesPrice;
+  return {
+    price: noLeads ? noPrice : yesPrice,
+    label: noLeads ? outcomes[1] || "No" : outcomes[0] || "Yes",
+    spread,
+    // oneDayPriceChange tracks the Yes leg; the No leg moves the opposite way.
+    oneDayPriceChange: change === null ? null : noLeads ? -change : change,
+    conditionId,
+    gameStartTime,
+    yesTokenId,
+    yesPrice
+  };
+}
+
 // An event has many outcome markets (e.g. one per team). There's no single event price, so we
 // surface the *favored* outcome — the one the market judges most likely, not the most-traded. For a
 // multi-candidate event that's the candidate market with the highest implied (Yes) probability and
@@ -437,45 +480,13 @@ function pickLeadingOutcome(markets: JsonRecord[]): LeadingOutcome {
   let bestYes = -Infinity;
 
   for (const market of markets) {
-    const prices = parseJsonArray(market.outcomePrices)
-      .map((entry) => Number(entry))
-      .filter((value) => Number.isFinite(value));
-    // Implied Yes probability from outcomePrices[0]; fall back to the last trade price.
-    const yesPrice = prices.length > 0 ? prices[0] ?? null : readOptionalNumber(market, ["lastTradePrice"]);
+    const outcome = extractOutcome(market);
     // Rank candidates by implied probability — the favored outcome leads, regardless of volume.
-    if (yesPrice === null || yesPrice <= bestYes) {
+    if (outcome.yesPrice === null || outcome.yesPrice <= bestYes) {
       continue;
     }
-    bestYes = yesPrice;
-
-    const outcomes = parseJsonArray(market.outcomes).map((entry) => String(entry));
-    const groupTitle = readString(market, ["groupItemTitle"]);
-    const change = readOptionalNumber(market, ["oneDayPriceChange"]);
-    const spread = readOptionalNumber(market, ["spread"]);
-    const conditionId = readString(market, ["conditionId", "condition_id", "id"]) || null;
-    // Scheduled real-world start time — set on sports/esports games, absent everywhere else.
-    const gameStartTime = readString(market, ["gameStartTime"]) || null;
-    // clobTokenIds is a JSON-string array [yesToken, noToken]; index 0 is the YES outcome token.
-    const yesTokenId = parseJsonArray(market.clobTokenIds).map((entry) => String(entry))[0] || null;
-
-    if (groupTitle) {
-      // Candidate within a multi-outcome event: the candidate *is* the Yes side.
-      leading = { price: yesPrice, label: groupTitle, spread, oneDayPriceChange: change, conditionId, gameStartTime, yesTokenId };
-    } else {
-      // Plain binary market: surface whichever leg (Yes/No) is priced higher.
-      const noPrice = prices.length > 1 ? prices[1] ?? null : 1 - yesPrice;
-      const noLeads = noPrice !== null && noPrice > yesPrice;
-      leading = {
-        price: noLeads ? noPrice : yesPrice,
-        label: noLeads ? outcomes[1] || "No" : outcomes[0] || "Yes",
-        spread,
-        // oneDayPriceChange tracks the Yes leg; the No leg moves the opposite way.
-        oneDayPriceChange: change === null ? null : noLeads ? -change : change,
-        conditionId,
-        gameStartTime,
-        yesTokenId
-      };
-    }
+    bestYes = outcome.yesPrice;
+    leading = outcome;
   }
 
   return leading;
@@ -510,6 +521,68 @@ export function mapEvent(record: JsonRecord): EventSummary {
     active: record.active === true,
     closed: record.closed === true
   };
+}
+
+// Every candidate market in an event, not just the leading one — mapEvent's single-winner view means
+// every other candidate in a multi-outcome event (an election, a tournament-winner market) never gets
+// a `markets` row, so a non-favorite candidate with real leaderboard activity can never appear on the
+// Markets page or qualify for the Trending panel. The /events payload already carries full per-market
+// data for every candidate (pickLeadingOutcome just discards all but the best), so this needs no new
+// API call — same fetch, more rows kept. A plain binary event has exactly one market object, so this
+// naturally yields one row for it too (no special-casing needed).
+export function mapEventCandidates(record: JsonRecord): EventSummary[] {
+  const markets = parseJsonArray(record.markets).filter(isRecord);
+  if (markets.length === 0) return [];
+
+  const eventId = readString(record, ["id", "eventId"]);
+  const firstTag = parseJsonArray(record.tags)[0];
+  const tagLabel = isRecord(firstTag) ? readString(firstTag, ["label", "slug", "name"]) || null : null;
+  const category = readString(record, ["category"]) || tagLabel;
+  const question = readString(record, ["title", "question"]);
+  const slug = readString(record, ["slug"]);
+  const endDate = readString(record, ["endDate", "endDateIso"]) || null;
+  const image = readString(record, ["image", "icon"]) || null;
+  const active = record.active === true;
+  const closed = record.closed === true;
+
+  const candidates: EventSummary[] = [];
+  for (const market of markets) {
+    const outcome = extractOutcome(market);
+    if (outcome.yesPrice === null) continue;
+    // Per-candidate liquidity/volume, not the event-level aggregate mapEvent reads — every candidate
+    // in a multi-outcome event carries its own, and reusing the event total would make every candidate
+    // look equally liquid, which defeats the point of ranking them against each other.
+    const liquidityUsd = readNumber(market, ["liquidity", "liquidityNum"]);
+    const volumeUsd = readNumber(market, ["volume", "volumeNum"]);
+    const volume24hrUsd = readNumber(market, ["volume24hr"]);
+    const volume1wkUsd = readNumber(market, ["volume1wk"]);
+    // Most candidates in a large multi-outcome event never traded (120 of 128 in a spot-checked
+    // election event) — prune dead placeholder rows before they compete for a MARKETS_TOP_N slot.
+    if (liquidityUsd <= 0 && volumeUsd <= 0) continue;
+
+    candidates.push({
+      id: outcome.conditionId ?? eventId,
+      conditionId: outcome.conditionId,
+      yesTokenId: outcome.yesTokenId,
+      question,
+      slug,
+      category,
+      liquidityUsd,
+      volumeUsd,
+      volume24hrUsd,
+      volume1wkUsd,
+      currentPrice: outcome.price,
+      topOutcome: outcome.label,
+      spread: outcome.spread,
+      oneDayPriceChange: outcome.oneDayPriceChange,
+      endDate,
+      gameStartTime: outcome.gameStartTime,
+      image,
+      active,
+      closed
+    });
+  }
+  return candidates;
 }
 
 export class PolymarketClient {
@@ -614,10 +687,15 @@ export class PolymarketClient {
   // so no per-sort fetch is needed. /events groups the per-outcome markets into one row each. Gamma
   // returns a bare array, so asArray handles it.
   async getTopEvents(): Promise<EventSummary[]> {
-    const events: EventSummary[] = [];
+    // Pagination is bounded by raw events fetched, not by the expanded candidate pool (one event can
+    // now yield many rows via mapEventCandidates — see its header note) — so the loop count and the
+    // short-page stop-detection below both track rawEventCount, matching this function's cost/behavior
+    // before candidates were expanded per-event.
+    const candidates: EventSummary[] = [];
+    let rawEventCount = 0;
     for (
       let offset = 0;
-      events.length < CONFIG.MARKETS_TOP_N;
+      rawEventCount < CONFIG.MARKETS_TOP_N;
       offset += CONFIG.MARKETS_PAGE_SIZE
     ) {
       const params = new URLSearchParams({
@@ -631,14 +709,19 @@ export class PolymarketClient {
         liquidity_min: String(CONFIG.MARKETS_MIN_LIQUIDITY),
         volume_min: String(CONFIG.MARKETS_MIN_VOLUME)
       });
-      const page = asArray(await fetchJson("/events", params, "general", CONFIG.GAMMA_API_BASE)).map(mapEvent);
-      events.push(...page);
-      if (page.length < CONFIG.MARKETS_PAGE_SIZE) {
+      const rawPage = asArray(await fetchJson("/events", params, "general", CONFIG.GAMMA_API_BASE));
+      rawEventCount += rawPage.length;
+      for (const record of rawPage) candidates.push(...mapEventCandidates(record));
+      if (rawPage.length < CONFIG.MARKETS_PAGE_SIZE) {
         break;
       }
     }
 
-    return events.slice(0, CONFIG.MARKETS_TOP_N);
+    // Re-rank across the full candidate pool by liquidity (Gamma's own ordering was per-event, not
+    // per-candidate) and take the top MARKETS_TOP_N — same cap and selection principle as before, just
+    // applied per-market instead of per-event.
+    candidates.sort((a, b) => b.liquidityUsd - a.liquidityUsd);
+    return candidates.slice(0, CONFIG.MARKETS_TOP_N);
   }
 }
 

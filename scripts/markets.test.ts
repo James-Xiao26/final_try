@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mapEvent } from "./polymarket.js";
+import { mapEvent, mapEventCandidates } from "./polymarket.js";
 
 // A representative Gamma /events record. Nested markets carry outcomePrices/groupItemTitle/spread
 // in the JSON-string form Gamma returns most often.
@@ -161,4 +161,56 @@ test("mapEvent defaults missing aggregate numbers to 0 and maps status flags", (
   assert.equal(event.volume24hrUsd, 0);
   assert.equal(event.active, false);
   assert.equal(event.closed, true);
+});
+
+test("mapEventCandidates: a plain binary event yields exactly one row, matching mapEvent", () => {
+  const record = eventRecord({
+    markets: [nestedMarket({ groupItemTitle: "", outcomePrices: "[\"0.64\", \"0.36\"]", spread: 0.01, liquidityNum: 5_000, volumeNum: 10_000 })]
+  });
+  const rows = mapEventCandidates(record);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.topOutcome, "Yes");
+  assert.equal(rows[0]?.currentPrice, 0.64);
+  // No conditionId set on this market, so id falls back to the event id.
+  assert.equal(rows[0]?.id, "30615");
+});
+
+test("mapEventCandidates: a grouped multi-candidate event yields one row per candidate, each with its own liquidity/volume/conditionId", () => {
+  const rows = mapEventCandidates(
+    eventRecord({
+      markets: [
+        nestedMarket({ groupItemTitle: "France", outcomePrices: "[\"0.22\", \"0.78\"]", conditionId: "0xfrance", liquidityNum: 100_000, volumeNum: 500_000 }),
+        nestedMarket({ groupItemTitle: "Spain", outcomePrices: "[\"0.17\", \"0.83\"]", conditionId: "0xspain", liquidityNum: 40_000, volumeNum: 200_000 })
+      ]
+    })
+  );
+  assert.equal(rows.length, 2);
+  const france = rows.find((r) => r.topOutcome === "France");
+  const spain = rows.find((r) => r.topOutcome === "Spain");
+  assert.equal(france?.conditionId, "0xfrance");
+  assert.equal(france?.liquidityUsd, 100_000);
+  assert.equal(spain?.conditionId, "0xspain");
+  assert.equal(spain?.liquidityUsd, 40_000);
+  // Neither candidate inherited the event-level aggregate (299,790,000 in eventRecord's default).
+  assert.notEqual(france?.liquidityUsd, 299_790_000);
+  assert.notEqual(spain?.liquidityUsd, 299_790_000);
+  assert.equal(france?.id, "0xfrance");
+  assert.equal(spain?.id, "0xspain");
+});
+
+test("mapEventCandidates: candidates with zero liquidity and zero volume are pruned", () => {
+  const rows = mapEventCandidates(
+    eventRecord({
+      markets: [
+        nestedMarket({ groupItemTitle: "France", outcomePrices: "[\"0.22\", \"0.78\"]", conditionId: "0xfrance", liquidityNum: 100_000, volumeNum: 500_000 }),
+        nestedMarket({ groupItemTitle: "DeadCandidate", outcomePrices: "[\"0.01\", \"0.99\"]", conditionId: "0xdead", liquidityNum: 0, volumeNum: 0 })
+      ]
+    })
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.topOutcome, "France");
+});
+
+test("mapEventCandidates: an event with no markets yields no rows", () => {
+  assert.deepEqual(mapEventCandidates(eventRecord({ markets: [] })), []);
 });
