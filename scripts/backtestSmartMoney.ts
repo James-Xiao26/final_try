@@ -260,6 +260,19 @@
 // beat plain dollar size — and the pattern is monotonic again: the further a formula moves away from
 // raw dollar size (toward pure conviction, v18c), the worse it gets. Raw bet size remains the strongest
 // signal found in this dataset. Not shipped.
+//
+// v19: EXPERIMENTAL, isolated — weight = sqrt(cost) alone, no skill at all. Completes the 2x2
+// size-scaling-x-skill grid that's been built piecemeal without ever explicitly assembling it: linear
+// cost with no skill (dollarPct), linear cost with skill (v17), sqrt cost with skill (locked v1), and
+// this — sqrt cost with no skill. Same locked v1 population (5+, $10 dust floor). Reported against all
+// three other corners on the exact same entries.
+// RESULT: dollarPct (linear, no skill) remains the overall best at 0.1128, n=217. But the grid reveals
+// an asymmetry the earlier "monotonic" framing missed: sqrt dampening's effect FLIPS depending on
+// whether skill is in the base. With skill, sqrt helps (locked v1 0.1178 beats v17's linear 0.1244) —
+// it's counteracting skill's noise. Without skill, sqrt HURTS (dollarPct's linear 0.1128 beats v19's
+// 0.1199) — it throws away real information from an already-clean signal. So sqrt isn't generically
+// good or bad; it's specifically a counterweight to skill's unreliability, and only earns its keep when
+// paired with something noisy to dampen. Not shipped.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -357,6 +370,7 @@ interface HistoryEntry {
   smartPctCostConviction?: number; // EXPERIMENTAL (v18a) — not locked, may be absent on older entries
   smartPctSqrtConviction?: number; // EXPERIMENTAL (v18b) — not locked, may be absent on older entries
   smartPctConvictionOnly?: number; // EXPERIMENTAL (v18c) — not locked, may be absent on older entries
+  smartPctSqrtDollar?: number; // EXPERIMENTAL (v19) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -653,6 +667,7 @@ async function main(): Promise<void> {
     smartPctCostConviction: number; // EXPERIMENTAL (v18a) — cost * confidenceMultiplier, no skill
     smartPctSqrtConviction: number; // EXPERIMENTAL (v18b) — sqrt(cost) * confidenceMultiplier, no skill
     smartPctConvictionOnly: number; // EXPERIMENTAL (v18c) — confidenceMultiplier alone, no dollar/skill base
+    smartPctSqrtDollar: number; // EXPERIMENTAL (v19) — sqrt(cost) alone, no skill
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -739,6 +754,8 @@ async function main(): Promise<void> {
     let noDustWeighted = 0;
     let linearWeight = 0;
     let linearWeighted = 0;
+    let sqrtDollarWeight = 0;
+    let sqrtDollarWeighted = 0;
     let costConvictionWeight = 0;
     let costConvictionWeighted = 0;
     let sqrtConvictionWeight = 0;
@@ -767,6 +784,10 @@ async function main(): Promise<void> {
       const wLinear = skill * c;
       linearWeight += wLinear;
       linearWeighted += wLinear * yesEq;
+      // EXPERIMENTAL (v19): sqrt(cost) alone, no skill — completes the 2x2 grid with dollarPct/v17/v1.
+      const wSqrtDollar = Math.sqrt(c);
+      sqrtDollarWeight += wSqrtDollar;
+      sqrtDollarWeighted += wSqrtDollar * yesEq;
       const isSpecialtyMatch = marketCategory !== null && specialtyByAddress.get(row.address) === marketCategory;
       const wSpecialty = isSpecialtyMatch ? w * SPECIALTY_BOOST : w;
       specialtyWeight += wSpecialty;
@@ -858,6 +879,7 @@ async function main(): Promise<void> {
       smartPctCostConviction: costConvictionWeight > 0 ? costConvictionWeighted / costConvictionWeight : smartWeighted / smartWeight,
       smartPctSqrtConviction: sqrtConvictionWeight > 0 ? sqrtConvictionWeighted / sqrtConvictionWeight : smartWeighted / smartWeight,
       smartPctConvictionOnly: convictionOnlyWeight > 0 ? convictionOnlyWeighted / convictionOnlyWeight : smartWeighted / smartWeight,
+      smartPctSqrtDollar: sqrtDollarWeight > 0 ? sqrtDollarWeighted / sqrtDollarWeight : smartWeighted / smartWeight,
       actual,
       daysEarly,
       refEntryMs
@@ -1001,7 +1023,8 @@ async function main(): Promise<void> {
       smartPctLinear: s.smartPctLinear,
       smartPctCostConviction: s.smartPctCostConviction,
       smartPctSqrtConviction: s.smartPctSqrtConviction,
-      smartPctConvictionOnly: s.smartPctConvictionOnly
+      smartPctConvictionOnly: s.smartPctConvictionOnly,
+      smartPctSqrtDollar: s.smartPctSqrtDollar
     });
   }
   for (const s of matched) recordMatch(s);
@@ -1038,7 +1061,7 @@ async function main(): Promise<void> {
   saveHistory(history);
   console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
 
-  // EXPERIMENTAL (v6-v18) backfill: existing entries never got these fields (they didn't exist
+  // EXPERIMENTAL (v6-v19) backfill: existing entries never got these fields (they didn't exist
   // yet). None touch any locked field, so it's safe to add retroactively for any entry whose
   // underlying market is still represented in this run's samples (older ones may have aged out of
   // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
@@ -1115,6 +1138,10 @@ async function main(): Promise<void> {
     }
     if (entry.smartPctConvictionOnly === undefined) {
       entry.smartPctConvictionOnly = sample.smartPctConvictionOnly;
+      changed = true;
+    }
+    if (entry.smartPctSqrtDollar === undefined) {
+      entry.smartPctSqrtDollar = sample.smartPctSqrtDollar;
       changed = true;
     }
     if (changed) backfilled += 1;
@@ -1751,6 +1778,44 @@ async function main(): Promise<void> {
   reportConvictionVariant("v18a: cost * confidenceMultiplier (dollar-linear, conviction-scaled)", "smartPctCostConviction");
   reportConvictionVariant("v18b: sqrt(cost) * confidenceMultiplier (sqrt-dampened, conviction-scaled)", "smartPctSqrtConviction");
   reportConvictionVariant("v18c: confidenceMultiplier alone (equal base, conviction-scaled only)", "smartPctConvictionOnly");
+
+  // ── EXPERIMENTAL (v19): completes the 2x2 size-scaling x skill grid. ──
+  const withGrid = currentVersionAll.filter(
+    (s) => s.smartPctSqrtDollar !== undefined && s.dollarPct !== undefined && s.smartPctLinear !== undefined
+  );
+  console.log(`\nEXPERIMENTAL: the full size-scaling x skill grid, n=${withGrid.length}:`);
+  if (withGrid.length === 0) {
+    console.log("  No entries have smartPctSqrtDollar yet.");
+  } else {
+    const dollarBrierGrid = mean(withGrid.map((s) => brier(s.dollarPct!, s.actual)));
+    const sqrtDollarBrier = mean(withGrid.map((s) => brier(s.smartPctSqrtDollar!, s.actual)));
+    const linearBrierGrid = mean(withGrid.map((s) => brier(s.smartPctLinear!, s.actual)));
+    const v1BrierGrid = mean(withGrid.map((s) => brier(s.smartPct, s.actual)));
+    console.log("                    no skill        with skill");
+    console.log(`  linear cost:      ${dollarBrierGrid.toFixed(4)} (dollarPct)  ${linearBrierGrid.toFixed(4)} (v17)`);
+    console.log(`  sqrt(cost):       ${sqrtDollarBrier.toFixed(4)} (v19)       ${v1BrierGrid.toFixed(4)} (locked v1)`);
+    const best = Math.min(dollarBrierGrid, sqrtDollarBrier, linearBrierGrid, v1BrierGrid);
+    const bestLabel =
+      best === dollarBrierGrid ? "dollarPct (linear, no skill)" : best === sqrtDollarBrier ? "v19 (sqrt, no skill)" : best === linearBrierGrid ? "v17 (linear, with skill)" : "locked v1 (sqrt, with skill)";
+    console.log(`  -> best of the four: ${bestLabel} at ${best.toFixed(4)}`);
+
+    console.log("\n  Simulated return per $1 staked using the v19 (sqrt, no skill) tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withGrid
+        .map((s) => ({ ...s, gapSqrtDollar: s.smartPctSqrtDollar! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapSqrtDollar) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapSqrtDollar >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
 }
 
 main().catch((error) => {
