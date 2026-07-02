@@ -64,10 +64,13 @@ const lookups: CrowdLookups = {
   skillByAddress: new Map([["0xa", 8.5], ["0xb", 6]])
 };
 
+// minTraders=1 lets unit tests use small fixtures without hitting the ≥5 production threshold.
+const MIN1 = 1;
+
 test("summarizeCrowdedMarkets counts distinct wallets, YES/NO split, committed capital, and best rank", () => {
   const positions = [open({ address: "0xa", outcomeIndex: 0 }), open({ address: "0xb", outcomeIndex: 1, curPrice: 0.55 })];
   const closedRows = [closed({ address: "0xa", outcomeIndex: 0, closeTime: "2026-01-03T00:00:00.000Z" })];
-  const [summary] = summarizeCrowdedMarkets(positions, closedRows, lookups);
+  const [summary] = summarizeCrowdedMarkets(positions, closedRows, lookups, MIN1);
   assert.ok(summary);
   assert.equal(summary.conditionId, "c1");
   assert.equal(summary.traderCount, 2);
@@ -82,21 +85,33 @@ test("summarizeCrowdedMarkets counts distinct wallets, YES/NO split, committed c
   assert.equal(summary.lastTradedAt, "2026-01-03T00:00:00.000Z");
 });
 
-test("summarizeCrowdedMarkets ranks markets by trader count then committed capital, honoring the limit", () => {
+test("summarizeCrowdedMarkets ranks markets by trader count then committed capital", () => {
   const positions = [
     open({ address: "0xa", conditionId: "c1" }),
     open({ address: "0xb", conditionId: "c1" }),
     open({ address: "0xa", conditionId: "c2" })
   ];
-  const out = summarizeCrowdedMarkets(positions, [], lookups, 1);
-  assert.equal(out.length, 1);
-  assert.equal(out[0]?.conditionId, "c1"); // 2 traders beats c2's 1
+  // c1 has 2 traders, c2 has 1 → c1 ranks first by trader count; both qualify at minTraders=1.
+  const out = summarizeCrowdedMarkets(positions, [], lookups, MIN1);
+  assert.equal(out.length, 2);
+  assert.equal(out[0]?.conditionId, "c1");
+  assert.equal(out[1]?.conditionId, "c2");
+});
+
+test("summarizeCrowdedMarkets applies the minTraders threshold", () => {
+  const positions = [
+    open({ address: "0xa", conditionId: "c1" }),
+    open({ address: "0xb", conditionId: "c1" }),
+    open({ address: "0xa", conditionId: "c2" })
+  ];
+  // default minTraders=5: neither market qualifies
+  assert.equal(summarizeCrowdedMarkets(positions, [], lookups).length, 0);
 });
 
 test("summarizeCrowdedMarkets drops a market no wallet currently holds (all positions closed)", () => {
-  const resolved = summarizeCrowdedMarkets([], [closed({ conditionId: "resolved" }), closed({ address: "0xb", conditionId: "resolved" })], lookups);
+  const resolved = summarizeCrowdedMarkets([], [closed({ conditionId: "resolved" }), closed({ address: "0xb", conditionId: "resolved" })], lookups, MIN1);
   assert.equal(resolved.length, 0);
-  const active = summarizeCrowdedMarkets([open({ conditionId: "live" })], [closed({ conditionId: "live" })], lookups);
+  const active = summarizeCrowdedMarkets([open({ conditionId: "live" })], [closed({ conditionId: "live" })], lookups, MIN1);
   assert.equal(active.length, 1);
   assert.equal(active[0]?.openCount, 1);
 });
