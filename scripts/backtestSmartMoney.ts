@@ -1560,19 +1560,26 @@ async function main(): Promise<void> {
     }
   }
 
-  // ── EXPERIMENTAL (v16): DUST_FLOOR_USD removed entirely — compares locked v1 (on its own dust-
-  // floored 5+ population) against smartPctNoDust (on the separately-gated no-dust 5+ population),
-  // since the two populations aren't guaranteed to be identical. ──
-  console.log(`\nEXPERIMENTAL: dust floor removed entirely, n=${currentVersionAllNoDust.length} (vs. locked v1's n=${currentVersionAll.length}, dust floor $${DUST_FLOOR_USD}):`);
+  // ── EXPERIMENTAL (v16): DUST_FLOOR_USD removed entirely. currentVersionAllNoDust (the no-dust-
+  // gated population) is a strict superset of currentVersionAll — every market clearing the $10-floor
+  // gate automatically clears the no-dust gate too, since the no-dust participant count can only be
+  // >= the dust-floored one. But not every entry has smartPctNoDust backfilled (a market that aged out
+  // of wallet_closed_positions' rolling window since it was first recorded can't be recomputed), so
+  // `withNoDust` below is smaller than the full no-dust-qualifying set — comparing it against the
+  // GLOBAL locked-v1 Brier (computed over a different, not-necessarily-overlapping set of entries)
+  // would be an apples-to-oranges mismatch. v1BrierSub recomputes locked v1's Brier restricted to the
+  // exact same withNoDust entries, matching every other section's "same entries" discipline. ──
+  console.log(`\nEXPERIMENTAL: dust floor removed entirely, n=${currentVersionAllNoDust.length} qualify (vs. locked v1's n=${currentVersionAll.length}, dust floor $${DUST_FLOOR_USD}):`);
   const withNoDust = currentVersionAllNoDust.filter((s) => s.smartPctNoDust !== undefined);
   if (withNoDust.length === 0) {
     console.log("  No entries have smartPctNoDust yet.");
   } else {
+    const v1BrierSub = mean(withNoDust.map((s) => brier(s.smartPct, s.actual)));
     const noDustBrier = mean(withNoDust.map((s) => brier(s.smartPctNoDust!, s.actual)));
-    console.log(`  locked v1 Brier ($10 dust floor, n=${currentVersionAll.length}): ${smartBrierM.toFixed(4)}`);
-    console.log(`  no-dust-floor Brier (n=${withNoDust.length}):                    ${noDustBrier.toFixed(4)}`);
+    console.log(`  locked v1 Brier (same ${withNoDust.length} entries): ${v1BrierSub.toFixed(4)}`);
+    console.log(`  no-dust-floor Brier:                    ${noDustBrier.toFixed(4)}`);
     console.log(
-      noDustBrier < smartBrierM
+      noDustBrier < v1BrierSub
         ? "  -> removing the dust floor improves on locked v1."
         : "  -> removing the dust floor does NOT improve on locked v1 — the $10 floor is filtering real noise, not real signal."
     );
