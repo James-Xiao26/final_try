@@ -130,9 +130,18 @@ function closedBasisCost(row: ClosedBasisInput): number {
   return row.avgPrice !== null && row.size !== null ? row.avgPrice * row.size : 0;
 }
 
+// Effective exit price implied by the realized P/L: exit = entry + realizedPnl/size. Positions closed
+// by holding to resolution (redeemed or resolved-but-unredeemed) never generate a SELL activity fill —
+// redemption is on-chain settlement, not a marketplace trade — so this is the only way to know their
+// exit price at all.
+function impliedExitPrice(avgPrice: number | null, size: number | null, realizedPnl: number | null): number | null {
+  return avgPrice !== null && size !== null && size > 0 && realizedPnl !== null ? avgPrice + realizedPnl / size : null;
+}
+
 // Merge the closed-positions cache into the fill-grouped trade history. Two jobs:
 //  1. Backfill: the history is grouped from only the last ~200 fills, so a position bought before that
-//     window shows blank avg entry / 0 bought shares — the closed row carries the truth. Attach P/L too.
+//     window shows blank avg entry / 0 bought shares — the closed row carries the truth. Attach P/L,
+//     and derive avg exit too when the group has no real SELL fill (closed by resolution, not a sell).
 //  2. Append: a wallet that churns one market (a scalper) can fill the entire 200-fill window with a
 //     single market, hiding every other position it ever closed. Closed positions with no fill group
 //     are appended as synthetic rows (entry/size/P/L from the closed row, exit derived from realized
@@ -156,6 +165,10 @@ export function applyClosedBasis(groups: WalletTradeGroup[], closed: ClosedBasis
       outcomeLabel: group.outcomeLabel ?? match.outcomeLabel,
       eventSlug: group.eventSlug ?? match.eventSlug,
       avgEntryPrice: group.avgEntryPrice === null && avgPrice !== null && avgPrice > 0 ? avgPrice : group.avgEntryPrice,
+      // group.avgExitPrice is only ever non-null from real SELL fills already in the window — those
+      // stay authoritative. Only a group with no real sell (closed by resolution, not an active sell)
+      // gets the derived exit filled in.
+      avgExitPrice: group.avgExitPrice ?? impliedExitPrice(avgPrice, size, realizedPnl),
       totalBoughtSize: group.totalBoughtSize === 0 && size !== null && size > 0 ? size : group.totalBoughtSize,
       realizedPnl,
       realizedPnlPct: realizedPnl !== null && basis > 0 ? realizedPnl / basis : null
@@ -167,8 +180,7 @@ export function applyClosedBasis(groups: WalletTradeGroup[], closed: ClosedBasis
     if (!row.conditionId || seen.has(`${row.conditionId}:${row.outcomeIndex}`)) continue;
     const { avgPrice, size, realizedPnl } = row;
     const basis = closedBasisCost(row);
-    // Effective exit price implied by the realized P/L: exit = entry + realizedPnl/size.
-    const exit = avgPrice !== null && size !== null && size > 0 && realizedPnl !== null ? avgPrice + realizedPnl / size : null;
+    const exit = impliedExitPrice(avgPrice, size, realizedPnl);
     backfilled.push({
       conditionId: row.conditionId,
       market: row.market,

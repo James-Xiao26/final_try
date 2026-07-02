@@ -112,6 +112,28 @@ test("applyClosedBasis keeps fill-derived entry/bought when present, still attac
   assert.equal(group.realizedPnlPct, -0.15);
 });
 
+test("applyClosedBasis derives avg exit for a position closed by resolution (no SELL fill)", () => {
+  // Bought in-window, held to resolution instead of selling — no SELL fill ever exists for this.
+  const [group] = applyClosedBasis(
+    groupWalletTrades([row({ side: "BUY", price: 0.4, size: 500 })]),
+    [closed({ avgPrice: 0.4, size: 500, realizedPnl: 250 })]
+  );
+  assert.ok(group);
+  assert.equal(group.avgEntryPrice, 0.4); // real fill-derived entry, unchanged
+  // exit = entry + pnl/size = 0.4 + 250/500 = 0.9
+  assert.equal(group.avgExitPrice, 0.9);
+});
+
+test("applyClosedBasis keeps a real SELL-fill exit over the closed row's derived one", () => {
+  const [group] = applyClosedBasis(
+    groupWalletTrades([row({ side: "BUY", price: 0.4, size: 500 }), row({ side: "SELL", price: 0.7, size: 500 })]),
+    [closed({ avgPrice: 0.4, size: 500, realizedPnl: 100 })] // derived would be 0.4 + 100/500 = 0.6, different from the real fill
+  );
+  assert.ok(group);
+  // Real sell fill (0.7) wins over the closed row's implied 0.6 — proves the fill isn't overwritten.
+  assert.equal(group.avgExitPrice, 0.7);
+});
+
 test("applyClosedBasis leaves groups with no matching closed row untouched (P/L null)", () => {
   const [group] = applyClosedBasis(groupWalletTrades([row({ side: "BUY", price: 0.5, size: 50 })]), []);
   assert.ok(group);
