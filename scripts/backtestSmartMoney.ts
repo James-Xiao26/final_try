@@ -273,6 +273,23 @@
 // 0.1199) — it throws away real information from an already-clean signal. So sqrt isn't generically
 // good or bad; it's specifically a counterweight to skill's unreliability, and only earns its keep when
 // paired with something noisy to dampen. Not shipped.
+//
+// v20: EXPERIMENTAL, isolated — caps any single wallet's share of a market's total skill*sqrt(cost)
+// weight at MAX_WALLET_SHARE, redistributing the excess proportionally to everyone else in that market
+// (a single-pass approximation, not a full iterative water-fill — documented, not exact, same
+// approximation-with-a-disclaimer standard as v8/v9's close_time proxy). Directly tests the prediction
+// from the ad hoc concentration diagnostic (see the v15 follow-up note): skill-weighting did WORST when
+// weight was spread across many wallets and best when one wallet dominated — capping pushes markets
+// toward MORE balance, which that finding predicts should make things worse, not better. Same locked v1
+// population (5+, $10 dust floor). Computed as a standalone per-market pass (two-pass: totals first,
+// then a capped weighted average), not folded into the main per-row accumulator loop like the other
+// experiments, since capping genuinely needs the market's full wallet-level totals before it can
+// determine anyone's scale factor.
+// RESULT: confirms the prediction. Locked v1 Brier 0.1178 (n=217) -> capped (40% max share) 0.1313 —
+// worse, plus lower win rate across every gap bucket (47.5%/45.2%/49.1%/56.4% vs. v1's higher
+// baseline). Skill-weighting's problem is NOT a dominant whale distorting the average — forcing
+// markets toward more balanced weight distribution makes it worse, matching the concentration
+// diagnostic exactly. Not shipped.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -340,6 +357,10 @@ const FULL_EXIT_EPSILON_FRACTION = 0.02;
 // population floor tested — a market with even a single positioned leaderboard wallet qualifies.
 const MIN_PARTICIPANTS_FLOOR = 1;
 
+// EXPERIMENTAL (v20) — not part of the locked v1 formula, see the header note. Round starting value —
+// tune against the backtest, not by feel, same discipline as every other experimental constant here.
+const MAX_WALLET_SHARE = 0.4;
+
 // Persisted, ever-growing record of matched results — see the v4 note at the top of the file for why
 // this exists (wallet_closed_positions is a rolling window, not an archive).
 const HISTORY_FILE = join(dirname(fileURLToPath(import.meta.url)), "backtestSmartMoneyHistory.json");
@@ -371,6 +392,7 @@ interface HistoryEntry {
   smartPctSqrtConviction?: number; // EXPERIMENTAL (v18b) — not locked, may be absent on older entries
   smartPctConvictionOnly?: number; // EXPERIMENTAL (v18c) — not locked, may be absent on older entries
   smartPctSqrtDollar?: number; // EXPERIMENTAL (v19) — not locked, may be absent on older entries
+  smartPctCapped?: number; // EXPERIMENTAL (v20) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -514,6 +536,38 @@ function convictionMultiplier(fills: TradeActivity[]): number {
 
 function yesEquivalentEntry(row: ClosedRow): number {
   return row.outcome_index === 1 ? 1 - (row.avg_price ?? 0) : row.avg_price ?? 0;
+}
+
+// EXPERIMENTAL (v20): locked v1's weighted average, but no single wallet's skill*sqrt(cost) can exceed
+// maxShare of the market's total. Single-pass approximation: wallets over the cap are scaled down to
+// exactly maxShare of the ORIGINAL (pre-cap) total; everyone else's absolute weight is untouched, so
+// their RELATIVE share still rises automatically once the total shrinks. Not a full iterative water-
+// fill (if multiple wallets simultaneously exceed the cap, their post-cap shares of the NEW total can
+// still slightly exceed maxShare) — a documented approximation, not exact, same standard as v8/v9's
+// close_time proxy.
+function cappedSmartPct(positioned: ClosedRow[], skillByAddress: Map<string, number>, maxShare: number): number | null {
+  const rawWeightByWallet = new Map<string, number>();
+  for (const row of positioned) {
+    const skill = Math.max(0, skillByAddress.get(row.address) ?? 0);
+    const w = skill * Math.sqrt(cost(row));
+    rawWeightByWallet.set(row.address, (rawWeightByWallet.get(row.address) ?? 0) + w);
+  }
+  const rawTotal = [...rawWeightByWallet.values()].reduce((a, b) => a + b, 0);
+  if (rawTotal <= 0) return null;
+  const capWeight = rawTotal * maxShare;
+  const scaleByWallet = new Map<string, number>();
+  for (const [address, raw] of rawWeightByWallet) {
+    scaleByWallet.set(address, raw > capWeight ? capWeight / raw : 1);
+  }
+  let weight = 0;
+  let weighted = 0;
+  for (const row of positioned) {
+    const skill = Math.max(0, skillByAddress.get(row.address) ?? 0);
+    const w = skill * Math.sqrt(cost(row)) * (scaleByWallet.get(row.address) ?? 1);
+    weight += w;
+    weighted += w * yesEquivalentEntry(row);
+  }
+  return weight > 0 ? weighted / weight : null;
 }
 
 interface PriceRow {
@@ -668,6 +722,7 @@ async function main(): Promise<void> {
     smartPctSqrtConviction: number; // EXPERIMENTAL (v18b) — sqrt(cost) * confidenceMultiplier, no skill
     smartPctConvictionOnly: number; // EXPERIMENTAL (v18c) — confidenceMultiplier alone, no dollar/skill base
     smartPctSqrtDollar: number; // EXPERIMENTAL (v19) — sqrt(cost) alone, no skill
+    smartPctCapped: number | null; // EXPERIMENTAL (v20) — locked v1 with each wallet's share capped at MAX_WALLET_SHARE
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -716,6 +771,10 @@ async function main(): Promise<void> {
     // (locked + experimental) formula, so v16 is the only one that sees the dust-floor-excluded rows.
     const allPositioned = rows.filter((r) => cost(r) > 0);
     const allDistinctWallets = new Set(allPositioned.map((r) => r.address));
+
+    // EXPERIMENTAL (v20): standalone two-pass computation — needs the market's full wallet-level
+    // totals up front, so it can't be folded into the main per-row accumulator loop below.
+    const smartPctCapped = cappedSmartPct(positioned, skillByAddress, MAX_WALLET_SHARE);
 
     // EXPERIMENTAL (v11): every non-dust position (across every wallet) on the same outcome_index —
     // no leaderboard money at all took the other side.
@@ -880,6 +939,7 @@ async function main(): Promise<void> {
       smartPctSqrtConviction: sqrtConvictionWeight > 0 ? sqrtConvictionWeighted / sqrtConvictionWeight : smartWeighted / smartWeight,
       smartPctConvictionOnly: convictionOnlyWeight > 0 ? convictionOnlyWeighted / convictionOnlyWeight : smartWeighted / smartWeight,
       smartPctSqrtDollar: sqrtDollarWeight > 0 ? sqrtDollarWeighted / sqrtDollarWeight : smartWeighted / smartWeight,
+      smartPctCapped,
       actual,
       daysEarly,
       refEntryMs
@@ -1024,7 +1084,8 @@ async function main(): Promise<void> {
       smartPctCostConviction: s.smartPctCostConviction,
       smartPctSqrtConviction: s.smartPctSqrtConviction,
       smartPctConvictionOnly: s.smartPctConvictionOnly,
-      smartPctSqrtDollar: s.smartPctSqrtDollar
+      smartPctSqrtDollar: s.smartPctSqrtDollar,
+      ...(s.smartPctCapped !== null ? { smartPctCapped: s.smartPctCapped } : {})
     });
   }
   for (const s of matched) recordMatch(s);
@@ -1061,7 +1122,7 @@ async function main(): Promise<void> {
   saveHistory(history);
   console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
 
-  // EXPERIMENTAL (v6-v19) backfill: existing entries never got these fields (they didn't exist
+  // EXPERIMENTAL (v6-v20) backfill: existing entries never got these fields (they didn't exist
   // yet). None touch any locked field, so it's safe to add retroactively for any entry whose
   // underlying market is still represented in this run's samples (older ones may have aged out of
   // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
@@ -1142,6 +1203,10 @@ async function main(): Promise<void> {
     }
     if (entry.smartPctSqrtDollar === undefined) {
       entry.smartPctSqrtDollar = sample.smartPctSqrtDollar;
+      changed = true;
+    }
+    if (entry.smartPctCapped === undefined && sample.smartPctCapped !== null) {
+      entry.smartPctCapped = sample.smartPctCapped;
       changed = true;
     }
     if (changed) backfilled += 1;
@@ -1809,6 +1874,41 @@ async function main(): Promise<void> {
         continue;
       }
       const profits = trades.map((s) => (s.gapSqrtDollar >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  // ── EXPERIMENTAL (v20): max-wallet-share cap — compared against locked v1 on the same entries.
+  // Tests the concentration diagnostic's prediction directly (capping should hurt, not help). ──
+  const withCapped = currentVersionAll.filter((s) => s.smartPctCapped !== undefined);
+  console.log(`\nEXPERIMENTAL: max single-wallet weight share capped at ${(MAX_WALLET_SHARE * 100).toFixed(0)}%, n=${withCapped.length}:`);
+  if (withCapped.length === 0) {
+    console.log("  No entries have smartPctCapped yet.");
+  } else {
+    const v1BrierSub = mean(withCapped.map((s) => brier(s.smartPct, s.actual)));
+    const cappedBrier = mean(withCapped.map((s) => brier(s.smartPctCapped!, s.actual)));
+    console.log(`  locked v1 Brier (same ${withCapped.length} entries): ${v1BrierSub.toFixed(4)}`);
+    console.log(`  capped Brier:                                ${cappedBrier.toFixed(4)}`);
+    console.log(
+      cappedBrier < v1BrierSub
+        ? "  -> capping improves on locked v1 — the concentration diagnostic's prediction does NOT hold up."
+        : "  -> capping does NOT improve on locked v1 — confirms the concentration diagnostic's prediction: pushing markets toward more balance hurts skill-weighting, it doesn't help."
+    );
+
+    console.log("\n  Simulated return per $1 staked using the capped tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withCapped
+        .map((s) => ({ ...s, gapCapped: s.smartPctCapped! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapCapped) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapCapped >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
       const avgProfit = mean(profits);
       const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
       console.log(
