@@ -156,12 +156,54 @@
 // an artifact of v8's hindsight leak: once the honest, live-plausible filter is substituted in, the
 // entire "held/open-as-of x confidence" line of weighting is a dead end, not just an unproven one. Not
 // shipped.
+//
+// v14: EXPERIMENTAL, a new weighting axis on top of locked v1 — "wavering conviction." v6-v13 only ever
+// used the aggregate closed-position row (avg_price/size/realized_pnl), which can't tell a clean
+// dollar-cost-average-in from a wallet that got cold feet partway through. This pulls each positioned
+// wallet's raw /activity (chronological BUY/SELL fills, same source detectArbitrageConditions in
+// botDetection.ts already reads) filtered to the specific (conditionId, outcomeIndex) and walks it:
+//   - pure accumulation (buy, buy, buy, ... — never sells while still holding) -> multiplier 1.0. This
+//     is the "don't reward averaging in" guard the user asked for explicitly — size alone never moves
+//     the multiplier, only a sell-while-still-holding does.
+//   - a SELL that leaves a non-dust remainder (still holding some after) -> WAVER_PENALTY once per
+//     episode ("decrease their weight a bit").
+//   - a subsequent BUY after having wavered -> RECOVERY_MULTIPLIER once, applied on top of the waver
+//     penalty, not replacing it ("when they buy back, increase their weight a bit") — net effect after
+//     one waver+one recovery is still slightly below 1.0 (partial, not full, trust restored).
+// A full exit (remainder near zero) is NOT a waver — it's just closing the position normally.
+// Implemented against locked v1 (skill*sqrt(cost) base) only, per the ask — not v6/v7/v10 variants.
+// RESULT: negative. n=217 same-entries comparison: locked v1 0.1178, conviction-weighted 0.1310 —
+// worse, plus lower win rate across every gap bucket. Plausible reason: a partial sell that still
+// leaves a position open is often routine profit-taking or risk trimming by a wallet that still has
+// real conviction on the remainder, not doubt — penalizing it removes signal rather than noise. Not
+// shipped.
+//
+// v15: two related asks, reported together since one is a special case of the other's machinery.
+//   (a) "copy every trade from every leaderboard wallet" baseline — the dollarPct field already
+//       computed for every sample (dollar-weighted average entry, no skill at all) is now ALSO
+//       persisted and point-in-time price-matched like every other variant, instead of only ever being
+//       compared to the final outcome in the early unmatched section. This is the honest floor: what
+//       you'd get by literally sizing a copy-trade proportional to how much each wallet actually bet,
+//       with zero selectivity about who's good at forecasting.
+//   (b) MIN_PARTICIPANTS_FLOOR (1) — walks the per-condition loop down to markets with even a single
+//       positioned wallet, the most permissive population possible. Reported for locked v1 AND the
+//       dollarPct baseline, at all three floors (5+/3+/1+) side by side, so "does skill-weighting help"
+//       and "does requiring more agreement help" can both be read off independently at every population
+//       size instead of just at the locked 5+ this file has used everywhere until now.
+// RESULT: notable — the dollar-weighted "copy everyone" baseline beats locked v1's skill-weighting at
+// EVERY population floor tested: 5+ n=217, v1=0.1178 vs dollar=0.1128; 3+ n=411, v1=0.1286 vs
+// dollar=0.1236; 1+ n=1144, v1=0.1472 vs dollar=0.1449. The margin is modest (~0.003-0.005 Brier, not
+// in v8's league) but consistent in direction across three different population sizes, not a one-off.
+// Also reconfirms v10b independently at the extreme: loosening 5+ -> 1+ roughly doubles Brier for
+// EITHER weighting (agreement among more traders is real signal, regardless of how you weight within a
+// market). Skill-weighting may be adding noise relative to simply following dollar volume — worth a
+// closer look before touching production, but not acted on yet.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PolymarketClient } from "./polymarket.js";
+import { PolymarketClient, type TradeActivity } from "./polymarket.js";
 import { dailyPointsFromHistory } from "./priceHistory.js";
 import { classifyMarket } from "./specialty.js";
 
@@ -207,6 +249,22 @@ const EQUAL_WEIGHT_BOOST = 2;
 // market gate; MIN_PARTICIPANTS (5) stays the locked value used for the primary report.
 const MIN_PARTICIPANTS_LOOSE = 3;
 
+// EXPERIMENTAL (v14) — not part of the locked v1 formula, see the header note. A partial sell that
+// still leaves a non-dust remainder counts as "wavered" (decrease weight a bit); a later buy after
+// wavering counts as "recovered" (increase weight a bit, but not all the way back — net effect after
+// one waver+one recovery is 0.85*1.15 = 0.9775, still slightly below neutral, not a reward for having
+// wavered at all). Round, simple starting values — tune against the backtest, not by feel, same
+// discipline as SPECIALTY_BOOST.
+const WAVER_PENALTY = 0.85;
+const RECOVERY_MULTIPLIER = 1.15;
+// A sell leaving less than this fraction of the position's peak size behind counts as a full exit
+// (not a waver) — guards against floating-point/rounding dust registering as "still holding."
+const FULL_EXIT_EPSILON_FRACTION = 0.02;
+
+// EXPERIMENTAL (v15b) — not part of the locked v1 formula, see the header note. Most permissive
+// population floor tested — a market with even a single positioned leaderboard wallet qualifies.
+const MIN_PARTICIPANTS_FLOOR = 1;
+
 // Persisted, ever-growing record of matched results — see the v4 note at the top of the file for why
 // this exists (wallet_closed_positions is a rolling window, not an archive).
 const HISTORY_FILE = join(dirname(fileURLToPath(import.meta.url)), "backtestSmartMoneyHistory.json");
@@ -229,6 +287,8 @@ interface HistoryEntry {
   isUnanimous?: boolean; // EXPERIMENTAL (v11) — not locked, may be absent on older entries
   smartPctHeldConfidence?: number; // EXPERIMENTAL (v12) — not locked, may be absent on older entries
   smartPctOpenAsOfConfidence?: number; // EXPERIMENTAL (v13) — not locked, may be absent on older entries
+  smartPctConviction?: number; // EXPERIMENTAL (v14) — not locked, may be absent on older entries
+  dollarPct?: number; // EXPERIMENTAL (v15a) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -295,6 +355,22 @@ async function fetchSpecialtyByAddress(): Promise<Map<string, string>> {
   return specialty;
 }
 
+// EXPERIMENTAL (v14) — raw chronological fills per wallet, fetched live (not cached anywhere in
+// Supabase at this granularity/retention — wallet_trades is a rolling ~200-fill window scoped to
+// current leaderboard wallets only, too lossy for a wallet's full lifetime history in one market).
+// One /activity call per distinct address, same "general" rate lane as ingest's own bot-detection pass.
+async function fetchActivityByAddress(addresses: string[], client: PolymarketClient): Promise<Map<string, TradeActivity[]>> {
+  const activityByAddress = new Map<string, TradeActivity[]>();
+  let done = 0;
+  for (const address of addresses) {
+    done += 1;
+    if (done % 25 === 0) console.log(`  ...${done}/${addresses.length}`);
+    const activity = await client.getActivity(address);
+    activityByAddress.set(address, activity);
+  }
+  return activityByAddress;
+}
+
 // exitValue ~1 -> held to a winning resolution, ~0 -> held to a loss. Mid-range -> sold early
 // (not a resolution confirmation), same logic as web/lib/resolvedMarkets.ts.
 function exitValue(row: ClosedRow): number | null {
@@ -321,6 +397,37 @@ function isOpenAsOf(row: ClosedRow, referenceMs: number): boolean {
 
 function cost(row: ClosedRow): number {
   return (row.size ?? 0) * (row.avg_price ?? 0);
+}
+
+// EXPERIMENTAL (v14): walk one wallet's raw chronological fills for a single (conditionId,
+// outcomeIndex) position and derive the conviction multiplier — see the header note for the state
+// machine (pure accumulation = neutral, a partial sell that leaves a remainder = wavered, a buy after
+// wavering = partial recovery). Fills outside this exact position are already filtered out by the
+// caller; this function assumes `fills` is already scoped to one (wallet, conditionId, outcomeIndex).
+function convictionMultiplier(fills: TradeActivity[]): number {
+  const sorted = [...fills].sort((a, b) => a.timestamp - b.timestamp);
+  let runningSize = 0;
+  let peakSize = 0;
+  let hasWavered = false;
+  let multiplier = 1;
+  for (const fill of sorted) {
+    if (fill.side === "BUY") {
+      if (hasWavered) {
+        multiplier *= RECOVERY_MULTIPLIER;
+        hasWavered = false; // consume — a second buy in a row shouldn't stack another bump
+      }
+      runningSize += fill.size;
+      peakSize = Math.max(peakSize, runningSize);
+    } else if (fill.side === "SELL") {
+      runningSize -= fill.size;
+      const isFullExit = peakSize === 0 || runningSize <= peakSize * FULL_EXIT_EPSILON_FRACTION;
+      if (!isFullExit && !hasWavered) {
+        multiplier *= WAVER_PENALTY;
+        hasWavered = true;
+      }
+    }
+  }
+  return multiplier;
 }
 
 function yesEquivalentEntry(row: ClosedRow): number {
@@ -424,6 +531,16 @@ async function main(): Promise<void> {
   ]);
   console.log(`${allClosed.length} closed-position rows, ${skillByAddress.size} leaderboard wallets, ${specialtyByAddress.size} with a specialty\n`);
 
+  // EXPERIMENTAL (v14): one /activity fetch per distinct address touching any closed position, so the
+  // per-condition loop below can reconstruct each wallet's raw fill sequence for the conviction
+  // multiplier. Instantiated here (rather than down where the price-history live-fetch fallback used to
+  // create its own client) so both steps share one instance.
+  const client = new PolymarketClient();
+  const distinctAddresses = [...new Set(allClosed.map((r) => r.address))];
+  console.log(`Fetching raw activity for ${distinctAddresses.length} distinct wallets (v14 conviction weighting)...`);
+  const activityByAddress = await fetchActivityByAddress(distinctAddresses, client);
+  console.log(`${activityByAddress.size} wallets' activity fetched\n`);
+
   // EXPERIMENTAL (v7): each wallet's own average dust-floored bet size, across their whole recorded
   // history — the baseline "this bet is bigger than usual FOR THEM" is measured against. Dust-floored
   // so a pile of $2 noise trades doesn't drag the average down and make every real bet look outsized.
@@ -461,6 +578,7 @@ async function main(): Promise<void> {
     isUnanimous: boolean; // EXPERIMENTAL (v11) — every non-dust position in the market is on the same outcome_index
     smartPctHeldConfidence: number; // EXPERIMENTAL (v12) — v8's held-to-resolution filter + v7's confidence multiplier, combined
     smartPctOpenAsOfConfidence: number; // EXPERIMENTAL (v13) — v9's open-as-of filter + v7's confidence multiplier, combined
+    smartPctConviction: number; // EXPERIMENTAL (v14) — v1 base weight x wavering-conviction multiplier
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -497,11 +615,12 @@ async function main(): Promise<void> {
     const actual = winningOutcomeIndex === 0 ? 1 : 0;
 
     // Locked-v1 population is 5+ distinct wallets, each with a non-dust position — but the loop now
-    // walks down to MIN_PARTICIPANTS_LOOSE (v10b) so 3-4-participant markets get discovered and
-    // matched too; every downstream "locked v1" report still filters back up to MIN_PARTICIPANTS.
+    // walks all the way down to MIN_PARTICIPANTS_FLOOR (v15b, 1) so every population tier (5+/3+/1+)
+    // gets discovered and matched in one pass; every downstream "locked v1" report still filters back
+    // up to whichever floor it's reporting on.
     const positioned = rows.filter((r) => cost(r) >= DUST_FLOOR_USD);
     const distinctWallets = new Set(positioned.map((r) => r.address));
-    if (distinctWallets.size < MIN_PARTICIPANTS_LOOSE) continue;
+    if (distinctWallets.size < MIN_PARTICIPANTS_FLOOR) continue;
 
     // EXPERIMENTAL (v11): every non-dust position (across every wallet) on the same outcome_index —
     // no leaderboard money at all took the other side.
@@ -534,6 +653,8 @@ async function main(): Promise<void> {
     let openAsOfConfidenceWeighted = 0;
     let equalWeight = 0;
     let equalWeighted = 0;
+    let convictionWeight = 0;
+    let convictionWeighted = 0;
     let dateWeight = 0;
     let dateWeighted = 0; // sum(weight * entry epoch ms) -> weighted-average entry date
     for (const row of positioned) {
@@ -581,6 +702,14 @@ async function main(): Promise<void> {
       const wEqual = theirAvg && theirAvg > 0 && c > theirAvg ? EQUAL_WEIGHT_BOOST : 1;
       equalWeight += wEqual;
       equalWeighted += wEqual * yesEq;
+      // EXPERIMENTAL (v14): v1's base weight x wavering-conviction multiplier, derived from this
+      // wallet's raw fills for this exact (conditionId, outcomeIndex) — see convictionMultiplier().
+      const positionFills = (activityByAddress.get(row.address) ?? []).filter(
+        (a) => a.conditionId === conditionId && a.outcomeIndex === row.outcome_index
+      );
+      const wConviction = w * convictionMultiplier(positionFills);
+      convictionWeight += wConviction;
+      convictionWeighted += wConviction * yesEq;
       const entryMs = row.first_traded_at ? Date.parse(row.first_traded_at) : NaN;
       if (Number.isFinite(entryMs)) {
         dateWeight += w;
@@ -611,6 +740,7 @@ async function main(): Promise<void> {
       isUnanimous,
       smartPctHeldConfidence: heldConfidenceWeight > 0 ? heldConfidenceWeighted / heldConfidenceWeight : smartWeighted / smartWeight,
       smartPctOpenAsOfConfidence: openAsOfConfidenceWeight > 0 ? openAsOfConfidenceWeighted / openAsOfConfidenceWeight : smartWeighted / smartWeight,
+      smartPctConviction: convictionWeight > 0 ? convictionWeighted / convictionWeight : smartWeighted / smartWeight,
       actual,
       daysEarly,
       refEntryMs
@@ -618,7 +748,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `${samples.length} resolved markets clear the ${MIN_PARTICIPANTS_LOOSE}-participant / $10 floor (${samples.filter((s) => s.participantCount >= MIN_PARTICIPANTS).length} of those also clear the locked ${MIN_PARTICIPANTS}-participant floor)\n`
+    `${samples.length} resolved markets clear the ${MIN_PARTICIPANTS_FLOOR}-participant / $10 floor (${samples.filter((s) => s.participantCount >= MIN_PARTICIPANTS_LOOSE).length} clear ${MIN_PARTICIPANTS_LOOSE}+, ${samples.filter((s) => s.participantCount >= MIN_PARTICIPANTS).length} clear the locked ${MIN_PARTICIPANTS}+ floor)\n`
   );
   if (samples.length === 0) {
     console.log("Nothing to score.");
@@ -721,39 +851,14 @@ async function main(): Promise<void> {
   // markets forever.
   const history = loadHistory();
   const matchedIds = new Set(matched.map((s) => s.conditionId));
-  const client = new PolymarketClient();
-  const liveFetched: MatchedSample[] = [];
-  const toFetch = samples.filter((s) => s.refEntryMs !== null && !matchedIds.has(s.conditionId) && !history.has(s.conditionId));
-  if (toFetch.length > 0) {
-    console.log(`Fetching real price history from Gamma+CLOB for ${toFetch.length} markets the cache missed...`);
-    let done = 0;
-    for (const s of toFetch) {
-      done += 1;
-      if (done % 25 === 0) console.log(`  ...${done}/${toFetch.length}`);
-      const yesTokenId = await client.getYesTokenId(s.conditionId);
-      if (!yesTokenId) continue;
-      const raw = await client.getPriceHistory(yesTokenId);
-      if (raw.length === 0) continue;
-      // clobTokenIds[0] is the YES token directly (Gamma tells us, not inferred from settled
-      // prices), so no orientation step needed — dailyPointsFromHistory's price is already YES-equivalent.
-      const points = dailyPointsFromHistory(raw, 3650, Date.now());
-      if (points.length === 0) continue;
-      const series = new Map(points.map((p) => [p.ts, p.price]));
-      const livePriceAtEntry = nearestPrice(series, s.refEntryMs!);
-      if (livePriceAtEntry === null) continue;
-      liveFetched.push({ ...s, livePriceAtEntry, gap: s.smartPct - livePriceAtEntry });
-    }
-    console.log(`${liveFetched.length} additional markets matched via live fetch`);
-  }
-
-  // Fold into the persisted history — resolved markets already recorded stay as-is (their outcome and
-  // matched price are fixed historical facts, LOCKED and never touched), new ones from this run get
-  // added. This is what makes the sample actually grow across runs instead of shifting with
-  // wallet_closed_positions' rolling window.
   const before = history.size;
   const now = new Date().toISOString();
-  for (const s of [...matched, ...liveFetched]) {
-    if (history.has(s.conditionId)) continue;
+  // Fold a matched/live-fetched sample into the persisted history — resolved markets already recorded
+  // stay as-is (their outcome and matched price are fixed historical facts, LOCKED and never touched),
+  // new ones from this run get added. This is what makes the sample actually grow across runs instead
+  // of shifting with wallet_closed_positions' rolling window.
+  function recordMatch(s: MatchedSample): void {
+    if (history.has(s.conditionId)) return;
     history.set(s.conditionId, {
       conditionId: s.conditionId,
       smartPct: s.smartPct,
@@ -771,13 +876,46 @@ async function main(): Promise<void> {
       participantCount: s.participantCount,
       isUnanimous: s.isUnanimous,
       smartPctHeldConfidence: s.smartPctHeldConfidence,
-      smartPctOpenAsOfConfidence: s.smartPctOpenAsOfConfidence
+      smartPctOpenAsOfConfidence: s.smartPctOpenAsOfConfidence,
+      smartPctConviction: s.smartPctConviction,
+      dollarPct: s.dollarPct
     });
+  }
+  for (const s of matched) recordMatch(s);
+
+  const toFetch = samples.filter((s) => s.refEntryMs !== null && !matchedIds.has(s.conditionId) && !history.has(s.conditionId));
+  let liveFetchedCount = 0;
+  if (toFetch.length > 0) {
+    console.log(`Fetching real price history from Gamma+CLOB for ${toFetch.length} markets the cache missed...`);
+    let done = 0;
+    for (const s of toFetch) {
+      done += 1;
+      if (done % 25 === 0) console.log(`  ...${done}/${toFetch.length}`);
+      // Checkpoint periodically — this loop can run long on a wide population (v15b's 1+ floor pulls
+      // in thousands of markets needing a live fetch each), so bank progress instead of losing it all
+      // if the run gets killed/times out partway through; a resumed run's toFetch filter already skips
+      // anything already in history.
+      if (done % 50 === 0) saveHistory(history);
+      const yesTokenId = await client.getYesTokenId(s.conditionId);
+      if (!yesTokenId) continue;
+      const raw = await client.getPriceHistory(yesTokenId);
+      if (raw.length === 0) continue;
+      // clobTokenIds[0] is the YES token directly (Gamma tells us, not inferred from settled
+      // prices), so no orientation step needed — dailyPointsFromHistory's price is already YES-equivalent.
+      const points = dailyPointsFromHistory(raw, 3650, Date.now());
+      if (points.length === 0) continue;
+      const series = new Map(points.map((p) => [p.ts, p.price]));
+      const livePriceAtEntry = nearestPrice(series, s.refEntryMs!);
+      if (livePriceAtEntry === null) continue;
+      recordMatch({ ...s, livePriceAtEntry, gap: s.smartPct - livePriceAtEntry });
+      liveFetchedCount += 1;
+    }
+    console.log(`${liveFetchedCount} additional markets matched via live fetch`);
   }
   saveHistory(history);
   console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
 
-  // EXPERIMENTAL (v6-v13) backfill: existing entries never got these fields (they didn't exist
+  // EXPERIMENTAL (v6-v15) backfill: existing entries never got these fields (they didn't exist
   // yet). None touch any locked field, so it's safe to add retroactively for any entry whose
   // underlying market is still represented in this run's samples (older ones may have aged out of
   // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
@@ -824,6 +962,14 @@ async function main(): Promise<void> {
       entry.smartPctOpenAsOfConfidence = sample.smartPctOpenAsOfConfidence;
       changed = true;
     }
+    if (entry.smartPctConviction === undefined) {
+      entry.smartPctConviction = sample.smartPctConviction;
+      changed = true;
+    }
+    if (entry.dollarPct === undefined) {
+      entry.dollarPct = sample.dollarPct;
+      changed = true;
+    }
     if (changed) backfilled += 1;
   }
   if (backfilled > 0) {
@@ -862,6 +1008,10 @@ async function main(): Promise<void> {
   // only by the v10b section at the very end.
   const currentVersionAllLoose = all.filter(
     (s) => s.methodologyVersion === METHODOLOGY_VERSION && (s.participantCount ?? MIN_PARTICIPANTS) >= MIN_PARTICIPANTS_LOOSE
+  );
+  // EXPERIMENTAL (v15b): the most permissive 1+ population — a strict superset of currentVersionAllLoose.
+  const currentVersionAllFloor = all.filter(
+    (s) => s.methodologyVersion === METHODOLOGY_VERSION && (s.participantCount ?? MIN_PARTICIPANTS) >= MIN_PARTICIPANTS_FLOOR
   );
 
   const smartBrierM = mean(currentVersionAll.map((s) => brier(s.smartPct, s.actual)));
@@ -1230,6 +1380,85 @@ async function main(): Promise<void> {
         continue;
       }
       const profits = trades.map((s) => (s.gapCombined >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  // ── EXPERIMENTAL (v14): wavering-conviction weighting — v1's base weight x convictionMultiplier —
+  // compared against locked v1 on the same entries. ──
+  const withConviction = currentVersionAll.filter((s) => s.smartPctConviction !== undefined);
+  console.log(`\nEXPERIMENTAL: wavering-conviction weighted (partial-sell-then-hold penalized, buy-back-after partially restored), n=${withConviction.length}:`);
+  if (withConviction.length === 0) {
+    console.log("  No entries have smartPctConviction yet.");
+  } else {
+    const v1BrierSub = mean(withConviction.map((s) => brier(s.smartPct, s.actual)));
+    const convictionBrier = mean(withConviction.map((s) => brier(s.smartPctConviction!, s.actual)));
+    console.log(`  locked v1 Brier (same ${withConviction.length} entries): ${v1BrierSub.toFixed(4)}`);
+    console.log(`  conviction-weighted Brier:                   ${convictionBrier.toFixed(4)}`);
+    console.log(
+      convictionBrier < v1BrierSub
+        ? "  -> conviction weighting improves on locked v1 on this sample."
+        : "  -> conviction weighting does NOT improve on locked v1 on this sample — not worth shipping as-is."
+    );
+
+    console.log("\n  Simulated return per $1 staked using the conviction-weighted tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withConviction
+        .map((s) => ({ ...s, gapConviction: s.smartPctConviction! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapConviction) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapConviction >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  // ── EXPERIMENTAL (v15): "copy every trade" dollar-weighted baseline (v15a) + the most permissive
+  // 1+ population floor (v15b), reported together as a 3-tier table (locked v1 vs. dollarPct, at
+  // 5+/3+/1+) so both "does skill-weighting help" and "does requiring agreement help" are visible at
+  // every population size, not just the locked 5+. ──
+  console.log("\nEXPERIMENTAL: locked v1 vs. dollar-weighted 'copy every trade' baseline, by population floor:");
+  const populationTiers: [string, HistoryEntry[]][] = [
+    [`${MIN_PARTICIPANTS}+ (locked)`, currentVersionAll],
+    [`${MIN_PARTICIPANTS_LOOSE}+`, currentVersionAllLoose],
+    [`${MIN_PARTICIPANTS_FLOOR}+ (most permissive)`, currentVersionAllFloor]
+  ];
+  for (const [label, pool] of populationTiers) {
+    const withDollar = pool.filter((s) => s.dollarPct !== undefined);
+    if (withDollar.length === 0) {
+      console.log(`  ${label}: n=0`);
+      continue;
+    }
+    const v1BrierTier = mean(withDollar.map((s) => brier(s.smartPct, s.actual)));
+    const dollarBrierTier = mean(withDollar.map((s) => brier(s.dollarPct!, s.actual)));
+    console.log(
+      `  ${label}: n=${withDollar.length}, locked v1=${v1BrierTier.toFixed(4)}, copy-every-trade (dollar-weighted)=${dollarBrierTier.toFixed(4)}` +
+        (dollarBrierTier < v1BrierTier ? "  <- copy-everyone beats skill-weighting here" : "")
+    );
+  }
+
+  const floorWithDollar = currentVersionAllFloor.filter((s) => s.dollarPct !== undefined);
+  if (floorWithDollar.length > 0) {
+    console.log(`\n  Simulated return per $1 staked, copy-every-trade baseline, ${MIN_PARTICIPANTS_FLOOR}+ population (min gap):`);
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = floorWithDollar
+        .map((s) => ({ ...s, gapDollar: s.dollarPct! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapDollar) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapDollar >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
       const avgProfit = mean(profits);
       const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
       console.log(
