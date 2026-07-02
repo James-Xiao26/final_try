@@ -110,6 +110,21 @@
 // (b) loosening to 3+ participants makes locked v1 itself worse too (Brier 0.1129 -> 0.1250, n=234 ->
 // 428) — a 3-4-participant market is a noisier signal, not just a bigger sample; equal-weighting on
 // that widened population is worse still (0.1343). Not shipped.
+//
+// v11: EXPERIMENTAL, isolated from v6-v10 (population filter, not a weighting change). Restricts to
+// unanimous markets — every non-dust position in the market (across every positioned wallet) is on the
+// SAME outcome_index, i.e. no leaderboard money at all took the other side. A market with even one
+// dissenting position (including a wallet's own hedge/arb leg — wallet_closed_positions keeps both legs
+// unfiltered, see the v8 note) fails unanimity. Reported for both the locked 5+ and loosened 3+
+// populations (v10b), using both the locked-v1 and equal-weighted (v10a) formulas on the unanimous-only
+// subset — since with everyone agreeing, weighting mostly collapses to "how big was the total bet,"
+// this mainly tests whether *filtering out disagreement entirely* beats weighting through it.
+// RESULT: negative at both floors. Locked v1 Brier 0.1129 (n=234) -> 0.1456 unanimous-only (n=12) at
+// 5+; 0.1247 (n=429) -> 0.1678 unanimous-only (n=57) at 3+. The n=12 slice is too small to trust on its
+// own (win-rate swings 33%-100% across gap buckets, classic small-n noise), but the larger n=57 slice
+// points the same direction, so this doesn't look like it flips with more data. Plausible reason:
+// unanimity discards markets where 4 skilled wallets agreed and 1 mediocre one didn't — exactly what
+// skill-weighting already handles correctly without throwing the data away. Not shipped.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -180,6 +195,7 @@ interface HistoryEntry {
   smartPctOpenAsOf?: number; // EXPERIMENTAL (v9) — not locked, may be absent on older entries
   smartPctEqual?: number; // EXPERIMENTAL (v10a) — not locked, may be absent on older entries
   participantCount?: number; // EXPERIMENTAL (v10b) — not locked, may be absent on older entries
+  isUnanimous?: boolean; // EXPERIMENTAL (v11) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -409,6 +425,7 @@ async function main(): Promise<void> {
     smartPctOpenAsOf: number; // EXPERIMENTAL (v9) — only positions still open OPEN_AS_OF_LEAD_DAYS before resolution
     smartPctEqual: number; // EXPERIMENTAL (v10a) — equal weight per wallet, 2x bump on an unusually-large-for-them bet
     participantCount: number; // EXPERIMENTAL (v10b) — distinct positioned wallets; markets can be as few as MIN_PARTICIPANTS_LOOSE now
+    isUnanimous: boolean; // EXPERIMENTAL (v11) — every non-dust position in the market is on the same outcome_index
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -450,6 +467,10 @@ async function main(): Promise<void> {
     const positioned = rows.filter((r) => cost(r) >= DUST_FLOOR_USD);
     const distinctWallets = new Set(positioned.map((r) => r.address));
     if (distinctWallets.size < MIN_PARTICIPANTS_LOOSE) continue;
+
+    // EXPERIMENTAL (v11): every non-dust position (across every wallet) on the same outcome_index —
+    // no leaderboard money at all took the other side.
+    const isUnanimous = new Set(positioned.map((r) => r.outcome_index)).size === 1;
 
     // EXPERIMENTAL (v6): classify the market once via the same keyword classifier wallets.specialty
     // was itself computed with (not markets.category, which is Gamma's raw tag and much noisier).
@@ -539,6 +560,7 @@ async function main(): Promise<void> {
       smartPctOpenAsOf: openAsOfWeight > 0 ? openAsOfWeighted / openAsOfWeight : smartWeighted / smartWeight,
       smartPctEqual: equalWeight > 0 ? equalWeighted / equalWeight : smartWeighted / smartWeight,
       participantCount: distinctWallets.size,
+      isUnanimous,
       actual,
       daysEarly,
       refEntryMs
@@ -696,7 +718,8 @@ async function main(): Promise<void> {
       smartPctHeld: s.smartPctHeld,
       smartPctOpenAsOf: s.smartPctOpenAsOf,
       smartPctEqual: s.smartPctEqual,
-      participantCount: s.participantCount
+      participantCount: s.participantCount,
+      isUnanimous: s.isUnanimous
     });
   }
   saveHistory(history);
@@ -735,6 +758,10 @@ async function main(): Promise<void> {
     }
     if (entry.participantCount === undefined) {
       entry.participantCount = sample.participantCount;
+      changed = true;
+    }
+    if (entry.isUnanimous === undefined) {
+      entry.isUnanimous = sample.isUnanimous;
       changed = true;
     }
     if (changed) backfilled += 1;
@@ -1022,6 +1049,48 @@ async function main(): Promise<void> {
       }
     }
   }
+
+  // ── EXPERIMENTAL (v11): unanimous markets only — no leaderboard money at all took the other side —
+  // reported for both the locked 5+ and loosened 3+ populations, each compared against that same
+  // population's non-filtered baseline computed above (smartBrierM for 5+, v1BrierLoose for 3+). ──
+  function reportUnanimous(label: string, pool: HistoryEntry[], baselineBrier: number, baselineN: number): void {
+    const unanimous = pool.filter((s) => s.isUnanimous === true);
+    console.log(`\nEXPERIMENTAL: unanimous-only, ${label} population, n=${unanimous.length} (vs. n=${baselineN} unfiltered):`);
+    if (unanimous.length === 0) {
+      console.log("  No unanimous entries recorded yet.");
+      return;
+    }
+    const v1BrierUnanimous = mean(unanimous.map((s) => brier(s.smartPct, s.actual)));
+    const v1AccUnanimous = accuracy(unanimous.map((s) => s.smartPct), unanimous.map((s) => s.actual));
+    console.log(`  locked v1 formula, unfiltered:  ${baselineBrier.toFixed(4)}`);
+    console.log(`  locked v1 formula, unanimous-only: ${v1BrierUnanimous.toFixed(4)}, accuracy=${(v1AccUnanimous * 100).toFixed(1)}%`);
+    console.log(
+      v1BrierUnanimous < baselineBrier
+        ? "  -> restricting to unanimous markets improves on the unfiltered population."
+        : "  -> restricting to unanimous markets does NOT improve on the unfiltered population."
+    );
+    const withEqualUnanimous = unanimous.filter((s) => s.smartPctEqual !== undefined);
+    if (withEqualUnanimous.length > 0) {
+      const equalBrierUnanimous = mean(withEqualUnanimous.map((s) => brier(s.smartPctEqual!, s.actual)));
+      console.log(`  equal-weighted formula, unanimous-only (n=${withEqualUnanimous.length}): ${equalBrierUnanimous.toFixed(4)}`);
+    }
+    console.log(`\n  Simulated return per $1 staked, unanimous-only, ${label} population (min gap):`);
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = unanimous.filter((s) => Math.abs(s.gap) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gap >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+  reportUnanimous(`locked ${MIN_PARTICIPANTS}+`, currentVersionAll, smartBrierM, currentVersionAll.length);
+  reportUnanimous(`loosened ${MIN_PARTICIPANTS_LOOSE}+`, currentVersionAllLoose, mean(currentVersionAllLoose.map((s) => brier(s.smartPct, s.actual))), currentVersionAllLoose.length);
 }
 
 main().catch((error) => {
