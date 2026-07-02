@@ -85,6 +85,31 @@
 // vs. that reference rather than the final outcome) — and see whether the effect survives, and how
 // large it really is. That's the number worth trusting before deciding whether any production code
 // needs to change at all.
+//
+// v10: EXPERIMENTAL, isolated from v6/v7/v8/v9. Two independent changes, reported separately so
+// neither masks the other:
+//   (a) equal weighting — every positioned wallet counts the same (weight 1), no skill lookup at all,
+//       with a flat 2x bump when THIS bet is unusually large for that specific wallet (cost exceeds
+//       their own dust-floored average, same "vs their own norm" definition v7 already established,
+//       just applied as a binary bump to an equal base instead of scaling the skill-weighted base).
+//       Tests whether skill-weighting is earning its complexity versus "just listen to the room,
+//       weighted toward whoever's betting bigger than they usually do." Reported head-to-head against
+//       locked v1 on the SAME 5-participant population first — single-variable comparison, same
+//       discipline as v6-v9.
+//   (b) loosening the qualifying-market gate from the locked MIN_PARTICIPANTS (5) to
+//       MIN_PARTICIPANTS_LOOSE (3) — a different population than v1/v6-v9's every-market-locked-at-5
+//       comparisons, so it's reported as its own separate section (locked-v1 vs equal-weight, BOTH
+//       recomputed on the 3+ population) rather than blended into the persisted 5+ history numbers.
+//       The main per-condition loop now walks every market with >=3 participants (a strict superset of
+//       the old >=5 walk) so 3-4-participant markets get discovered and their point-in-time price
+//       matched/persisted too — MIN_PARTICIPANTS itself (5) is untouched and still gates the primary
+//       locked-v1 report, so v1/v6-v9's numbers are unaffected by this widening.
+// RESULT: both changes are negative, independently and combined. (a) equal-weight Brier 0.1331 vs.
+// locked v1's 0.1129 on the identical 5+ population, n=217 (worse on every gap-size win-rate bucket
+// too: ~47-53% vs. v1's ~51-63%) — skill-weighting is earning its complexity, not just adding noise.
+// (b) loosening to 3+ participants makes locked v1 itself worse too (Brier 0.1129 -> 0.1250, n=234 ->
+// 428) — a 3-4-participant market is a noisier signal, not just a bigger sample; equal-weighting on
+// that widened population is worse still (0.1343). Not shipped.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -128,6 +153,14 @@ const SPECIALTY_BOOST = 2;
 // retrospective-only "held all the way to the very end" v8 uses.
 const OPEN_AS_OF_LEAD_DAYS = 7;
 
+// EXPERIMENTAL (v10a) — not part of the locked v1 formula, see the header note. Flat bump applied to
+// an equal (1-per-wallet) base when a bet is unusually large FOR THAT WALLET specifically.
+const EQUAL_WEIGHT_BOOST = 2;
+
+// EXPERIMENTAL (v10b) — not part of the locked v1 formula, see the header note. Loosened qualifying-
+// market gate; MIN_PARTICIPANTS (5) stays the locked value used for the primary report.
+const MIN_PARTICIPANTS_LOOSE = 3;
+
 // Persisted, ever-growing record of matched results — see the v4 note at the top of the file for why
 // this exists (wallet_closed_positions is a rolling window, not an archive).
 const HISTORY_FILE = join(dirname(fileURLToPath(import.meta.url)), "backtestSmartMoneyHistory.json");
@@ -145,6 +178,8 @@ interface HistoryEntry {
   smartPctConfidence?: number; // EXPERIMENTAL (v7) — not locked, may be absent on older entries
   smartPctHeld?: number; // EXPERIMENTAL (v8) — not locked, may be absent on older entries
   smartPctOpenAsOf?: number; // EXPERIMENTAL (v9) — not locked, may be absent on older entries
+  smartPctEqual?: number; // EXPERIMENTAL (v10a) — not locked, may be absent on older entries
+  participantCount?: number; // EXPERIMENTAL (v10b) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -372,6 +407,8 @@ async function main(): Promise<void> {
     smartPctConfidence: number; // EXPERIMENTAL (v7) — equals smartPct when no bet exceeds its wallet's own average
     smartPctHeld: number; // EXPERIMENTAL (v8) — only positions held to confirmed resolution, excludes early sells
     smartPctOpenAsOf: number; // EXPERIMENTAL (v9) — only positions still open OPEN_AS_OF_LEAD_DAYS before resolution
+    smartPctEqual: number; // EXPERIMENTAL (v10a) — equal weight per wallet, 2x bump on an unusually-large-for-them bet
+    participantCount: number; // EXPERIMENTAL (v10b) — distinct positioned wallets; markets can be as few as MIN_PARTICIPANTS_LOOSE now
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -407,10 +444,12 @@ async function main(): Promise<void> {
     }
     const actual = winningOutcomeIndex === 0 ? 1 : 0;
 
-    // Same population the live panel would show: 5+ distinct wallets, each with a non-dust position.
+    // Locked-v1 population is 5+ distinct wallets, each with a non-dust position — but the loop now
+    // walks down to MIN_PARTICIPANTS_LOOSE (v10b) so 3-4-participant markets get discovered and
+    // matched too; every downstream "locked v1" report still filters back up to MIN_PARTICIPANTS.
     const positioned = rows.filter((r) => cost(r) >= DUST_FLOOR_USD);
     const distinctWallets = new Set(positioned.map((r) => r.address));
-    if (distinctWallets.size < MIN_PARTICIPANTS) continue;
+    if (distinctWallets.size < MIN_PARTICIPANTS_LOOSE) continue;
 
     // EXPERIMENTAL (v6): classify the market once via the same keyword classifier wallets.specialty
     // was itself computed with (not markets.category, which is Gamma's raw tag and much noisier).
@@ -433,6 +472,8 @@ async function main(): Promise<void> {
     let heldWeighted = 0;
     let openAsOfWeight = 0;
     let openAsOfWeighted = 0;
+    let equalWeight = 0;
+    let equalWeighted = 0;
     let dateWeight = 0;
     let dateWeighted = 0; // sum(weight * entry epoch ms) -> weighted-average entry date
     for (const row of positioned) {
@@ -466,6 +507,11 @@ async function main(): Promise<void> {
         openAsOfWeight += w;
         openAsOfWeighted += w * yesEq;
       }
+      // EXPERIMENTAL (v10a): no skill lookup — every wallet is worth 1, bumped to
+      // EQUAL_WEIGHT_BOOST only when this bet is bigger than that wallet's own dust-floored average.
+      const wEqual = theirAvg && theirAvg > 0 && c > theirAvg ? EQUAL_WEIGHT_BOOST : 1;
+      equalWeight += wEqual;
+      equalWeighted += wEqual * yesEq;
       const entryMs = row.first_traded_at ? Date.parse(row.first_traded_at) : NaN;
       if (Number.isFinite(entryMs)) {
         dateWeight += w;
@@ -491,13 +537,17 @@ async function main(): Promise<void> {
       smartPctConfidence: confidenceWeight > 0 ? confidenceWeighted / confidenceWeight : smartWeighted / smartWeight,
       smartPctHeld: heldWeight > 0 ? heldWeighted / heldWeight : smartWeighted / smartWeight,
       smartPctOpenAsOf: openAsOfWeight > 0 ? openAsOfWeighted / openAsOfWeight : smartWeighted / smartWeight,
+      smartPctEqual: equalWeight > 0 ? equalWeighted / equalWeight : smartWeighted / smartWeight,
+      participantCount: distinctWallets.size,
       actual,
       daysEarly,
       refEntryMs
     });
   }
 
-  console.log(`${samples.length} resolved markets clear the 5-participant / $10 floor\n`);
+  console.log(
+    `${samples.length} resolved markets clear the ${MIN_PARTICIPANTS_LOOSE}-participant / $10 floor (${samples.filter((s) => s.participantCount >= MIN_PARTICIPANTS).length} of those also clear the locked ${MIN_PARTICIPANTS}-participant floor)\n`
+  );
   if (samples.length === 0) {
     console.log("Nothing to score.");
     return;
@@ -508,9 +558,14 @@ async function main(): Promise<void> {
   const accuracy = (preds: number[], actuals: number[]): number =>
     mean(preds.map((p, i) => (p > 0.5 === actuals[i]! > 0.5 ? 1 : 0)));
 
-  const smartBrier = mean(samples.map((s) => brier(s.smartPct, s.actual)));
-  const dollarBrier = mean(samples.map((s) => brier(s.dollarPct, s.actual)));
-  const naiveBrier = mean(samples.map((s) => brier(0.5, s.actual)));
+  // Locked-v1 population only (>=5 participants) for every report below up through the gap-simulation
+  // section, so these numbers stay directly comparable to v1/v6-v9's historical results — the loosened
+  // 3+ population (v10b) gets its own separate section further down instead of blending in here.
+  const samplesLocked = samples.filter((s) => s.participantCount >= MIN_PARTICIPANTS);
+
+  const smartBrier = mean(samplesLocked.map((s) => brier(s.smartPct, s.actual)));
+  const dollarBrier = mean(samplesLocked.map((s) => brier(s.dollarPct, s.actual)));
+  const naiveBrier = mean(samplesLocked.map((s) => brier(0.5, s.actual)));
 
   console.log("Mean Brier score (lower is better; 0.25 = coin flip, 0 = perfect):");
   console.log(`  smart money (skill*sqrt(cost) weighted): ${smartBrier.toFixed(4)}`);
@@ -518,8 +573,8 @@ async function main(): Promise<void> {
   console.log(`  naive 50/50 baseline:                     ${naiveBrier.toFixed(4)}`);
   console.log();
   console.log("Directional accuracy (predicted majority side matched the actual winner):");
-  console.log(`  smart money:  ${(accuracy(samples.map((s) => s.smartPct), samples.map((s) => s.actual)) * 100).toFixed(1)}%`);
-  console.log(`  dollar-only:  ${(accuracy(samples.map((s) => s.dollarPct), samples.map((s) => s.actual)) * 100).toFixed(1)}%`);
+  console.log(`  smart money:  ${(accuracy(samplesLocked.map((s) => s.smartPct), samplesLocked.map((s) => s.actual)) * 100).toFixed(1)}%`);
+  console.log(`  dollar-only:  ${(accuracy(samplesLocked.map((s) => s.dollarPct), samplesLocked.map((s) => s.actual)) * 100).toFixed(1)}%`);
 
   // Bucket by conviction (distance from 50/50) as a proxy for "how big a signal is this" — the
   // question that actually matters: does a stronger signal predict better, or is it noise?
@@ -530,7 +585,7 @@ async function main(): Promise<void> {
     ["  high (>=25pt)", (s) => Math.abs(s.smartPct - 0.5) >= 0.25]
   ];
   for (const [label, filter] of buckets) {
-    const bucket = samples.filter(filter);
+    const bucket = samplesLocked.filter(filter);
     if (bucket.length === 0) {
       console.log(`${label}: n=0`);
       continue;
@@ -545,7 +600,7 @@ async function main(): Promise<void> {
   // was mostly late entries riding an already-obvious outcome. If it holds up, that's real evidence
   // smart money saw something early rather than just piling on late.
   console.log("\nHigh-conviction (>=25pt) accuracy by minimum lead time before resolution:");
-  const highConviction = samples.filter((s) => Math.abs(s.smartPct - 0.5) >= 0.25 && s.daysEarly !== null);
+  const highConviction = samplesLocked.filter((s) => Math.abs(s.smartPct - 0.5) >= 0.25 && s.daysEarly !== null);
   for (const minDays of LEAD_TIME_THRESHOLDS_DAYS) {
     const bucket = highConviction.filter((s) => s.daysEarly! >= minDays);
     if (bucket.length === 0) {
@@ -639,13 +694,15 @@ async function main(): Promise<void> {
       smartPctSpecialty: s.smartPctSpecialty,
       smartPctConfidence: s.smartPctConfidence,
       smartPctHeld: s.smartPctHeld,
-      smartPctOpenAsOf: s.smartPctOpenAsOf
+      smartPctOpenAsOf: s.smartPctOpenAsOf,
+      smartPctEqual: s.smartPctEqual,
+      participantCount: s.participantCount
     });
   }
   saveHistory(history);
   console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
 
-  // EXPERIMENTAL (v6/v7/v8/v9) backfill: existing entries never got these fields (they didn't exist
+  // EXPERIMENTAL (v6/v7/v8/v9/v10) backfill: existing entries never got these fields (they didn't exist
   // yet). None touch any locked field, so it's safe to add retroactively for any entry whose
   // underlying market is still represented in this run's samples (older ones may have aged out of
   // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
@@ -672,6 +729,14 @@ async function main(): Promise<void> {
       entry.smartPctOpenAsOf = sample.smartPctOpenAsOf;
       changed = true;
     }
+    if (entry.smartPctEqual === undefined) {
+      entry.smartPctEqual = sample.smartPctEqual;
+      changed = true;
+    }
+    if (entry.participantCount === undefined) {
+      entry.participantCount = sample.participantCount;
+      changed = true;
+    }
     if (changed) backfilled += 1;
   }
   if (backfilled > 0) {
@@ -695,11 +760,22 @@ async function main(): Promise<void> {
       `\n⚠ ${all.length - all.filter((s) => s.methodologyVersion === METHODOLOGY_VERSION).length} recorded entries use a different methodology version (${[...otherVersions].join(", ")}) than the current one (${METHODOLOGY_VERSION}). Scoring below is CURRENT-VERSION ONLY — mixing would make the numbers meaningless.`
     );
   }
-  const currentVersionAll = all.filter((s) => s.methodologyVersion === METHODOLOGY_VERSION);
+  // Locked-v1 (>=5 participant) subset only, for every report through the v9 section below — the same
+  // population v1/v6-v9 have always been scored on. Entries without a recorded participantCount (older
+  // than v10b) default to exactly MIN_PARTICIPANTS, since the OLD code that captured them only ever
+  // walked the 5+ population in the first place.
+  const currentVersionAll = all.filter(
+    (s) => s.methodologyVersion === METHODOLOGY_VERSION && (s.participantCount ?? MIN_PARTICIPANTS) >= MIN_PARTICIPANTS
+  );
   if (currentVersionAll.length === 0) {
     console.log("No entries recorded under the current methodology version.");
     return;
   }
+  // EXPERIMENTAL (v10b): the loosened 3+ population — a strict superset of currentVersionAll, used
+  // only by the v10b section at the very end.
+  const currentVersionAllLoose = all.filter(
+    (s) => s.methodologyVersion === METHODOLOGY_VERSION && (s.participantCount ?? MIN_PARTICIPANTS) >= MIN_PARTICIPANTS_LOOSE
+  );
 
   const smartBrierM = mean(currentVersionAll.map((s) => brier(s.smartPct, s.actual)));
   const liveBrierM = mean(currentVersionAll.map((s) => brier(s.livePriceAtEntry, s.actual)));
@@ -867,6 +943,83 @@ async function main(): Promise<void> {
       console.log(
         `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
       );
+    }
+  }
+
+  // ── EXPERIMENTAL (v10a): equal-weight-per-wallet (no skill lookup), 2x bump when a bet is unusually
+  // large for that specific wallet — compared head-to-head against locked v1 on the SAME 5-participant
+  // population (same discipline as v6-v9: one variable at a time). ──
+  const withEqual = currentVersionAll.filter((s) => s.smartPctEqual !== undefined);
+  console.log(`\nEXPERIMENTAL: equal-weighted (no skill; ${EQUAL_WEIGHT_BOOST}x bump on an unusually-large-for-them bet), n=${withEqual.length}:`);
+  if (withEqual.length === 0) {
+    console.log("  No entries have smartPctEqual yet.");
+  } else {
+    const v1BrierSub = mean(withEqual.map((s) => brier(s.smartPct, s.actual)));
+    const equalBrier = mean(withEqual.map((s) => brier(s.smartPctEqual!, s.actual)));
+    console.log(`  locked v1 Brier (same ${withEqual.length} entries): ${v1BrierSub.toFixed(4)}`);
+    console.log(`  equal-weighted Brier:                       ${equalBrier.toFixed(4)}`);
+    console.log(
+      equalBrier < v1BrierSub
+        ? "  -> equal weighting improves on locked v1 on this sample — skill-weighting may not be earning its complexity."
+        : "  -> equal weighting does NOT improve on locked v1 on this sample — not worth shipping as-is."
+    );
+
+    console.log("\n  Simulated return per $1 staked using the equal-weighted tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withEqual
+        .map((s) => ({ ...s, gapEqual: s.smartPctEqual! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapEqual) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapEqual >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  // ── EXPERIMENTAL (v10b): loosened qualifying gate (3+ participants instead of the locked 5+) — a
+  // different population than every section above, so it's not blended in there. Four-way comparison
+  // on the SAME loosened population: locked-v1 formula vs. v10a's equal-weight formula, both recomputed
+  // on the wider set, so "does loosening help" and "does equal-weighting help" can each be read off
+  // independently instead of conflated into one number. ──
+  console.log(`\nEXPERIMENTAL: loosened to ${MIN_PARTICIPANTS_LOOSE}+ participants (vs. locked ${MIN_PARTICIPANTS}+), n=${currentVersionAllLoose.length}:`);
+  if (currentVersionAllLoose.length === 0) {
+    console.log("  No entries recorded under the loosened floor yet.");
+  } else {
+    const v1BrierLoose = mean(currentVersionAllLoose.map((s) => brier(s.smartPct, s.actual)));
+    console.log(`  locked v1 formula, on the ${MIN_PARTICIPANTS}+ population (n=${currentVersionAll.length}): ${smartBrierM.toFixed(4)}`);
+    console.log(`  locked v1 formula, on the ${MIN_PARTICIPANTS_LOOSE}+ population (n=${currentVersionAllLoose.length}):  ${v1BrierLoose.toFixed(4)}`);
+    const withEqualLoose = currentVersionAllLoose.filter((s) => s.smartPctEqual !== undefined);
+    if (withEqualLoose.length > 0) {
+      const equalBrierLoose = mean(withEqualLoose.map((s) => brier(s.smartPctEqual!, s.actual)));
+      console.log(`  equal-weighted formula, on the ${MIN_PARTICIPANTS_LOOSE}+ population (n=${withEqualLoose.length}): ${equalBrierLoose.toFixed(4)}`);
+      console.log(
+        equalBrierLoose < v1BrierLoose
+          ? "  -> on the loosened population, equal weighting beats locked v1."
+          : "  -> on the loosened population, equal weighting does NOT beat locked v1."
+      );
+
+      console.log(`\n  Simulated return per $1 staked, equal-weighted tilt on the ${MIN_PARTICIPANTS_LOOSE}+ population (min gap):`);
+      for (const minGap of GAP_THRESHOLDS) {
+        const trades = withEqualLoose
+          .map((s) => ({ ...s, gapEqualLoose: s.smartPctEqual! - s.livePriceAtEntry }))
+          .filter((s) => Math.abs(s.gapEqualLoose) >= minGap);
+        if (trades.length === 0) {
+          console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+          continue;
+        }
+        const profits = trades.map((s) => (s.gapEqualLoose >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+        const avgProfit = mean(profits);
+        const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+        console.log(
+          `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+        );
+      }
     }
   }
 }
