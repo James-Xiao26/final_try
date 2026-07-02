@@ -119,3 +119,57 @@ export function botSignal(activity: TradeActivity[], config: typeof CONFIG): Bot
 
   return null;
 }
+
+// conditionIds where the wallet held BOTH outcome legs concurrently (overlapping open windows), each
+// leg's cost basis clearing ARBITRAGE_MIN_LEG_USD — locking in a YES+NO<$1 mispricing or hedging, not
+// a directional forecast. A separate pass from botSignal (not folded in) because its output is a
+// per-market exclusion set consumed by excludeArbitrage (scripts/metrics.ts), not a wallet-level ban:
+// only the specific two-sided positions are stripped from scoring, everything else the wallet
+// forecasted still counts. Concurrency (not just "held both sides ever") matters — a wallet that
+// genuinely changed its mind (sold YES, later bought NO) must NOT be flagged, and only the raw
+// chronological /activity stream (not the aggregated ClosedPosition records computeMetrics sees) can
+// tell the two apart. Once a conditionId is flagged it stays flagged for the whole run, even if one
+// leg is later closed — the two-sided hold already happened.
+export function detectArbitrageConditions(activity: TradeActivity[], config: typeof CONFIG): Set<string> {
+  const netSizeByPosition = new Map<string, number>();
+  const netCostByPosition = new Map<string, number>();
+  const openLegsByCondition = new Map<string, Set<string>>();
+  const arbConditionIds = new Set<string>();
+  const chronological = [...activity].sort((left, right) => left.timestamp - right.timestamp);
+
+  for (const trade of chronological) {
+    const positionKey = keyFor(trade);
+    const sign = trade.side === "BUY" ? 1 : trade.side === "SELL" ? -1 : 0;
+    const nextSize = (netSizeByPosition.get(positionKey) ?? 0) + sign * trade.size;
+    const nextCost = (netCostByPosition.get(positionKey) ?? 0) + sign * trade.usdcSize;
+    const isOpen = nextSize > CLOSED_SIZE_EPSILON;
+
+    if (isOpen) {
+      netSizeByPosition.set(positionKey, nextSize);
+      netCostByPosition.set(positionKey, nextCost);
+    } else {
+      netSizeByPosition.delete(positionKey);
+      netCostByPosition.delete(positionKey);
+    }
+
+    let legs = openLegsByCondition.get(trade.conditionId);
+    if (isOpen && nextCost >= config.ARBITRAGE_MIN_LEG_USD) {
+      if (!legs) {
+        legs = new Set();
+        openLegsByCondition.set(trade.conditionId, legs);
+      }
+      legs.add(positionKey);
+    } else if (legs) {
+      legs.delete(positionKey);
+      if (legs.size === 0) {
+        openLegsByCondition.delete(trade.conditionId);
+      }
+    }
+
+    if ((openLegsByCondition.get(trade.conditionId)?.size ?? 0) >= 2) {
+      arbConditionIds.add(trade.conditionId);
+    }
+  }
+
+  return arbConditionIds;
+}

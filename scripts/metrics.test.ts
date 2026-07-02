@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CONFIG } from "./config.js";
-import { computeMetrics, computeSkillScore, isScorableMarket, type WalletMetrics } from "./metrics.js";
+import { computeMetrics, computeSkillScore, excludeArbitrage, ineligibilityReason, isScorableMarket, type WalletMetrics } from "./metrics.js";
 import type { ClosedPosition } from "./polymarket.js";
 
 const recentIso = (daysAgo: number): string =>
@@ -39,7 +39,7 @@ function metrics(overrides: Partial<WalletMetrics> = {}): WalletMetrics {
     pctEdge: 0,
     avgEdgePerShare: 0,
     nResolved: 0,
-    outlierFlag: false,
+    ineligibleReason: null,
     equityCurve: [],
     ...overrides
   };
@@ -130,6 +130,21 @@ test("computeMetrics excludes recurring 'Up or Down' windowed positions from eve
   assert.equal(m.nResolved, 1);
 });
 
+test("excludeArbitrage strips only positions in a flagged conditionId, leaves everything else", () => {
+  const positions = [
+    position({ conditionId: "arb-market", realizedPnl: 100 }),
+    position({ conditionId: "clean-market", realizedPnl: 50 })
+  ];
+  const filtered = excludeArbitrage(positions, new Set(["arb-market"]));
+  assert.equal(filtered.length, 1);
+  assert.equal(filtered[0]?.conditionId, "clean-market");
+});
+
+test("excludeArbitrage is a no-op with an empty exclusion set", () => {
+  const positions = [position({ conditionId: "c1" }), position({ conditionId: "c2" })];
+  assert.deepEqual(excludeArbitrage(positions, new Set()), positions);
+});
+
 test("computeMetrics handles an empty position set without dividing by zero", () => {
   const m = computeMetrics([], 30, CONFIG);
   assert.equal(m.nTrades, 0);
@@ -215,8 +230,22 @@ test("computeSkillScore is null for sub-cent longshot traders (low avg entry pri
   assert.ok(computeSkillScore(metrics({ avgEntryPrice: CONFIG.MIN_AVG_ENTRY_PRICE }), CONFIG) !== null);
 });
 
-test("computeSkillScore is null when a single win dominates PnL", () => {
-  assert.equal(computeSkillScore(metrics({ outlierFlag: true }), CONFIG), null);
+// --- ineligibilityReason: same gates as computeSkillScore, broken out into a reason code ---------
+
+test("ineligibilityReason returns null for an eligible wallet", () => {
+  assert.equal(ineligibilityReason(metrics(), CONFIG), null);
+});
+
+test("ineligibilityReason flags insufficient_trades before the other gates", () => {
+  assert.equal(ineligibilityReason(metrics({ nTrades: CONFIG.MIN_TRADES - 1 }), CONFIG), "insufficient_trades");
+});
+
+test("ineligibilityReason flags insufficient_volume", () => {
+  assert.equal(ineligibilityReason(metrics({ totalVolumeUsd: CONFIG.MIN_VOLUME_USD - 1 }), CONFIG), "insufficient_volume");
+});
+
+test("ineligibilityReason flags longshot_entry", () => {
+  assert.equal(ineligibilityReason(metrics({ avgEntryPrice: 0.005 }), CONFIG), "longshot_entry");
 });
 
 // --- computeSkillScore: Bayesian-shrunk edge (0, then 4–10) -----------------

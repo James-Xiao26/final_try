@@ -1,9 +1,9 @@
 import { pathToFileURL } from "node:url";
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
-import { botSignal, type BotSignal } from "./botDetection.js";
+import { botSignal, detectArbitrageConditions, type BotSignal } from "./botDetection.js";
 import { CONFIG } from "./config.js";
-import { computeMetrics, type WalletMetrics } from "./metrics.js";
+import { computeMetrics, excludeArbitrage, type IneligibilityReason, type WalletMetrics } from "./metrics.js";
 import { apiStats, discoverTopWallets, discoverCandidateAddresses, scanChipBoards, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet, type EventSummary } from "./polymarket.js";
 import { recentTradesFromActivity, type RecentTrade } from "./recentTrades.js";
 import { walletSpecialty } from "./specialty.js";
@@ -14,6 +14,7 @@ import { earliestEntryDates, earliestTradeMs, latestFillDates, openPositionRecor
 import { bestSkillScore, computeScoringOutcome, selectCandidateBatch, type CandidateWallet, type CandidateStatus } from "./candidateDiscovery.js";
 import { summarizeCrowdedMarkets, type CrowdClosedPosition, type CrowdOpenPosition } from "./marketCrowd.js";
 import { newEntriesFromActivity, summarizeFreshEntries, type NewEntry } from "./freshEntries.js";
+import { shouldSkipWallet, type WalletRecheckState, type WalletRecheckStatsRow } from "./walletRecheck.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -32,6 +33,7 @@ interface Database {
           lifetime_pnl: number | null;
           specialty: string | null;
           leaderboard_chips: string[] | null;
+          earliest_trade_at: string | null;
           first_seen_at: string;
           updated_at: string;
         };
@@ -45,6 +47,7 @@ interface Database {
           lifetime_pnl?: number | null;
           specialty?: string | null;
           leaderboard_chips?: string[] | null;
+          earliest_trade_at?: string | null;
         };
         Update: {
           is_bot_suspected?: boolean;
@@ -55,6 +58,7 @@ interface Database {
           lifetime_pnl?: number | null;
           specialty?: string | null;
           leaderboard_chips?: string[] | null;
+          earliest_trade_at?: string | null;
         };
         Relationships: [];
       };
@@ -72,6 +76,7 @@ interface Database {
           pct_edge: number | null;
           avg_edge_per_share: number | null;
           n_resolved: number | null;
+          ineligible_reason: string | null;
           computed_at: string;
         };
         Insert: {
@@ -87,6 +92,7 @@ interface Database {
           pct_edge?: number | null;
           avg_edge_per_share?: number | null;
           n_resolved?: number | null;
+          ineligible_reason?: string | null;
           computed_at?: string;
         };
         Update: {
@@ -100,6 +106,7 @@ interface Database {
           pct_edge?: number | null;
           avg_edge_per_share?: number | null;
           n_resolved?: number | null;
+          ineligible_reason?: string | null;
           computed_at?: string;
         };
         Relationships: [];
@@ -717,6 +724,7 @@ async function upsertMetrics(
     pct_edge: metrics.pctEdge,
     avg_edge_per_share: metrics.avgEdgePerShare,
     n_resolved: metrics.nResolved,
+    ineligible_reason: metrics.ineligibleReason,
     computed_at: new Date().toISOString()
   }, { onConflict: "address,horizon_days" });
 
@@ -736,15 +744,21 @@ export async function processWallet(
   const activity = await client.getActivity(normalized);
   const botReason = botSignal(activity, CONFIG);
   const bot = botReason !== null;
+  // Wallet's own earliest trade ever seen, made durable (previously computed transiently just for
+  // the age-gate check below, then discarded) so a future run's tiered recheck cooldown
+  // (walletRecheck.ts) can compute exactly when a too-new wallet becomes eligible without needing to
+  // re-fetch /activity just to find out.
+  const firstTradeMs = earliestTradeMs(activity);
 
   const handle = wallet.userName?.trim() || null;
   const walletRow: Database["public"]["Tables"]["wallets"]["Insert"] = {
     address: normalized,
     is_bot_suspected: bot,
-    // Only set handle/lifetime_pnl when we have them, so re-runs without a value (e.g. /trades
-    // fallback discovery) don't wipe a previously stored one.
+    // Only set handle/lifetime_pnl/earliest_trade_at when we have them, so re-runs without a value
+    // (e.g. /trades fallback discovery, or empty activity) don't wipe a previously stored one.
     ...(handle ? { handle } : {}),
-    ...(wallet.lifetimePnl !== null ? { lifetime_pnl: wallet.lifetimePnl } : {})
+    ...(wallet.lifetimePnl !== null ? { lifetime_pnl: wallet.lifetimePnl } : {}),
+    ...(firstTradeMs !== null ? { earliest_trade_at: new Date(firstTradeMs).toISOString() } : {})
   };
 
   // Persist the wallet row once. Bots short-circuit here (no positions fetched, no specialty);
@@ -771,7 +785,12 @@ export async function processWallet(
   ]);
   const resolvedPositions = resolvedToClosed(currentPositions);
   const unrealizedPnlUsd = openUnrealizedPnl(currentPositions);
-  const positions = [...closedPositions, ...resolvedPositions];
+  // Positions in a conditionId the wallet arbed (held both outcome legs concurrently) are stripped
+  // before scoring — not a directional forecast, same non-punitive philosophy as isScorableMarket.
+  // closedPositions itself stays unfiltered below (closedPositionRecords, the Trade History
+  // persistence, still shows the real history).
+  const arbConditionIds = detectArbitrageConditions(activity, CONFIG);
+  const positions = excludeArbitrage([...closedPositions, ...resolvedPositions], arbConditionIds);
 
   // The wallet's best market category (or null), computed over all resolved positions — the same
   // forecasting edge the Skill Score uses, sliced per category. Folded into the single wallet upsert.
@@ -793,13 +812,15 @@ export async function processWallet(
   // MIN_ACCOUNT_AGE_DAYS, so a brand-new account can't rank on a few days of bets. Done here (not in
   // computeSkillScore) because the age signal comes from /activity, which the pure metric functions
   // don't receive; a null skill score keeps the wallet out of leaderboard_cache (see rebuildLeaderboardCache).
-  const firstTradeMs = earliestTradeMs(activity);
   const tooNew =
     firstTradeMs !== null &&
     Date.now() - firstTradeMs < CONFIG.MIN_ACCOUNT_AGE_DAYS * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
   const metrics = CONFIG.HORIZONS.map((horizon) => {
     const metric = computeMetrics(positions, horizon, CONFIG, unrealizedPnlUsd);
-    return tooNew ? { ...metric, skillScore: null } : metric;
+    // ineligibleReason override (not just skillScore): the age gate is horizon-independent and comes
+    // from /activity, which computeMetrics never sees — same reasoning as the skillScore override.
+    // The tiered recheck cooldown (walletRecheck.ts) reads this to compute an exact re-eligibility date.
+    return tooNew ? { ...metric, skillScore: null, ineligibleReason: "too_new" as const } : metric;
   });
 
   await Promise.all(metrics.map((metric) => upsertMetrics(supabase, normalized, metric)));
@@ -2279,6 +2300,53 @@ async function updateTrackedCandidateStatuses(supabase: SupabaseClient): Promise
   return retired;
 }
 
+// Bulk-loads each address' last-known bot/eligibility state for the main discovery loop's tiered
+// recheck cooldown (walletRecheck.ts). Chunked the same way rebuildLeaderboardCache chunks its
+// wallets lookup: a single .in() with thousands of addresses overflows the request URL.
+async function loadWalletRecheckStates(supabase: SupabaseClient, addresses: string[]): Promise<Map<string, WalletRecheckState>> {
+  const walletRows: { address: string; is_bot_suspected: boolean; updated_at: string; earliest_trade_at: string | null }[] = [];
+  const statsRows: { address: string; horizon_days: number; skill_score: number | null; ineligible_reason: string | null; computed_at: string }[] = [];
+
+  for (let offset = 0; offset < addresses.length; offset += CONFIG.LEADERBOARD_FILTER_CHUNK) {
+    const slice = addresses.slice(offset, offset + CONFIG.LEADERBOARD_FILTER_CHUNK);
+    const [{ data: wRows, error: wError }, { data: sRows, error: sError }] = await Promise.all([
+      supabase.from("wallets").select("address, is_bot_suspected, updated_at, earliest_trade_at").in("address", slice),
+      supabase.from("wallet_stats").select("address, horizon_days, skill_score, ineligible_reason, computed_at").in("address", slice)
+    ]);
+    if (wError) {
+      throw wError;
+    }
+    if (sError) {
+      throw sError;
+    }
+    walletRows.push(...(wRows ?? []));
+    statsRows.push(...(sRows ?? []));
+  }
+
+  const statsByAddress = new Map<string, WalletRecheckStatsRow[]>();
+  for (const row of statsRows) {
+    const rows = statsByAddress.get(row.address) ?? [];
+    rows.push({
+      horizonDays: row.horizon_days,
+      skillScore: row.skill_score,
+      ineligibleReason: row.ineligible_reason as IneligibilityReason | null,
+      computedAt: row.computed_at
+    });
+    statsByAddress.set(row.address, rows);
+  }
+
+  const states = new Map<string, WalletRecheckState>();
+  for (const row of walletRows) {
+    states.set(row.address, {
+      isBotSuspected: row.is_bot_suspected,
+      updatedAt: row.updated_at,
+      earliestTradeAt: row.earliest_trade_at,
+      statsRows: statsByAddress.get(row.address) ?? []
+    });
+  }
+  return states;
+}
+
 async function main(): Promise<void> {
   const startedAt = Date.now();
   const supabase = createClient<Database>(
@@ -2407,6 +2475,39 @@ async function main(): Promise<void> {
   const newTracked = trackedCandidates.filter((w) => !mainAddressSet.has(w.address));
   const wallets = [...discoveredWallets, ...newTracked];
 
+  // Skip re-fetching a wallet whose last full run flagged it bot/ineligible, tiered by *why* (see
+  // walletRecheck.ts) — the bottleneck is the throttled restricted API lane
+  // (/closed-positions + /positions), not compute, so cutting this traffic directly cuts wall-clock
+  // ingest time. Bulk-loaded once for the whole discovered set, then filtered before the worker pool
+  // starts so a skipped wallet never pays for /activity + /closed-positions + /positions at all.
+  let walletsToProcess = wallets;
+  const skipBreakdown = { bot: 0, thin: 0, longshot: 0, too_new: 0 };
+  try {
+    const recheckStates = await loadWalletRecheckStates(supabase, wallets.map((w) => w.address.toLowerCase()));
+    walletsToProcess = wallets.filter((wallet) => {
+      const state = recheckStates.get(wallet.address.toLowerCase()) ?? null;
+      if (!shouldSkipWallet(state, CONFIG)) {
+        return true;
+      }
+      if (state && state.isBotSuspected) {
+        skipBreakdown.bot += 1;
+      } else if (state) {
+        const widest = state.statsRows.reduce((a, b) => (b.horizonDays > a.horizonDays ? b : a));
+        if (widest.ineligibleReason === "too_new") {
+          skipBreakdown.too_new += 1;
+        } else if (widest.ineligibleReason === "longshot_entry") {
+          skipBreakdown.longshot += 1;
+        } else {
+          skipBreakdown.thin += 1;
+        }
+      }
+      return false;
+    });
+  } catch (reason) {
+    console.warn(`Recheck-cooldown lookup failed (non-fatal, processing every wallet): ${describeError(reason)}`);
+  }
+  const skippedCount = wallets.length - walletsToProcess.length;
+
   const collectedTrades: RecentTrade[] = [];
   const collectedFills: ProfileFill[] = [];
   const collectedPositions: OpenPositionRecord[] = [];
@@ -2422,17 +2523,21 @@ async function main(): Promise<void> {
   let insufficient = 0;
   const botBreakdown: Record<BotSignal, number> = { trade_rate: 0, dust_trades: 0, simultaneous_markets: 0, fast_flipper: 0 };
 
-  console.log(`Discovered ${discoveredWallets.length} wallets + ${newTracked.length} tracked candidates = ${wallets.length} total`);
+  console.log(
+    `Discovered ${discoveredWallets.length} wallets + ${newTracked.length} tracked candidates = ${wallets.length} total; ` +
+      `skipped ${skippedCount} on cooldown (bot=${skipBreakdown.bot}, thin=${skipBreakdown.thin}, longshot=${skipBreakdown.longshot}, too_new=${skipBreakdown.too_new}); ` +
+      `processing ${walletsToProcess.length}`
+  );
 
   // Worker pool: each worker pulls the next wallet from a shared cursor and never waits on its
   // siblings, so fast wallets (bots) don't idle behind slow ones (deep-history whales). This keeps
   // the per-lane rate gates saturated instead of starving them during per-batch stragglers.
   const processingStartedAt = Date.now();
   let cursor = 0;
-  const total = wallets.length;
+  const total = walletsToProcess.length;
   const worker = async (): Promise<void> => {
     while (cursor < total) {
-      const wallet = wallets[cursor];
+      const wallet = walletsToProcess[cursor];
       cursor += 1; // single-threaded JS: read+increment is atomic between awaits, so no double-claim.
       if (!wallet) {
         continue;

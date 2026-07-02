@@ -408,6 +408,12 @@ test("processWallet scores an eligible wallet and upserts stats for every horizo
   const walletUpsert = log.find((o) => o.table === "wallets" && o.op === "upsert");
   assert.ok(walletUpsert);
   assert.equal((walletUpsert.payload as Record<string, unknown>).is_bot_suspected, false);
+  // Durable for the tiered recheck cooldown (walletRecheck.ts) — the wallet's earliest fill (m0, 30d
+  // ago), not just the age-gate boolean.
+  assert.equal(
+    (walletUpsert.payload as Record<string, unknown>).earliest_trade_at,
+    new Date(DAYS_30_AGO_SEC * 1000).toISOString()
+  );
 });
 
 test("processWallet withholds a skill score from a too-new wallet (recency gate)", async () => {
@@ -426,6 +432,9 @@ test("processWallet withholds a skill score from a too-new wallet (recency gate)
   assert.equal(statsUpserts.length, CONFIG.HORIZONS.length); // stats still written, just with no score
   for (const u of statsUpserts) {
     assert.equal((u.payload as Record<string, unknown>).skill_score, null);
+    // The age-gate override sets ineligible_reason too (not just skill_score) — the tiered recheck
+    // cooldown (walletRecheck.ts) needs it to compute an exact re-eligibility date.
+    assert.equal((u.payload as Record<string, unknown>).ineligible_reason, "too_new");
   }
 });
 

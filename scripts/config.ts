@@ -15,8 +15,7 @@ export const CONFIG = {
   // shares have a tiny capital-proxy denominator, which inflates pctReturn and distorts the score;
   // this gate excludes them. Volume-weighted (not median) so a few small dust bets among normal
   // positions don't trip it — only wallets whose *capital* sits in cheap shares are caught.
-  MIN_AVG_ENTRY_PRICE: 0.02,
-  OUTLIER_TRADE_FRACTION: 0.6,
+  MIN_AVG_ENTRY_PRICE: 0.04,
   // Skill Score = pure statistical forecasting edge, on a 0-SCORE_MAX scale. Each resolved
   // position is a Bernoulli trial whose entry price is the market's implied probability; per-share
   // edge is (outcome - price). The score is the Bayesian-shrunk mean edge, remapped so that any
@@ -68,7 +67,10 @@ export const CONFIG = {
     // near 500/day, so real market-making bots cluster high while discretionary traders sit well
     // below even on event days. Retune from the trades/day distribution if exclusions look off.
     MAX_TRADES_PER_DAY: 250,
-    MAX_SIMULTANEOUS_MARKETS: 30,
+    // Raised 30 -> 50: some genuinely broad-forecasting wallets legitimately hold many markets at
+    // once, and simultaneous breadth alone isn't a copyability problem the way rate/dust-size/fast-
+    // flip are — only flag the more extreme tail.
+    MAX_SIMULTANEOUS_MARKETS: 50,
     MIN_AVG_TRADE_SIZE_USD: 1,
     // Floor (days) for the trades/day denominator. /activity returns the most recent
     // ACTIVITY_LIMIT trades with no date filter, so trades/day is computed over the span the
@@ -87,6 +89,25 @@ export const CONFIG = {
     FAST_FLIP_MAX_HOURS: 1, // open→close within 1h counts as a non-copyable flip
     FAST_FLIP_FRACTION: 0.7, // ≥70% of completed round-trips being flips → excluded
     FAST_FLIP_MIN_ROUNDTRIPS: 10 // need this many completed round-trips before judging
+  },
+  // Both legs' cost basis must clear this before a concurrently-held YES+NO pair counts as
+  // arbitrage (scripts/botDetection.ts detectArbitrageConditions) — stops incidental residual
+  // dust on one side from false-positiving a genuine one-sided forecast.
+  ARBITRAGE_MIN_LEG_USD: 10,
+  // Main-discovery-loop recheck cooldown: how long a wallet flagged bot/ineligible last full run is
+  // skipped before being re-fetched, tiered by *why* it was flagged since each reason resolves on a
+  // different timescale (see scripts/walletRecheck.ts). Scope: the main ~5k-wallet discovery loop
+  // only — the candidate pipeline keeps its own flat CANDIDATE_RESCORE_DAYS cooldown untouched.
+  WALLET_RECHECK: {
+    // Longest — an automated strategy essentially never becomes a normal human trader.
+    BOT_DAYS: 45,
+    // Shortest — a genuinely active trader can cross MIN_TRADES/MIN_VOLUME_USD within days; missing
+    // an emerging skilled wallet for a full month is a real cost.
+    THIN_SAMPLE_DAYS: 7,
+    // Medium — a structural trading-style flag (longshot entries), not urgent but not permanent.
+    LONGSHOT_DAYS: 21
+    // "too_new" (age gate) isn't a fixed window at all — computed exactly from
+    // wallets.earliest_trade_at + MIN_ACCOUNT_AGE_DAYS, since it resolves on a known calendar date.
   },
   POLYMARKET_API_BASE: process.env.POLYMARKET_API_BASE ?? "https://data-api.polymarket.com",
   // The Gamma API (a different host than the Data API above) is the only Polymarket source that

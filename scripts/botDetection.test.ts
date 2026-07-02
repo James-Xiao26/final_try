@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CONFIG } from "./config.js";
-import { botSignal, isSuspectedBot } from "./botDetection.js";
+import { botSignal, detectArbitrageConditions, isSuspectedBot } from "./botDetection.js";
 import type { TradeActivity } from "./polymarket.js";
 
 const DAY = CONFIG.SECONDS_PER_DAY;
@@ -191,4 +191,47 @@ test("botSignal reports which heuristic flagged the wallet", () => {
 
   const wide = build(CONFIG.BOT.MAX_SIMULTANEOUS_MARKETS + 1, (index) => ({ conditionId: `cond-${index}` }));
   assert.equal(botSignal(wide, CONFIG), "simultaneous_markets");
+});
+
+// --- detectArbitrageConditions -----------------------------------------------
+
+test("detectArbitrageConditions is empty for a one-sided position", () => {
+  const activity = [trade({ conditionId: "m1", asset: "yes", outcomeIndex: 0, side: "BUY", size: 100, usdcSize: 50, timestamp: 1 })];
+  assert.deepEqual(detectArbitrageConditions(activity, CONFIG), new Set());
+});
+
+test("detectArbitrageConditions flags a conditionId held on both legs concurrently, above the dust floor", () => {
+  const activity = [
+    trade({ conditionId: "m1", asset: "yes", outcomeIndex: 0, side: "BUY", size: 100, usdcSize: 50, timestamp: 1 }),
+    trade({ conditionId: "m1", asset: "no", outcomeIndex: 1, side: "BUY", size: 100, usdcSize: 50, timestamp: 2 })
+  ];
+  assert.deepEqual(detectArbitrageConditions(activity, CONFIG), new Set(["m1"]));
+});
+
+test("detectArbitrageConditions does not flag a genuine reversal (sell one side, later buy the other)", () => {
+  const activity = [
+    trade({ conditionId: "m1", asset: "yes", outcomeIndex: 0, side: "BUY", size: 100, usdcSize: 50, timestamp: 1 }),
+    trade({ conditionId: "m1", asset: "yes", outcomeIndex: 0, side: "SELL", size: 100, usdcSize: 50, timestamp: 2 }),
+    trade({ conditionId: "m1", asset: "no", outcomeIndex: 1, side: "BUY", size: 100, usdcSize: 50, timestamp: 3 })
+  ];
+  // The two legs never overlap — YES fully closed before NO opened — so this is a changed-mind
+  // reversal, not arbitrage.
+  assert.deepEqual(detectArbitrageConditions(activity, CONFIG), new Set());
+});
+
+test("detectArbitrageConditions ignores a dust-sized second leg", () => {
+  const activity = [
+    trade({ conditionId: "m1", asset: "yes", outcomeIndex: 0, side: "BUY", size: 100, usdcSize: 50, timestamp: 1 }),
+    trade({ conditionId: "m1", asset: "no", outcomeIndex: 1, side: "BUY", size: 1, usdcSize: CONFIG.ARBITRAGE_MIN_LEG_USD / 2, timestamp: 2 })
+  ];
+  assert.deepEqual(detectArbitrageConditions(activity, CONFIG), new Set());
+});
+
+test("detectArbitrageConditions only flags the two-sided market, not a clean one traded alongside it", () => {
+  const activity = [
+    trade({ conditionId: "arb", asset: "yes", outcomeIndex: 0, side: "BUY", size: 100, usdcSize: 50, timestamp: 1 }),
+    trade({ conditionId: "arb", asset: "no", outcomeIndex: 1, side: "BUY", size: 100, usdcSize: 50, timestamp: 2 }),
+    trade({ conditionId: "clean", asset: "yes2", outcomeIndex: 0, side: "BUY", size: 100, usdcSize: 50, timestamp: 3 })
+  ];
+  assert.deepEqual(detectArbitrageConditions(activity, CONFIG), new Set(["arb"]));
 });

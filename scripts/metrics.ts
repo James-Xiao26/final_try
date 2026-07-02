@@ -23,8 +23,31 @@ export interface WalletMetrics {
   pctEdge: number;
   avgEdgePerShare: number;
   nResolved: number;
-  outlierFlag: boolean;
+  // Why skillScore is null, or null when eligible. Mirrors botSignal's reason-code pattern — lets
+  // ingest persist *why* a wallet is ineligible (not just that it is), which the tiered recheck
+  // cooldown (scripts/walletRecheck.ts) uses to decide how long to skip re-fetching it. "too_new"
+  // (the age gate) is never set here — that signal comes from /activity, which this function never
+  // sees, so processWallet overrides it directly.
+  ineligibleReason: IneligibilityReason | null;
   equityCurve: EquityPoint[];
+}
+
+export type IneligibilityReason = "insufficient_trades" | "insufficient_volume" | "longshot_entry" | "too_new";
+
+// Same three gates computeSkillScore checks (age gate excluded — see the field comment above),
+// broken out into a reason code instead of a bare null. Kept separate from computeSkillScore itself
+// (not folded in) so computeSkillScore's exact-constant-asserted tests don't need touching.
+export function ineligibilityReason(metrics: WalletMetrics, config: typeof CONFIG): IneligibilityReason | null {
+  if (metrics.nTrades < config.MIN_TRADES) {
+    return "insufficient_trades";
+  }
+  if (metrics.totalVolumeUsd < config.MIN_VOLUME_USD) {
+    return "insufficient_volume";
+  }
+  if (metrics.avgEntryPrice < config.MIN_AVG_ENTRY_PRICE) {
+    return "longshot_entry";
+  }
+  return null;
 }
 
 function round(value: number, decimals: number): number {
@@ -48,6 +71,18 @@ const RECURRING_WINDOW_MARKET = /up or down - .*\d{1,2}:\d{2}\s*[ap]m\s*-\s*\d{1
 
 export function isScorableMarket(title: string): boolean {
   return !RECURRING_WINDOW_MARKET.test(title);
+}
+
+// Strips positions in a conditionId where the wallet held both outcome legs concurrently (detected
+// from /activity by scripts/botDetection.ts detectArbitrageConditions) — locking in a YES+NO<$1
+// mispricing or hedging isn't a directional forecast, so it shouldn't count toward Skill Score or a
+// specialty chip. Same non-punitive shape as isScorableMarket: only the arb positions are dropped,
+// not the whole wallet: everything else it forecasted still counts normally.
+export function excludeArbitrage(positions: ClosedPosition[], arbConditionIds: ReadonlySet<string>): ClosedPosition[] {
+  if (arbConditionIds.size === 0) {
+    return positions;
+  }
+  return positions.filter((position) => !arbConditionIds.has(position.conditionId));
 }
 
 // Builds the daily cumulative-PnL curve. The interior is the realized path (steps on close dates);
@@ -105,8 +140,8 @@ export function computeMetrics(
   // Volume-weighted average entry price = total cost / total shares. Catches longshot wallets
   // whose capital sits in cheap shares (see MIN_AVG_ENTRY_PRICE gate in computeSkillScore).
   const avgEntryPrice = totalShares > 0 ? totalVolumeUsd / totalShares : 0;
-  // Return, win rate, outlier flag, and the Skill Score stay strictly realized — they measure
-  // realized discipline. Only totalPnlUsd and the curve's final point fold in unrealized.
+  // Return, win rate, and the Skill Score stay strictly realized — they measure realized discipline.
+  // Only totalPnlUsd and the curve's final point fold in unrealized.
   const pctReturn = totalVolumeUsd > 0 ? realizedPnlUsd / totalVolumeUsd : 0;
   const wins = positions.filter((position) => position.realizedPnl > 0).length;
   const winRate = positions.length > 0 ? wins / positions.length : 0;
@@ -135,11 +170,6 @@ export function computeMetrics(
   const pctEdge = edgeCapital > 0 ? edgeDollars / edgeCapital : 0;
   const avgEdgePerShare = nResolved > 0 ? perShareEdgeSum / nResolved : 0;
 
-  const largestWin = positions.reduce(
-    (largest, position) => Math.max(largest, position.realizedPnl),
-    0
-  );
-  const outlierFlag = realizedPnlUsd > 0 && largestWin / realizedPnlUsd > config.OUTLIER_TRADE_FRACTION;
   const metricsWithoutScore: WalletMetrics = {
     horizonDays,
     skillScore: null,
@@ -153,13 +183,14 @@ export function computeMetrics(
     pctEdge: round(pctEdge, 4),
     avgEdgePerShare: round(avgEdgePerShare, 4),
     nResolved,
-    outlierFlag,
+    ineligibleReason: null,
     equityCurve: buildDailyCurve(positions, unrealizedPnlUsd)
   };
 
   return {
     ...metricsWithoutScore,
-    skillScore: computeSkillScore(metricsWithoutScore, config)
+    skillScore: computeSkillScore(metricsWithoutScore, config),
+    ineligibleReason: ineligibilityReason(metricsWithoutScore, config)
   };
 }
 
@@ -170,15 +201,14 @@ export function computeMetrics(
  * by EDGE_SHRINKAGE_K pseudo-bets, so small/lucky samples can't earn a high score, then remap the
  * shrunk edge: zero/negative edge → 0, and any positive shrunk edge lands in
  * [SCORE_FLOOR, SCORE_MAX] (floor at SCORE_FLOOR, EDGE_FOR_TEN shrunk edge == SCORE_MAX), clamped.
- * Ineligible wallets receive null (too few trades, too little volume, sub-cent longshot trader, or
- * one win dominating realized PnL).
+ * Ineligible wallets receive null (too few trades, too little volume, or a sub-cent longshot
+ * trader — see ineligibilityReason for the reason code breakdown).
  */
 export function computeSkillScore(metrics: WalletMetrics, config: typeof CONFIG): number | null {
   if (
     metrics.nTrades < config.MIN_TRADES ||
     metrics.totalVolumeUsd < config.MIN_VOLUME_USD ||
-    metrics.avgEntryPrice < config.MIN_AVG_ENTRY_PRICE ||
-    metrics.outlierFlag
+    metrics.avgEntryPrice < config.MIN_AVG_ENTRY_PRICE
   ) {
     return null;
   }
