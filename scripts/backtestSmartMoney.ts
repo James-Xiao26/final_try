@@ -237,6 +237,29 @@
 // dampening is actively protective, not an arbitrary knob costing real signal; going further toward
 // dollar-only keeps helping. Not shipped, but this materially sharpens the v15 finding — worth
 // prioritizing over other open threads if this line of investigation continues.
+//
+// v18: EXPERIMENTAL, three isolated variants testing relative conviction (v7's confidenceMultiplier =
+// max(1, sqrt(cost / theirOwnDustFlooredAvg)) — reused as-is, not redefined) as the PRIMARY signal
+// instead of a multiplier stacked on skill-weighting. Motivation: dollarPct beating locked v1 (v15)
+// raises the concern that dollar-weighting just favors whoever has more money to bet, not whoever's
+// more convinced — v7 was supposed to test exactly that, but every prior use of it multiplied the
+// confidenceMultiplier onto the skill*sqrt(cost) base, so its result was confounded by skill (since
+// found to be net-harmful in v15-v17). These three drop skill from the base entirely:
+//   (a) v18a: cost * confidenceMultiplier — dollar-linear base, scaled by relative conviction.
+//   (b) v18b: sqrt(cost) * confidenceMultiplier — sqrt-dampened dollar base, scaled by relative
+//       conviction (the direct skill-free analogue of locked v1's own size-scaling).
+//   (c) v18c: confidenceMultiplier alone — equal 1-per-wallet base (no dollar or skill dependence at
+//       all), scaled purely by how unusual this bet is for that specific wallet.
+// All three use the SAME locked v1 population (5+, $10 dust floor) per the ask — no dust-floor removal
+// here, that's v16's separate, already-answered question. Reported against locked v1 and dollarPct, all
+// on the exact same entries.
+// RESULT: negative for all three relative to dollarPct, n=217 same entries: dollarPct 0.1128 (still
+// best), v18a (cost*conviction) 0.1143, locked v1 (skill*sqrt) 0.1178, v18b (sqrt*conviction) 0.1191,
+// v18c (conviction alone) 0.1318 (worst). v18a is the closest anything has come to dollarPct all
+// session (and beats locked v1), but even properly isolated from skill, relative conviction doesn't
+// beat plain dollar size — and the pattern is monotonic again: the further a formula moves away from
+// raw dollar size (toward pure conviction, v18c), the worse it gets. Raw bet size remains the strongest
+// signal found in this dataset. Not shipped.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -331,6 +354,9 @@ interface HistoryEntry {
   smartPctNoDust?: number; // EXPERIMENTAL (v16) — not locked, may be absent on older entries
   participantCountNoDust?: number; // EXPERIMENTAL (v16) — not locked, may be absent on older entries
   smartPctLinear?: number; // EXPERIMENTAL (v17) — not locked, may be absent on older entries
+  smartPctCostConviction?: number; // EXPERIMENTAL (v18a) — not locked, may be absent on older entries
+  smartPctSqrtConviction?: number; // EXPERIMENTAL (v18b) — not locked, may be absent on older entries
+  smartPctConvictionOnly?: number; // EXPERIMENTAL (v18c) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -624,6 +650,9 @@ async function main(): Promise<void> {
     smartPctNoDust: number; // EXPERIMENTAL (v16) — locked v1 formula with DUST_FLOOR_USD removed entirely
     participantCountNoDust: number; // EXPERIMENTAL (v16) — distinct wallets with ANY nonzero position, no dust floor
     smartPctLinear: number; // EXPERIMENTAL (v17) — skill*cost (no sqrt dampening), same population as locked v1
+    smartPctCostConviction: number; // EXPERIMENTAL (v18a) — cost * confidenceMultiplier, no skill
+    smartPctSqrtConviction: number; // EXPERIMENTAL (v18b) — sqrt(cost) * confidenceMultiplier, no skill
+    smartPctConvictionOnly: number; // EXPERIMENTAL (v18c) — confidenceMultiplier alone, no dollar/skill base
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -710,6 +739,12 @@ async function main(): Promise<void> {
     let noDustWeighted = 0;
     let linearWeight = 0;
     let linearWeighted = 0;
+    let costConvictionWeight = 0;
+    let costConvictionWeighted = 0;
+    let sqrtConvictionWeight = 0;
+    let sqrtConvictionWeighted = 0;
+    let convictionOnlyWeight = 0;
+    let convictionOnlyWeighted = 0;
     let dateWeight = 0;
     let dateWeighted = 0; // sum(weight * entry epoch ms) -> weighted-average entry date
     for (const row of allPositioned) {
@@ -743,6 +778,16 @@ async function main(): Promise<void> {
       const wConfidence = w * confidenceMultiplier;
       confidenceWeight += wConfidence;
       confidenceWeighted += wConfidence * yesEq;
+      // EXPERIMENTAL (v18): relative conviction as the PRIMARY signal, skill dropped from the base
+      // entirely — reuses the same confidenceMultiplier just computed above for v7.
+      const wCostConviction = c * confidenceMultiplier; // v18a — dollar-linear base
+      costConvictionWeight += wCostConviction;
+      costConvictionWeighted += wCostConviction * yesEq;
+      const wSqrtConviction = Math.sqrt(c) * confidenceMultiplier; // v18b — sqrt-dampened dollar base
+      sqrtConvictionWeight += wSqrtConviction;
+      sqrtConvictionWeighted += wSqrtConviction * yesEq;
+      convictionOnlyWeight += confidenceMultiplier; // v18c — equal base, conviction-scaled only
+      convictionOnlyWeighted += confidenceMultiplier * yesEq;
       // EXPERIMENTAL (v8): only positions actually held to a confirmed resolution count — a wallet
       // who bought in and later sold out doesn't get their (possibly-abandoned) entry counted.
       if (isHeldToResolution(row)) {
@@ -810,6 +855,9 @@ async function main(): Promise<void> {
       smartPctNoDust: noDustWeight > 0 ? noDustWeighted / noDustWeight : smartWeighted / smartWeight,
       participantCountNoDust: allDistinctWallets.size,
       smartPctLinear: linearWeight > 0 ? linearWeighted / linearWeight : smartWeighted / smartWeight,
+      smartPctCostConviction: costConvictionWeight > 0 ? costConvictionWeighted / costConvictionWeight : smartWeighted / smartWeight,
+      smartPctSqrtConviction: sqrtConvictionWeight > 0 ? sqrtConvictionWeighted / sqrtConvictionWeight : smartWeighted / smartWeight,
+      smartPctConvictionOnly: convictionOnlyWeight > 0 ? convictionOnlyWeighted / convictionOnlyWeight : smartWeighted / smartWeight,
       actual,
       daysEarly,
       refEntryMs
@@ -950,7 +998,10 @@ async function main(): Promise<void> {
       dollarPct: s.dollarPct,
       smartPctNoDust: s.smartPctNoDust,
       participantCountNoDust: s.participantCountNoDust,
-      smartPctLinear: s.smartPctLinear
+      smartPctLinear: s.smartPctLinear,
+      smartPctCostConviction: s.smartPctCostConviction,
+      smartPctSqrtConviction: s.smartPctSqrtConviction,
+      smartPctConvictionOnly: s.smartPctConvictionOnly
     });
   }
   for (const s of matched) recordMatch(s);
@@ -987,7 +1038,7 @@ async function main(): Promise<void> {
   saveHistory(history);
   console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
 
-  // EXPERIMENTAL (v6-v17) backfill: existing entries never got these fields (they didn't exist
+  // EXPERIMENTAL (v6-v18) backfill: existing entries never got these fields (they didn't exist
   // yet). None touch any locked field, so it's safe to add retroactively for any entry whose
   // underlying market is still represented in this run's samples (older ones may have aged out of
   // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
@@ -1052,6 +1103,18 @@ async function main(): Promise<void> {
     }
     if (entry.smartPctLinear === undefined) {
       entry.smartPctLinear = sample.smartPctLinear;
+      changed = true;
+    }
+    if (entry.smartPctCostConviction === undefined) {
+      entry.smartPctCostConviction = sample.smartPctCostConviction;
+      changed = true;
+    }
+    if (entry.smartPctSqrtConviction === undefined) {
+      entry.smartPctSqrtConviction = sample.smartPctSqrtConviction;
+      changed = true;
+    }
+    if (entry.smartPctConvictionOnly === undefined) {
+      entry.smartPctConvictionOnly = sample.smartPctConvictionOnly;
       changed = true;
     }
     if (changed) backfilled += 1;
@@ -1640,6 +1703,54 @@ async function main(): Promise<void> {
       );
     }
   }
+
+  // ── EXPERIMENTAL (v18): relative conviction as the PRIMARY signal (skill dropped from the base
+  // entirely), three variants — all on the SAME locked v1 (5+, $10 dust floor) entries, reported
+  // against BOTH locked v1 and dollarPct so "beats the money-only baseline" and "beats skill-weighting"
+  // are both visible. ──
+  type ConvictionKey = "smartPctCostConviction" | "smartPctSqrtConviction" | "smartPctConvictionOnly";
+  function reportConvictionVariant(label: string, key: ConvictionKey): void {
+    const withVariant = currentVersionAll.filter((s) => s[key] !== undefined && s.dollarPct !== undefined);
+    console.log(`\nEXPERIMENTAL: ${label}, n=${withVariant.length}:`);
+    if (withVariant.length === 0) {
+      console.log(`  No entries have ${key} yet.`);
+      return;
+    }
+    const v1BrierSub = mean(withVariant.map((s) => brier(s.smartPct, s.actual)));
+    const dollarBrierSub = mean(withVariant.map((s) => brier(s.dollarPct!, s.actual)));
+    const variantBrier = mean(withVariant.map((s) => brier(s[key]!, s.actual)));
+    console.log(`  locked v1 (skill*sqrt(cost)): ${v1BrierSub.toFixed(4)}`);
+    console.log(`  dollarPct (no skill, linear): ${dollarBrierSub.toFixed(4)}`);
+    console.log(`  this variant:                 ${variantBrier.toFixed(4)}`);
+    console.log(
+      variantBrier < Math.min(v1BrierSub, dollarBrierSub)
+        ? "  -> beats BOTH locked v1 and dollarPct — worth taking seriously."
+        : variantBrier < dollarBrierSub
+          ? "  -> beats dollarPct but not locked v1 — mixed result."
+          : variantBrier < v1BrierSub
+            ? "  -> beats locked v1 but not dollarPct — mixed result."
+            : "  -> does NOT beat either baseline — not worth shipping."
+    );
+    console.log(`\n  Simulated return per $1 staked using this tilt (min gap):`);
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withVariant
+        .map((s) => ({ ...s, gap: s[key]! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gap) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gap >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+  reportConvictionVariant("v18a: cost * confidenceMultiplier (dollar-linear, conviction-scaled)", "smartPctCostConviction");
+  reportConvictionVariant("v18b: sqrt(cost) * confidenceMultiplier (sqrt-dampened, conviction-scaled)", "smartPctSqrtConviction");
+  reportConvictionVariant("v18c: confidenceMultiplier alone (equal base, conviction-scaled only)", "smartPctConvictionOnly");
 }
 
 main().catch((error) => {
