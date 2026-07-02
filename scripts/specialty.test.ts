@@ -80,3 +80,9 @@ test("walletSpecialty ignores unresolved and unclassifiable positions", () => {
   const other = many(12, () => winning("Will it snow in Denver this week?"));
   assert.equal(walletSpecialty([...unresolved, ...other], CONFIG), null);
 });
+
+test("walletSpecialty ignores recurring 'Up or Down' windowed positions, same carve-out as Skill Score", () => {
+  const windowed = many(20, () => winning("Bitcoin Up or Down - May 31, 1:55PM-2:00PM ET"));
+  // Would otherwise easily clear MIN_SPECIALTY_TRADES with a strong positive edge.
+  assert.equal(walletSpecialty(windowed, CONFIG), null);
+});

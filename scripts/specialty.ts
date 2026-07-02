@@ -1,5 +1,6 @@
 import type { CONFIG } from "./config.js";
 import type { ClosedPosition } from "./polymarket.js";
+import { isScorableMarket } from "./metrics.js";
 
 // A wallet's "specialty" is the market category where it has both enough resolved bets AND a proven
 // positive forecasting edge — the same edge math the Skill Score uses (Bayesian-shrunk per-share
@@ -68,6 +69,9 @@ export function walletSpecialty(
   for (const position of positions) {
     if (position.outcome === null) {
       continue; // unresolved → no known edge
+    }
+    if (!isScorableMarket(position.market)) {
+      continue; // recurring "Up or Down" window market — same carve-out as Skill Score
     }
     const category = classifyMarket(position.market);
     if (category === null) {

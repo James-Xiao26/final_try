@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CONFIG } from "./config.js";
-import { computeMetrics, computeSkillScore, type WalletMetrics } from "./metrics.js";
+import { computeMetrics, computeSkillScore, isScorableMarket, type WalletMetrics } from "./metrics.js";
 import type { ClosedPosition } from "./polymarket.js";
 
 const recentIso = (daysAgo: number): string =>
@@ -108,6 +108,26 @@ test("computeMetrics excludes positions older than the horizon", () => {
   const m = computeMetrics(positions, 30, CONFIG);
   assert.equal(m.nTrades, 2);
   assert.equal(m.totalPnlUsd, 30);
+});
+
+test("isScorableMarket rejects recurring 'Up or Down' windowed markets, keeps everything else", () => {
+  assert.equal(isScorableMarket("Bitcoin Up or Down - May 31, 1:55PM-2:00PM ET"), false);
+  assert.equal(isScorableMarket("Ethereum Up or Down - June 3, 9:00AM-9:15AM ET"), false);
+  // A once-daily variant has no time range, so it isn't the recurring-window template.
+  assert.equal(isScorableMarket("S&P 500 (SPX) Up or Down on March 2?"), true);
+  assert.equal(isScorableMarket("Will Bitcoin reach $150,000 by 2026?"), true);
+});
+
+test("computeMetrics excludes recurring 'Up or Down' windowed positions from every metric", () => {
+  const positions = [
+    position({ realizedPnl: 500, market: "Bitcoin Up or Down - May 31, 1:55PM-2:00PM ET", outcome: 1, avgPrice: 0.4, size: 1000 }),
+    position({ realizedPnl: 10, market: "Will Bitcoin reach $150,000 by 2026?", outcome: 1, avgPrice: 0.5, size: 20 })
+  ];
+  const m = computeMetrics(positions, 90, CONFIG);
+  // Only the non-windowed position counts, as if the windowed one were never in the array.
+  assert.equal(m.nTrades, 1);
+  assert.equal(m.totalPnlUsd, 10);
+  assert.equal(m.nResolved, 1);
 });
 
 test("computeMetrics handles an empty position set without dividing by zero", () => {

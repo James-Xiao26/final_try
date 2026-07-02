@@ -37,6 +37,19 @@ function toMillis(closeTime: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+// Recurring "Up or Down" windowed markets (e.g. "Bitcoin Up or Down - May 31, 1:55PM-2:00PM ET")
+// resolve on a single price-feed snapshot minutes after the window opens. Winning them consistently
+// looks like high-frequency market-making/spread-capture (dozens of fills within one 5-min window),
+// not forecasting, and can't be copied by anyone with even a few seconds of lag — so they're excluded
+// from every metric below, as if the wallet never took the position. Matched by the "<time>-<time>"
+// range in the title, which is specific to this recurring-window template; a once-daily market like
+// "S&P 500 (SPX) Up or Down on March 2?" has no time range and isn't affected.
+const RECURRING_WINDOW_MARKET = /up or down - .*\d{1,2}:\d{2}\s*[ap]m\s*-\s*\d{1,2}:\d{2}\s*[ap]m/i;
+
+export function isScorableMarket(title: string): boolean {
+  return !RECURRING_WINDOW_MARKET.test(title);
+}
+
 // Builds the daily cumulative-PnL curve. The interior is the realized path (steps on close dates);
 // a final "today" point folds in current unrealized PnL on open positions so the curve ends at the
 // marked-to-market total, matching the displayed Total P/L. When unrealized is 0 the today-point
@@ -82,6 +95,7 @@ export function computeMetrics(
 ): WalletMetrics {
   const cutoffMs = Date.now() - horizonDays * config.SECONDS_PER_DAY * config.MS_PER_SECOND;
   const positions = closedPositions
+    .filter((position) => isScorableMarket(position.market))
     .filter((position) => toMillis(position.closeTime) >= cutoffMs)
     .sort((left, right) => toMillis(left.closeTime) - toMillis(right.closeTime));
 
