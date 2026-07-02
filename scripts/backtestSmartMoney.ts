@@ -67,7 +67,24 @@
 // test the outcome vote already uses) — the closed-position analogue of what the live panel already
 // does implicitly, since wallet_positions only ever contains currently-open positions. The 5-
 // participant qualifying gate is left untouched (same 225-market population as v1/v6/v7, for a fair
-// comparison) — only which positions feed the weighted average changes.
+// comparison) — only which positions feed the weighted average changes. RESULT: the largest effect of
+// any experiment (Brier 0.1055 -> 0.0705, n=201; win rate up 12-21pts across every gap bucket).
+//
+// v9: EXPERIMENTAL, isolated from v6/v7/v8. Traced through web/lib/trendingMarkets.ts +
+// web/lib/supabase.ts's getTrendingMarkets() and confirmed wallet_positions is wiped and rebuilt every
+// feed cycle from PolymarketClient.getCurrentPositions() — a direct call to Polymarket's live
+// /positions endpoint, which returns current balances only (a fully-exited position simply isn't
+// returned; a partial sell reduces the reported size directly). So the live feature ALREADY
+// structurally excludes abandoned positions — v8's idea isn't something trendingMarkets.ts needs to be
+// taught, it's an emergent property of reading current-holdings data. But v8's filter ("held all the
+// way to *confirmed resolution*") requires retrospective knowledge a live system can never have —
+// whether a wallet will sell at some point between now and resolution. It's a best-case upper bound,
+// not a simulation of what a continuously-updating panel could show a visitor on any given day before
+// resolution. v9 answers the real question: strip out that retrospective advantage — was the position
+// genuinely still open as of a live-plausible reference point (resolutionMs - 7 days, using close_time
+// vs. that reference rather than the final outcome) — and see whether the effect survives, and how
+// large it really is. That's the number worth trusting before deciding whether any production code
+// needs to change at all.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -106,6 +123,11 @@ const LEAD_TIME_THRESHOLDS_DAYS = [0, 3, 7, 14, 30]; // conviction-vs-lead-time 
 // starting multiplier; if this line of work continues, tune it against the backtest, not by feel.
 const SPECIALTY_BOOST = 2;
 
+// EXPERIMENTAL (v9) — not part of the locked v1 formula, see the header note. How far before
+// resolution to check "was this position genuinely still open" — a live-plausible lead time, not the
+// retrospective-only "held all the way to the very end" v8 uses.
+const OPEN_AS_OF_LEAD_DAYS = 7;
+
 // Persisted, ever-growing record of matched results — see the v4 note at the top of the file for why
 // this exists (wallet_closed_positions is a rolling window, not an archive).
 const HISTORY_FILE = join(dirname(fileURLToPath(import.meta.url)), "backtestSmartMoneyHistory.json");
@@ -122,6 +144,7 @@ interface HistoryEntry {
   smartPctSpecialty?: number; // EXPERIMENTAL (v6) — not locked, may be absent on older entries
   smartPctConfidence?: number; // EXPERIMENTAL (v7) — not locked, may be absent on older entries
   smartPctHeld?: number; // EXPERIMENTAL (v8) — not locked, may be absent on older entries
+  smartPctOpenAsOf?: number; // EXPERIMENTAL (v9) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -200,6 +223,16 @@ function exitValue(row: ClosedRow): number | null {
 function isHeldToResolution(row: ClosedRow): boolean {
   const ev = exitValue(row);
   return ev !== null && (ev >= 1 - RESOLVE_EPSILON || ev <= RESOLVE_EPSILON);
+}
+
+// EXPERIMENTAL (v9): was this position genuinely still open as of `referenceMs` — already entered,
+// not yet closed — rather than "did it ultimately survive to the very end" (v8). No point-in-time
+// size reconstruction (the data doesn't support it, same approximation level as v8): close_time is
+// used as the "still held" proxy.
+function isOpenAsOf(row: ClosedRow, referenceMs: number): boolean {
+  const entryMs = row.first_traded_at ? Date.parse(row.first_traded_at) : NaN;
+  const closeMs = row.close_time ? Date.parse(row.close_time) : NaN;
+  return Number.isFinite(entryMs) && Number.isFinite(closeMs) && entryMs <= referenceMs && closeMs > referenceMs;
 }
 
 function cost(row: ClosedRow): number {
@@ -338,6 +371,7 @@ async function main(): Promise<void> {
     smartPctSpecialty: number; // EXPERIMENTAL (v6) — equals smartPct when no positioned wallet has a specialty match
     smartPctConfidence: number; // EXPERIMENTAL (v7) — equals smartPct when no bet exceeds its wallet's own average
     smartPctHeld: number; // EXPERIMENTAL (v8) — only positions held to confirmed resolution, excludes early sells
+    smartPctOpenAsOf: number; // EXPERIMENTAL (v9) — only positions still open OPEN_AS_OF_LEAD_DAYS before resolution
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -383,6 +417,10 @@ async function main(): Promise<void> {
     const marketTitle = rows.find((r) => r.market)?.market ?? null;
     const marketCategory = marketTitle ? classifyMarket(marketTitle) : null;
 
+    // EXPERIMENTAL (v9): reference point for "was this position still open" — a live-plausible lead
+    // time before resolution, not the retrospective-only "held to the very end" v8 uses.
+    const openAsOfReferenceMs = Number.isFinite(resolutionMs) ? resolutionMs - OPEN_AS_OF_LEAD_DAYS * 86_400_000 : NaN;
+
     let smartWeight = 0;
     let smartWeighted = 0;
     let dollarWeight = 0;
@@ -393,6 +431,8 @@ async function main(): Promise<void> {
     let confidenceWeighted = 0;
     let heldWeight = 0;
     let heldWeighted = 0;
+    let openAsOfWeight = 0;
+    let openAsOfWeighted = 0;
     let dateWeight = 0;
     let dateWeighted = 0; // sum(weight * entry epoch ms) -> weighted-average entry date
     for (const row of positioned) {
@@ -421,6 +461,11 @@ async function main(): Promise<void> {
         heldWeight += w;
         heldWeighted += w * yesEq;
       }
+      // EXPERIMENTAL (v9): only positions genuinely still open at the reference lead time count.
+      if (Number.isFinite(openAsOfReferenceMs) && isOpenAsOf(row, openAsOfReferenceMs)) {
+        openAsOfWeight += w;
+        openAsOfWeighted += w * yesEq;
+      }
       const entryMs = row.first_traded_at ? Date.parse(row.first_traded_at) : NaN;
       if (Number.isFinite(entryMs)) {
         dateWeight += w;
@@ -445,6 +490,7 @@ async function main(): Promise<void> {
       smartPctSpecialty: specialtyWeight > 0 ? specialtyWeighted / specialtyWeight : smartWeighted / smartWeight,
       smartPctConfidence: confidenceWeight > 0 ? confidenceWeighted / confidenceWeight : smartWeighted / smartWeight,
       smartPctHeld: heldWeight > 0 ? heldWeighted / heldWeight : smartWeighted / smartWeight,
+      smartPctOpenAsOf: openAsOfWeight > 0 ? openAsOfWeighted / openAsOfWeight : smartWeighted / smartWeight,
       actual,
       daysEarly,
       refEntryMs
@@ -592,13 +638,14 @@ async function main(): Promise<void> {
       methodologyVersion: METHODOLOGY_VERSION,
       smartPctSpecialty: s.smartPctSpecialty,
       smartPctConfidence: s.smartPctConfidence,
-      smartPctHeld: s.smartPctHeld
+      smartPctHeld: s.smartPctHeld,
+      smartPctOpenAsOf: s.smartPctOpenAsOf
     });
   }
   saveHistory(history);
   console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
 
-  // EXPERIMENTAL (v6/v7/v8) backfill: existing entries never got these fields (they didn't exist
+  // EXPERIMENTAL (v6/v7/v8/v9) backfill: existing entries never got these fields (they didn't exist
   // yet). None touch any locked field, so it's safe to add retroactively for any entry whose
   // underlying market is still represented in this run's samples (older ones may have aged out of
   // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
@@ -619,6 +666,10 @@ async function main(): Promise<void> {
     }
     if (entry.smartPctHeld === undefined) {
       entry.smartPctHeld = sample.smartPctHeld;
+      changed = true;
+    }
+    if (entry.smartPctOpenAsOf === undefined) {
+      entry.smartPctOpenAsOf = sample.smartPctOpenAsOf;
       changed = true;
     }
     if (changed) backfilled += 1;
@@ -775,6 +826,42 @@ async function main(): Promise<void> {
         continue;
       }
       const profits = trades.map((s) => (s.gapHeld >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  // ── EXPERIMENTAL (v9): open-as-of-N-days-before-resolution weighted — the live-plausible version
+  // of v8's idea (v8 requires retrospective knowledge a live system can't have). Compared head-to-
+  // head against locked v1 on the exact same entries. ──
+  const withOpenAsOf = currentVersionAll.filter((s) => s.smartPctOpenAsOf !== undefined);
+  console.log(`\nEXPERIMENTAL: open-as-of-${OPEN_AS_OF_LEAD_DAYS}-days-before-resolution weighted, n=${withOpenAsOf.length}:`);
+  if (withOpenAsOf.length === 0) {
+    console.log("  No entries have smartPctOpenAsOf yet.");
+  } else {
+    const v1BrierSub = mean(withOpenAsOf.map((s) => brier(s.smartPct, s.actual)));
+    const openAsOfBrier = mean(withOpenAsOf.map((s) => brier(s.smartPctOpenAsOf!, s.actual)));
+    console.log(`  locked v1 Brier (same ${withOpenAsOf.length} entries): ${v1BrierSub.toFixed(4)}`);
+    console.log(`  open-as-of Brier:                           ${openAsOfBrier.toFixed(4)}`);
+    console.log(
+      openAsOfBrier < v1BrierSub
+        ? "  -> the live-plausible version still improves on locked v1 on this sample."
+        : "  -> the live-plausible version does NOT improve on locked v1 on this sample — v8's effect may not survive in real time."
+    );
+
+    console.log("\n  Simulated return per $1 staked using the open-as-of tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withOpenAsOf
+        .map((s) => ({ ...s, gapOpenAsOf: s.smartPctOpenAsOf! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapOpenAsOf) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapOpenAsOf >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
       const avgProfit = mean(profits);
       const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
       console.log(

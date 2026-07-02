@@ -10,7 +10,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.8371573589367409,
     "smartPctConfidence": 0.9137528882255902,
-    "smartPctHeld": 0.8375530441904233
+    "smartPctHeld": 0.8375530441904233,
+    "smartPctOpenAsOf": 0.8300416941854833
   },
   {
     "conditionId": "0x6114a8a3f9ac214f48a7e20d169f1c7a5c84082cb6f7058ed9fe1137b11fd0e7",
@@ -23,7 +24,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5774712006687219,
     "smartPctConfidence": 0.7020487334726663,
-    "smartPctHeld": 0.9739233010379957
+    "smartPctHeld": 0.9739233010379957,
+    "smartPctOpenAsOf": 0.3062303314593283
   },
   {
     "conditionId": "0x9352c559e9648ab4cab236087b64ca85c5b7123a4c7d9d7d4efde4a39c18056f",
@@ -36,7 +38,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.15419241043909906,
     "smartPctConfidence": 0.13223950977037496,
-    "smartPctHeld": 0.09314032538027897
+    "smartPctHeld": 0.09314032538027897,
+    "smartPctOpenAsOf": 0.0288630871495981
   },
   {
     "conditionId": "0x20af55ab35186377b81219db6cb8615240cba42cea41731091be9484a5f5b122",
@@ -49,7 +52,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.683057058991176,
     "smartPctConfidence": 0.8199068238861448,
-    "smartPctHeld": 0.5769577728097812
+    "smartPctHeld": 0.5769577728097812,
+    "smartPctOpenAsOf": 0.5958569690265824
   },
   {
     "conditionId": "0x9769f78cbc95a5ed11895e6064bac471d8fd8f930b260cf581b68d3f58630d27",
@@ -62,7 +66,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.8332429224143821,
     "smartPctConfidence": 0.8786941812043471,
-    "smartPctHeld": 0.8749102457985012
+    "smartPctHeld": 0.8749102457985012,
+    "smartPctOpenAsOf": 0.6842481485592513
   },
   {
     "conditionId": "0xda519921a7090298cbdc56ee838a403a5193c2b3f637aef3e154e52de7b5e79c",
@@ -75,7 +80,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.7128382289826753,
     "smartPctConfidence": 0.7158250238543321,
-    "smartPctHeld": 0.9927593690227571
+    "smartPctHeld": 0.9927593690227571,
+    "smartPctOpenAsOf": 0.7161814410234133
   },
   {
     "conditionId": "0xa48ee32a0cbe5bc1a48844bd14e1691701d3bf8f45f4dd8cb8d1d304561393b6",
@@ -88,7 +94,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6698510858071334,
     "smartPctConfidence": 0.6728502662426221,
-    "smartPctHeld": 0.731509944391852
+    "smartPctHeld": 0.731509944391852,
+    "smartPctOpenAsOf": 0.5391353549828799
   },
   {
     "conditionId": "0x348cd9adf4f6855f58bd9c6dbf9ff251c4142ef77233a5dc95c65b4b61cd2187",
@@ -101,7 +108,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.27345750897112386,
     "smartPctConfidence": 0.2881109411218282,
-    "smartPctHeld": 0.058824888210748084
+    "smartPctHeld": 0.058824888210748084,
+    "smartPctOpenAsOf": 0.18961608102133762
   },
   {
     "conditionId": "0xc4c3dbcc37a957a817599b0bf9fb5bd6b62b19210b0f527fec57cb75c7ed150a",
@@ -114,7 +122,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.7154630534203612,
     "smartPctConfidence": 0.7630015521018029,
-    "smartPctHeld": 0.8198865975289349
+    "smartPctHeld": 0.8198865975289349,
+    "smartPctOpenAsOf": 0.923774732079578
   },
   {
     "conditionId": "0x46666ceb4c63814f38a8c83784ae10e1c2e1ef52e2db648372bd86dea521cf64",
@@ -127,7 +136,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.13587706142748524,
     "smartPctConfidence": 0.13495557493891422,
-    "smartPctHeld": 0.0762416486943248
+    "smartPctHeld": 0.0762416486943248,
+    "smartPctOpenAsOf": 0.1162803816491231
   },
   {
     "conditionId": "0x291ff8aa0b7439389820e49584499d6dc65cf617dde1a47c4b84d05f42c85639",
@@ -152,7 +162,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5699563040277339,
     "smartPctConfidence": 0.6661221313239757,
-    "smartPctHeld": 0.9091491729370664
+    "smartPctHeld": 0.9091491729370664,
+    "smartPctOpenAsOf": 0.6623459658764972
   },
   {
     "conditionId": "0xfbe85201ab2b4acff01cd5a3639039fc813d3448c64db081f70926bd9b9e74e9",
@@ -165,7 +176,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.7409627915008486,
     "smartPctConfidence": 0.8037534665261753,
-    "smartPctHeld": 0.8348214247241584
+    "smartPctHeld": 0.8348214247241584,
+    "smartPctOpenAsOf": 0.8342733836082104
   },
   {
     "conditionId": "0x0c38dd9305e3205557885183f0730270779e7e426b0ec3e7743f23963b6d6e4a",
@@ -178,7 +190,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.04728387237862195,
     "smartPctConfidence": 0.0474233815574337,
-    "smartPctHeld": 0.04351593008467023
+    "smartPctHeld": 0.04351593008467023,
+    "smartPctOpenAsOf": 0.061176
   },
   {
     "conditionId": "0x1723b7ee4118dee6ae6be8802cb7b6e239c37d199997b20a8191e32553a5bd68",
@@ -191,7 +204,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.29737190468539904,
     "smartPctConfidence": 0.3049641307573282,
-    "smartPctHeld": 0.02280732542679189
+    "smartPctHeld": 0.02280732542679189,
+    "smartPctOpenAsOf": 0.024099
   },
   {
     "conditionId": "0x258031a51215d328eac2db15bdf45abdee1a23d38d66e12462a83c34cf31b5c8",
@@ -204,7 +218,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6743596452670888,
     "smartPctConfidence": 0.6966932154005763,
-    "smartPctHeld": 0.7432800435699325
+    "smartPctHeld": 0.7432800435699325,
+    "smartPctOpenAsOf": 0.7176374639199249
   },
   {
     "conditionId": "0x0b4cc3b739e1dfe5d73274740e7308b6fb389c5af040c3a174923d928d134bee",
@@ -229,7 +244,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.41799000821744664,
     "smartPctConfidence": 0.42961610145806917,
-    "smartPctHeld": 0.99
+    "smartPctHeld": 0.99,
+    "smartPctOpenAsOf": 0.36463
   },
   {
     "conditionId": "0x649bd3dc845f647aa8c9a739ad8de245b853224961afd01127de0071c13f84b3",
@@ -242,7 +258,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6553784089129088,
     "smartPctConfidence": 0.6576849014612914,
-    "smartPctHeld": 0.6542021503623682
+    "smartPctHeld": 0.6542021503623682,
+    "smartPctOpenAsOf": 0.7424569999999999
   },
   {
     "conditionId": "0x2a7a6ab8f4984f1ae82eacd7fb408832a50e63162ac6b98fff1fe094b8e9d3b5",
@@ -267,7 +284,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6387406266350254,
     "smartPctConfidence": 0.6373434557734126,
-    "smartPctHeld": 0.6505987429074895
+    "smartPctHeld": 0.6505987429074895,
+    "smartPctOpenAsOf": 0.6441469580745613
   },
   {
     "conditionId": "0xd90bf5f45f24c5de7881707cb5374f3d991388a2d220fa7e0fe2be912cd7642a",
@@ -280,7 +298,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.3741949014942444,
     "smartPctConfidence": 0.3644817815223232,
-    "smartPctHeld": 0.37518260757123006
+    "smartPctHeld": 0.37518260757123006,
+    "smartPctOpenAsOf": 0.35000000000000003
   },
   {
     "conditionId": "0x26c10c27cde58e2d6214d65ab562d8142d34723b3b6ec3f40836d24f6d22dfc9",
@@ -293,7 +312,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.482195457994409,
     "smartPctConfidence": 0.4822915263034789,
-    "smartPctHeld": 0.48168777559766074
+    "smartPctHeld": 0.48168777559766074,
+    "smartPctOpenAsOf": 0.48213590095620956
   },
   {
     "conditionId": "0x4cd77d456c83e7d8c569a8fb8f6396c3f40154f657e6d970733e2b1b6a7110ff",
@@ -306,7 +326,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.7067220867109871,
     "smartPctConfidence": 0.7039917256912066,
-    "smartPctHeld": 0.706824127511787
+    "smartPctHeld": 0.706824127511787,
+    "smartPctOpenAsOf": 0.706510658973252
   },
   {
     "conditionId": "0xcc5ffe6f0dd2ebbdae948dff2ebb541c17fb03eecd9e152bd0c91646d4e0049a",
@@ -319,7 +340,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5765445969379939,
     "smartPctConfidence": 0.5569447976424666,
-    "smartPctHeld": 0.46736649504565264
+    "smartPctHeld": 0.46736649504565264,
+    "smartPctOpenAsOf": 0.5765090916965288
   },
   {
     "conditionId": "0x7d9a8b8c29c55a7b5dce59aa1556be274bb5c6fb2ee431237c3f656603c96583",
@@ -344,7 +366,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6191710403828482,
     "smartPctConfidence": 0.7460114452485842,
-    "smartPctHeld": 0.7408968953277186
+    "smartPctHeld": 0.7408968953277186,
+    "smartPctOpenAsOf": 0.34502988630117226
   },
   {
     "conditionId": "0xd86a816093fcd0a0e1ca440bc5ce199bd3c5a8d6139e044b076958164f8c5423",
@@ -357,7 +380,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.596313405021252,
     "smartPctConfidence": 0.6599981579782365,
-    "smartPctHeld": 0.9128903471064794
+    "smartPctHeld": 0.9128903471064794,
+    "smartPctOpenAsOf": 0.5689730357864258
   },
   {
     "conditionId": "0x6619036865c2d27f1b1c00cd565ce74f6aa72ef93be29c315be36941d3559c59",
@@ -370,7 +394,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.9016356987553182,
     "smartPctConfidence": 0.8929413137805322,
-    "smartPctHeld": 0.9514866292861746
+    "smartPctHeld": 0.9514866292861746,
+    "smartPctOpenAsOf": 0.75
   },
   {
     "conditionId": "0x0e4a0c937b8934c2475613b6322b3f8edc8dedc24762e01e42b0e6f87424a089",
@@ -383,7 +408,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.1601565884301335,
     "smartPctConfidence": 0.14853844812665462,
-    "smartPctHeld": 0.08030031891994978
+    "smartPctHeld": 0.08030031891994978,
+    "smartPctOpenAsOf": 0.19978479570335084
   },
   {
     "conditionId": "0x3733a1b647e7364095736ab0966465d896a84cf3b6bc1695ca1f26c3239b3868",
@@ -396,7 +422,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.18136414530526648,
     "smartPctConfidence": 0.16279448366735674,
-    "smartPctHeld": 0.02734398062097947
+    "smartPctHeld": 0.02734398062097947,
+    "smartPctOpenAsOf": 0.8180310000000001
   },
   {
     "conditionId": "0x22e7b5e35423e76842dd3a5e1a21d13793811080d5e7b2896d0c001bd5e97d54",
@@ -409,7 +436,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.46166240678949216,
     "smartPctConfidence": 0.46166240678949216,
-    "smartPctHeld": 0.43775728249787826
+    "smartPctHeld": 0.43775728249787826,
+    "smartPctOpenAsOf": 0.4630367320075218
   },
   {
     "conditionId": "0x421bc1929df1429cf2cb94f80c1ce6a3ed0d1f0b7a2749b9890075f94eb549e9",
@@ -422,7 +450,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.1265367251441222,
     "smartPctConfidence": 0.11987441194456952,
-    "smartPctHeld": 0.0960972911922975
+    "smartPctHeld": 0.0960972911922975,
+    "smartPctOpenAsOf": 0.14682160399630415
   },
   {
     "conditionId": "0x4ba348328e4d4ddee9e6734c9a369b2e8138611651f9f6dc8f59dea51df6c734",
@@ -435,7 +464,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.4675524334443459,
     "smartPctConfidence": 0.4633184825234333,
-    "smartPctHeld": 0.4541807057822617
+    "smartPctHeld": 0.4541807057822617,
+    "smartPctOpenAsOf": 0.4425596040054527
   },
   {
     "conditionId": "0xa743ce4a2a42aa232c2caa41aa27837ff1cde07781a1e9a726342065c3d86ba6",
@@ -448,7 +478,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.09305583772230921,
     "smartPctConfidence": 0.08028521181989585,
-    "smartPctHeld": 0.23941000581841299
+    "smartPctHeld": 0.23941000581841299,
+    "smartPctOpenAsOf": 0.26607307064111413
   },
   {
     "conditionId": "0xdb22a7749b831aa07a52cbc83213e6c8ceb88226b224a831512f4460011bb0a1",
@@ -461,7 +492,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6238072292250364,
     "smartPctConfidence": 0.6238072292250364,
-    "smartPctHeld": 0.5519075285643785
+    "smartPctHeld": 0.5519075285643785,
+    "smartPctOpenAsOf": 0.4800671421844068
   },
   {
     "conditionId": "0x652002aa13ba253abd033a6a7d06457fe2a08309c7c5324598d677624cdabec3",
@@ -474,7 +506,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5845223203015577,
     "smartPctConfidence": 0.6300159931049728,
-    "smartPctHeld": 0.7028870267852615
+    "smartPctHeld": 0.7028870267852615,
+    "smartPctOpenAsOf": 0.637625923264405
   },
   {
     "conditionId": "0xe3033b163d0e0e30cb3154049f28295dada348030e5c6cdfe58ed0d4e393c7e9",
@@ -487,7 +520,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.398643786578781,
     "smartPctConfidence": 0.39217153116220077,
-    "smartPctHeld": 0.34674484388091387
+    "smartPctHeld": 0.34674484388091387,
+    "smartPctOpenAsOf": 0.36081086740607504
   },
   {
     "conditionId": "0xb7dd41c16cd5b59e543ffcdab6a0d876f5ccef5329ea42ef1798d80c9a2b8499",
@@ -500,7 +534,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.3644947980690222,
     "smartPctConfidence": 0.3589908749592763,
-    "smartPctHeld": 0.4682358620370797
+    "smartPctHeld": 0.4682358620370797,
+    "smartPctOpenAsOf": 0.42967166588654004
   },
   {
     "conditionId": "0xbcacd5a055f5a9ced6f69f122216c073dd6987d08253fc07bbcc168fa5b81d55",
@@ -513,7 +548,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.12261988361160801,
     "smartPctConfidence": 0.10543797301890341,
-    "smartPctHeld": 0.09164941632605997
+    "smartPctHeld": 0.09164941632605997,
+    "smartPctOpenAsOf": 0.12050204719972896
   },
   {
     "conditionId": "0x924a2942747dd75703321a7c8d809c68f6a514c3b0f2a2e64274e02310634669",
@@ -526,7 +562,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.2336337323482401,
     "smartPctConfidence": 0.2171420697526588,
-    "smartPctHeld": 0.053877342012950226
+    "smartPctHeld": 0.053877342012950226,
+    "smartPctOpenAsOf": 0.20999999999999994
   },
   {
     "conditionId": "0x518a5b030b205706b8ffe6bbad9bd3de59548348e5c0471827f5de21e513333c",
@@ -539,7 +576,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.1840685081372025,
     "smartPctConfidence": 0.16514462632744958,
-    "smartPctHeld": 0.09383188446599827
+    "smartPctHeld": 0.09383188446599827,
+    "smartPctOpenAsOf": 0.10999999999999999
   },
   {
     "conditionId": "0x6747bae2269c348786d0c0c0f4286ac006f13f16325d4dcbab954b46de029f19",
@@ -552,7 +590,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.891682001904194,
     "smartPctConfidence": 0.891682001904194,
-    "smartPctHeld": 0.913372095842763
+    "smartPctHeld": 0.913372095842763,
+    "smartPctOpenAsOf": 0.9650729834779065
   },
   {
     "conditionId": "0xfa59099fbda1e0f0058ed3cbd57e939fe90ab6d9b57d53bd488bcadf75c191d4",
@@ -565,7 +604,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.1684610875233858,
     "smartPctConfidence": 0.1497754602439635,
-    "smartPctHeld": 0.03783436822875729
+    "smartPctHeld": 0.03783436822875729,
+    "smartPctOpenAsOf": 0.24633281513581792
   },
   {
     "conditionId": "0x1d2787cb8aed975d092b2799ed6f4083e9445f7420cdc09e9d47e7d54356c6cd",
@@ -578,7 +618,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.10318421387388728,
     "smartPctConfidence": 0.058940051884031286,
-    "smartPctHeld": 0.009549946294113546
+    "smartPctHeld": 0.009549946294113546,
+    "smartPctOpenAsOf": 0.07558590750020318
   },
   {
     "conditionId": "0xceb6dfaa2cf5abc9d47ebc867b984a7715104944249274e8a483a2e17473e5f5",
@@ -591,7 +632,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.15469321145069984,
     "smartPctConfidence": 0.13857352182997779,
-    "smartPctHeld": 0.0907782840856103
+    "smartPctHeld": 0.0907782840856103,
+    "smartPctOpenAsOf": 0.1511741347182966
   },
   {
     "conditionId": "0xbbc6689d0f6d57ea42168836712237c7308b3e0118c8914d31b6126d0f3254c5",
@@ -604,7 +646,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.15639038324457125,
     "smartPctConfidence": 0.12416414814120552,
-    "smartPctHeld": 0.10421462711693417
+    "smartPctHeld": 0.10421462711693417,
+    "smartPctOpenAsOf": 0.48
   },
   {
     "conditionId": "0xc0be7b1f19f9b658778c2be7e6bc67596a00f347ab64392d0f5d387534c7c3b4",
@@ -617,7 +660,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5164823361030593,
     "smartPctConfidence": 0.509405416638534,
-    "smartPctHeld": 0.49008019633639405
+    "smartPctHeld": 0.49008019633639405,
+    "smartPctOpenAsOf": 0.4854299660276528
   },
   {
     "conditionId": "0x52bda1b8d68c469eb3176f2052f4da7cacc65a814c51f53294637d124af6afde",
@@ -642,7 +686,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6026880964911077,
     "smartPctConfidence": 0.586459744449202,
-    "smartPctHeld": 0.8629370842592217
+    "smartPctHeld": 0.8629370842592217,
+    "smartPctOpenAsOf": 0.72
   },
   {
     "conditionId": "0x68beecc857017df8663fa36c0c86310dec7305aa88fe830c94651391314afc1c",
@@ -655,7 +700,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.17010621154423566,
     "smartPctConfidence": 0.16543393668406964,
-    "smartPctHeld": 0.1329297503066811
+    "smartPctHeld": 0.1329297503066811,
+    "smartPctOpenAsOf": 0.16803612547637164
   },
   {
     "conditionId": "0x4c5701bcde0b8fb7d7f48c8e9d20245a6caa58c61a77f981fad98f2bfa0b1bc7",
@@ -668,7 +714,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6868349221469453,
     "smartPctConfidence": 0.822226877407095,
-    "smartPctHeld": 0.8092577982149359
+    "smartPctHeld": 0.8092577982149359,
+    "smartPctOpenAsOf": 0.289999
   },
   {
     "conditionId": "0x858071dbcd97be6e31f8467cba92fcb09d1d767d46da407e4434438a188b04a2",
@@ -681,7 +728,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.13167093229967922,
     "smartPctConfidence": 0.14021789722140734,
-    "smartPctHeld": 0.11961004228885715
+    "smartPctHeld": 0.11961004228885715,
+    "smartPctOpenAsOf": 0.16727400000000003
   },
   {
     "conditionId": "0x6d0e09d0f04572d9b1adad84703458b0297bc5603b69dccbde93147ee4443246",
@@ -694,7 +742,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.8546276142140989,
     "smartPctConfidence": 0.8967115385190011,
-    "smartPctHeld": 0.9460054009943359
+    "smartPctHeld": 0.9460054009943359,
+    "smartPctOpenAsOf": 0.8861213826501565
   },
   {
     "conditionId": "0x80059ff4e694f878c0498f6f3a067ee7ca62dc2fc46251a4287b58355ce47bc5",
@@ -707,7 +756,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.40243486340250134,
     "smartPctConfidence": 0.38711635894342367,
-    "smartPctHeld": 0.6120304256078565
+    "smartPctHeld": 0.6120304256078565,
+    "smartPctOpenAsOf": 0.38886765335579376
   },
   {
     "conditionId": "0x306d10d4a4d51b41910dbc779ca00908bd917c131541c5c42bbbc736258d2d56",
@@ -720,7 +770,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.14211136254957668,
     "smartPctConfidence": 0.10635616766089374,
-    "smartPctHeld": 0.10968927079377473
+    "smartPctHeld": 0.10968927079377473,
+    "smartPctOpenAsOf": 0.12074954586608404
   },
   {
     "conditionId": "0xffff6c984d7adab19e799c46d1a478d5ab6483479b41f9639d04617f07a8bab0",
@@ -733,7 +784,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.06563928031006436,
     "smartPctConfidence": 0.06036285876907234,
-    "smartPctHeld": 0.06722167758325354
+    "smartPctHeld": 0.06722167758325354,
+    "smartPctOpenAsOf": 0.06596599999999997
   },
   {
     "conditionId": "0x7cb525e831729325d651017f81cbcb6f1adde5011c7b2283babea00b4ae93ae7",
@@ -746,7 +798,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.03146745502001913,
     "smartPctConfidence": 0.03006381134588964,
-    "smartPctHeld": 0.026036002686009307
+    "smartPctHeld": 0.026036002686009307,
+    "smartPctOpenAsOf": 0.026055434183219914
   },
   {
     "conditionId": "0x3c6bcb7da14ea576e5af25547dbd96f2bb24ac34e748e76aecff2ee9195dd1ac",
@@ -759,7 +812,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.18962865939404702,
     "smartPctConfidence": 0.18465091175264386,
-    "smartPctHeld": 0.11239574875953198
+    "smartPctHeld": 0.11239574875953198,
+    "smartPctOpenAsOf": 0.17901397201820418
   },
   {
     "conditionId": "0x676e7cda423f5826bcbb3c141e808ad7c66bc2d055e4d0aca79c26779712062c",
@@ -784,7 +838,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6259868969778125,
     "smartPctConfidence": 0.6295558238841642,
-    "smartPctHeld": 0.9970833953793117
+    "smartPctHeld": 0.9970833953793117,
+    "smartPctOpenAsOf": 0.8274655151698911
   },
   {
     "conditionId": "0x5efa976ebe94080bbda7e45605333ff8f30156cc91604d66c41eb52fd3e25f3e",
@@ -797,7 +852,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.10651955765277503,
     "smartPctConfidence": 0.10854295151149741,
-    "smartPctHeld": 0.06714399999999998
+    "smartPctHeld": 0.06714399999999998,
+    "smartPctOpenAsOf": 0.06714399999999998
   },
   {
     "conditionId": "0x16608c4fdd7cb41292f6d42c1c02b43ac22593f1c198a104847a3479848d7abe",
@@ -810,7 +866,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.4624737683052366,
     "smartPctConfidence": 0.4796724630272229,
-    "smartPctHeld": 0.6182172199928766
+    "smartPctHeld": 0.6182172199928766,
+    "smartPctOpenAsOf": 0.4395696647749092
   },
   {
     "conditionId": "0xd8664606498aba2a8ccab56656860cb3f02d74de80e974ab87a9f940e65d4d5e",
@@ -823,7 +880,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.27653415434460393,
     "smartPctConfidence": 0.2566425951954481,
-    "smartPctHeld": 0.371018050492216
+    "smartPctHeld": 0.371018050492216,
+    "smartPctOpenAsOf": 0.13476459450196987
   },
   {
     "conditionId": "0xab1209b73e1ce9ebb4905dad781496385b5102c048889502b174ed733de1506a",
@@ -836,7 +894,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.49653570440271017,
     "smartPctConfidence": 0.49653570440271017,
-    "smartPctHeld": 0.797947
+    "smartPctHeld": 0.797947,
+    "smartPctOpenAsOf": 0.48174650030104044
   },
   {
     "conditionId": "0xfedc055699e34eac5f8cd6a1fb1d19e40d87c8e6920b59e741edcb41f8bbdf7d",
@@ -849,7 +908,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.3629899706187688,
     "smartPctConfidence": 0.3629899706187688,
-    "smartPctHeld": 0.24807165141691592
+    "smartPctHeld": 0.24807165141691592,
+    "smartPctOpenAsOf": 0.3637435193346205
   },
   {
     "conditionId": "0x724a93f3e0ed0a6c83d2b4f2bc60839b39a92cc2c7cbac0169447f48d72537ab",
@@ -862,7 +922,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.7553936902040218,
     "smartPctConfidence": 0.766561856045269,
-    "smartPctHeld": 0.8243471453938171
+    "smartPctHeld": 0.8243471453938171,
+    "smartPctOpenAsOf": 0.7569294957443852
   },
   {
     "conditionId": "0x1600d32f2f6c318c11436529c522bc3004164d997a4657feb02541d34e09423e",
@@ -875,7 +936,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6466765846514078,
     "smartPctConfidence": 0.6466765846514078,
-    "smartPctHeld": 0.41748099999999994
+    "smartPctHeld": 0.41748099999999994,
+    "smartPctOpenAsOf": 0.6466380177528381
   },
   {
     "conditionId": "0x51a7c8afb7a0e09b8b47643171d90f400de23a176c4ea06f6552d6e53213839c",
@@ -888,7 +950,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.4536224776760596,
     "smartPctConfidence": 0.4278682824411453,
-    "smartPctHeld": 0.8106061686654632
+    "smartPctHeld": 0.8106061686654632,
+    "smartPctOpenAsOf": 0.23294858346512587
   },
   {
     "conditionId": "0xd9933a54c518e773050255ea9dba01a71e1a41f49311ed078ae4a6f7e76b1625",
@@ -901,7 +964,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.4454778764481232,
     "smartPctConfidence": 0.430784539729218,
-    "smartPctHeld": 0.9374879975361927
+    "smartPctHeld": 0.9374879975361927,
+    "smartPctOpenAsOf": 0.110709
   },
   {
     "conditionId": "0x339727bd072a1756e1ff56b4512702e28ed0e30818fc28e0c9e39fafea56a578",
@@ -914,7 +978,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.13509001145955538,
     "smartPctConfidence": 0.13509001145955538,
-    "smartPctHeld": 0.011
+    "smartPctHeld": 0.011,
+    "smartPctOpenAsOf": 0.13975526470306704
   },
   {
     "conditionId": "0x876047c0df88886ddbe468fe811bc75a667da45a552d798e626ecfc5c60d52d9",
@@ -927,7 +992,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.12502736079174026,
     "smartPctConfidence": 0.12952658619516974,
-    "smartPctHeld": 0.04321562492874353
+    "smartPctHeld": 0.04321562492874353,
+    "smartPctOpenAsOf": 0.07084975611082873
   },
   {
     "conditionId": "0x5c0e75027a5561ea72a0776b00086be32fb4af8e758d26be217ac6c9efcdadf9",
@@ -940,7 +1006,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.0703529185148676,
     "smartPctConfidence": 0.0703529185148676,
-    "smartPctHeld": 0.01765399720085983
+    "smartPctHeld": 0.01765399720085983,
+    "smartPctOpenAsOf": 0.07378194472651219
   },
   {
     "conditionId": "0x3094a2b925483a06aa72945a1472e311e5eb6be75284f61e0c008e279508ddf6",
@@ -953,7 +1020,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.286334837155939,
     "smartPctConfidence": 0.28129167927113036,
-    "smartPctHeld": 0.33550314338297477
+    "smartPctHeld": 0.33550314338297477,
+    "smartPctOpenAsOf": 0.32499
   },
   {
     "conditionId": "0xc88e812beb27442554b9231273f6cdda7c96022afc1a5b2a841f03c17dbceaaf",
@@ -966,7 +1034,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.7179514381929476,
     "smartPctConfidence": 0.8391461371389202,
-    "smartPctHeld": 0.8050615460998178
+    "smartPctHeld": 0.8050615460998178,
+    "smartPctOpenAsOf": 0.7593008793047978
   },
   {
     "conditionId": "0x27182c8b13f2a6284754660cbb3c6350a04f7aa4afe04d24dad481947014d90d",
@@ -979,7 +1048,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.25195526911766136,
     "smartPctConfidence": 0.23097489392004025,
-    "smartPctHeld": 0.02200000000000002
+    "smartPctHeld": 0.02200000000000002,
+    "smartPctOpenAsOf": 0.09
   },
   {
     "conditionId": "0x366f89649caea042c96ee741b185461ec7faa408a2664ec44469a0061924b537",
@@ -992,7 +1062,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.10211088979798226,
     "smartPctConfidence": 0.08433551641057363,
-    "smartPctHeld": 0.10460172601964236
+    "smartPctHeld": 0.10460172601964236,
+    "smartPctOpenAsOf": 0.10331217204490063
   },
   {
     "conditionId": "0xf526b2fbff94ae996818e76c8b54cc99ffbfa0a1a9972a48253ada65e32786f7",
@@ -1005,7 +1076,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.2827455820115662,
     "smartPctConfidence": 0.2827455820115662,
-    "smartPctHeld": 0.04625767454160725
+    "smartPctHeld": 0.04625767454160725,
+    "smartPctOpenAsOf": 0.5248449187443769
   },
   {
     "conditionId": "0xa1d97efb8a19de58d995edf58b882c4f99ef356c8a564af8daf888a7610edea1",
@@ -1018,7 +1090,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.055537675152051914,
     "smartPctConfidence": 0.04446954929750049,
-    "smartPctHeld": 0.04705476797821859
+    "smartPctHeld": 0.04705476797821859,
+    "smartPctOpenAsOf": 0.04898532204575557
   },
   {
     "conditionId": "0x2f6a547524c1d290f8a2bbff80be2b0e8ca1b3b716dd3a0e74bf8ddb3e3fd6b7",
@@ -1031,7 +1104,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.09267974147485322,
     "smartPctConfidence": 0.07133779924887022,
-    "smartPctHeld": 0.06726481876252284
+    "smartPctHeld": 0.06726481876252284,
+    "smartPctOpenAsOf": 0.1608142007078356
   },
   {
     "conditionId": "0x6a8cfe84d17693425f27831db5949d7511f3393d4624b182ac6956164cd32b10",
@@ -1044,7 +1118,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.31426008997608096,
     "smartPctConfidence": 0.293291695853717,
-    "smartPctHeld": 0.21516409497428582
+    "smartPctHeld": 0.21516409497428582,
+    "smartPctOpenAsOf": 0.249999
   },
   {
     "conditionId": "0xd39905267d79b715f078279ef41f311b791c6e2c7361fea38011492b632212ef",
@@ -1057,7 +1132,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.1694822839584177,
     "smartPctConfidence": 0.17739540773235823,
-    "smartPctHeld": 0.16503362917035413
+    "smartPctHeld": 0.16503362917035413,
+    "smartPctOpenAsOf": 0.139
   },
   {
     "conditionId": "0xfef657b2f9ed83dd3db24c61d115203e836f9967289cd3281b6b91dcd7338104",
@@ -1070,7 +1146,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.05240401086578652,
     "smartPctConfidence": 0.031197410868471477,
-    "smartPctHeld": 0.23
+    "smartPctHeld": 0.23,
+    "smartPctOpenAsOf": 0.06754271667999925
   },
   {
     "conditionId": "0x4d0c4865bdecc5f7971dbab47bb6c069d93909dec75bdff52fb766ae6094a6d6",
@@ -1083,7 +1160,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.499947523461655,
     "smartPctConfidence": 0.4861500291951138,
-    "smartPctHeld": 0.4686247102147213
+    "smartPctHeld": 0.4686247102147213,
+    "smartPctOpenAsOf": 0.3755638827870266
   },
   {
     "conditionId": "0xbeab83146920be8f52b52fdbcb3464b24dc553f7b47eb4249243385b0faad271",
@@ -1096,7 +1174,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.19802864285298782,
     "smartPctConfidence": 0.19688746338501223,
-    "smartPctHeld": 0.14225540151819427
+    "smartPctHeld": 0.14225540151819427,
+    "smartPctOpenAsOf": 0.1854864752742267
   },
   {
     "conditionId": "0x8b369e10358094a99ffe7f85a81a8e8ca68c611eee0fe63a2efa790ad045bcd6",
@@ -1109,7 +1188,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.48069508009191864,
     "smartPctConfidence": 0.4948094268707019,
-    "smartPctHeld": 0.26873159179758965
+    "smartPctHeld": 0.26873159179758965,
+    "smartPctOpenAsOf": 0.33106745249712954
   },
   {
     "conditionId": "0xa70fc3695a65833b91b45df6db6015096f3e1471b70352ca411b4209010e7633",
@@ -1122,7 +1202,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.43269121249700776,
     "smartPctConfidence": 0.5369495101520589,
-    "smartPctHeld": 0.4513104715176972
+    "smartPctHeld": 0.4513104715176972,
+    "smartPctOpenAsOf": 0.4343075995988198
   },
   {
     "conditionId": "0xb2e7dd21dd889b9b56447857f03ea6188ebcef50599c3c1556c2f9141772d7bb",
@@ -1135,7 +1216,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.13115953466231375,
     "smartPctConfidence": 0.1299359241118197,
-    "smartPctHeld": 0.043
+    "smartPctHeld": 0.043,
+    "smartPctOpenAsOf": 0.133963975527771
   },
   {
     "conditionId": "0x71c49500d051a9b32b9aa5bc22e0a6925a8b2282840c3e62e0a3afcd0403ba03",
@@ -1160,7 +1242,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.40999066073512946,
     "smartPctConfidence": 0.3905872687131235,
-    "smartPctHeld": 0.28802685647779536
+    "smartPctHeld": 0.28802685647779536,
+    "smartPctOpenAsOf": 0.5368389611116324
   },
   {
     "conditionId": "0xf7ad79d04f2dc95740b512d657957bf16b521342ae41be894fa44c56b8b1d1ab",
@@ -1173,7 +1256,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.13235136039306045,
     "smartPctConfidence": 0.13191564609354534,
-    "smartPctHeld": 0.04283662953285424
+    "smartPctHeld": 0.04283662953285424,
+    "smartPctOpenAsOf": 0.10662280662744492
   },
   {
     "conditionId": "0x92485347d2c139beb425df7bee78b98805d0eab1eb0cc953cf000e9a287eab7e",
@@ -1198,7 +1282,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.9056372362859513,
     "smartPctConfidence": 0.9400992371845099,
-    "smartPctHeld": 0.9792932373004384
+    "smartPctHeld": 0.9792932373004384,
+    "smartPctOpenAsOf": 0.9185453541761841
   },
   {
     "conditionId": "0x4997c22d314ed5e9f3712e46eb4847441b51fa730d10ad26240afa85f5d902be",
@@ -1211,7 +1296,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.9270914603812704,
     "smartPctConfidence": 0.9437331656599278,
-    "smartPctHeld": 0.9294270274293186
+    "smartPctHeld": 0.9294270274293186,
+    "smartPctOpenAsOf": 0.9307803699766113
   },
   {
     "conditionId": "0x1eeb910620bfa52c348ca5b166c33230a0b142bec858d4fa46df18aeecbcecc0",
@@ -1236,7 +1322,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.049144541941363674,
     "smartPctConfidence": 0.04548985072647696,
-    "smartPctHeld": 0.04761150060719385
+    "smartPctHeld": 0.04761150060719385,
+    "smartPctOpenAsOf": 0.0494916787700442
   },
   {
     "conditionId": "0x789c947a9415600d30d56a4aae88d4111996679b0caed166d0c96242fdce92a2",
@@ -1249,7 +1336,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.030881723023623922,
     "smartPctConfidence": 0.030996974475735656,
-    "smartPctHeld": 0.029681449450486813
+    "smartPctHeld": 0.029681449450486813,
+    "smartPctOpenAsOf": 0.03473829708421064
   },
   {
     "conditionId": "0xb4067f81957ef1458e9712000807a4525c595f3c25a0c933ec2f69c0efb2e878",
@@ -1262,7 +1350,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.040948235785146204,
     "smartPctConfidence": 0.03980645939797035,
-    "smartPctHeld": 0.03421869104404078
+    "smartPctHeld": 0.03421869104404078,
+    "smartPctOpenAsOf": 0.032
   },
   {
     "conditionId": "0xe546672750517f62c45a5a00067481981e62b9c20fa8220203232c9dc8fd2093",
@@ -1275,7 +1364,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.42552223427542823,
     "smartPctConfidence": 0.5051216428760436,
-    "smartPctHeld": 0.9168782754471322
+    "smartPctHeld": 0.9168782754471322,
+    "smartPctOpenAsOf": 0.6020506716908942
   },
   {
     "conditionId": "0xa93b28a6384aefff4e7d5adb2061c444e4a0e95b8ad17755f9cee123c7099b35",
@@ -1288,7 +1378,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.46693657169874037,
     "smartPctConfidence": 0.4877890537631929,
-    "smartPctHeld": 0.7136035732524386
+    "smartPctHeld": 0.7136035732524386,
+    "smartPctOpenAsOf": 0.082
   },
   {
     "conditionId": "0x7434b22007745d99095c102119fdb6b975d34869212e9dda4c6c5c48db0683a7",
@@ -1301,7 +1392,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.03208663634163001,
     "smartPctConfidence": 0.03579629879680398,
-    "smartPctHeld": 0.019405724037331897
+    "smartPctHeld": 0.019405724037331897,
+    "smartPctOpenAsOf": 0.028668622261365843
   },
   {
     "conditionId": "0x02f8dd15d4c674a75fccbd0e00f0cf1256101c45ef41f6d0c5dfde9c36d4141e",
@@ -1314,7 +1406,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5371293756142336,
     "smartPctConfidence": 0.48953378242287576,
-    "smartPctHeld": 0.9611133034973571
+    "smartPctHeld": 0.9611133034973571,
+    "smartPctOpenAsOf": 0.6785177762040139
   },
   {
     "conditionId": "0xb412664463bbfe21be44b1963291205ab332afd4f7f6e0d027aec1ba7a9e6793",
@@ -1327,7 +1420,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.1621340176622925,
     "smartPctConfidence": 0.14862160834680052,
-    "smartPctHeld": 0.16690069110857708
+    "smartPctHeld": 0.16690069110857708,
+    "smartPctOpenAsOf": 0.03434899999999996
   },
   {
     "conditionId": "0xffe381a80c1e36f9e0b03a542aa8fe56e74a67d2566a4e29396d4427aa4244c9",
@@ -1340,7 +1434,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.09134610600798293,
     "smartPctConfidence": 0.07898880592239936,
-    "smartPctHeld": 0.05915680324939048
+    "smartPctHeld": 0.05915680324939048,
+    "smartPctOpenAsOf": 0.10249033825893603
   },
   {
     "conditionId": "0xe31a6c763685129123cb6a0f729bfce04b768c5a22cb09c5610406df1a302465",
@@ -1353,7 +1448,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.303166825382929,
     "smartPctConfidence": 0.3134282351075738,
-    "smartPctHeld": 0.08326931312061255
+    "smartPctHeld": 0.08326931312061255,
+    "smartPctOpenAsOf": 0.577014
   },
   {
     "conditionId": "0xd839785e6d4e4fdd44ef0e90f315eecccde47578924491e6ae74499e9f62d29e",
@@ -1366,7 +1462,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.23212181301006007,
     "smartPctConfidence": 0.23212181301006007,
-    "smartPctHeld": 0.17147568562840929
+    "smartPctHeld": 0.17147568562840929,
+    "smartPctOpenAsOf": 0.20799330607338407
   },
   {
     "conditionId": "0x6897736d782ce70f47126dfcec6669073f563d6e757e60bc61c0367370d6f73e",
@@ -1379,7 +1476,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.08840557599648609,
     "smartPctConfidence": 0.08994675180585449,
-    "smartPctHeld": 0.0463309946830824
+    "smartPctHeld": 0.0463309946830824,
+    "smartPctOpenAsOf": 0.042655
   },
   {
     "conditionId": "0x23408daff185f6c89d91bd279ce97142c573454277d72ae882a9d9fd1ae79af4",
@@ -1392,7 +1490,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.9006034393528234,
     "smartPctConfidence": 0.9006034393528234,
-    "smartPctHeld": 0.9093054037677785
+    "smartPctHeld": 0.9093054037677785,
+    "smartPctOpenAsOf": 0.8812452976905455
   },
   {
     "conditionId": "0x1480b819d03d4b6388d70e848b0384adf38c38d955cb783cdbcf6d4a436dee14",
@@ -1405,7 +1504,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6673338831629835,
     "smartPctConfidence": 0.49827931880698884,
-    "smartPctHeld": 0.9757034878804681
+    "smartPctHeld": 0.9757034878804681,
+    "smartPctOpenAsOf": 0.9849999999999999
   },
   {
     "conditionId": "0xfcde02af15efe40e336d67f0ef9aa49e9d40c37b92961fb890afc4afdbfe54d6",
@@ -1418,7 +1518,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.7697283956907308,
     "smartPctConfidence": 0.7697283956907308,
-    "smartPctHeld": 0.6740921292257428
+    "smartPctHeld": 0.6740921292257428,
+    "smartPctOpenAsOf": 0.7756964452227
   },
   {
     "conditionId": "0x773abaa5fe55e5cde51a261f444b7921652a4e059ead6b3be9fe56499c2d4609",
@@ -1431,7 +1532,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.3566456601460272,
     "smartPctConfidence": 0.366381761000113,
-    "smartPctHeld": 0.6841340927167777
+    "smartPctHeld": 0.6841340927167777,
+    "smartPctOpenAsOf": 0.32644534352290555
   },
   {
     "conditionId": "0x6e9f90a6f471b52d03499a81586ca478519474eb152f1327c8c767f020d62529",
@@ -1444,7 +1546,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.40508846061526155,
     "smartPctConfidence": 0.365760068857984,
-    "smartPctHeld": 0.49961484048375504
+    "smartPctHeld": 0.49961484048375504,
+    "smartPctOpenAsOf": 0.37988865986984344
   },
   {
     "conditionId": "0xac084d6558622409fda664dc5446a50a880900f311a4d1e8ff2c4ad8f0fb6f93",
@@ -1457,7 +1560,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.4901681529556961,
     "smartPctConfidence": 0.4910176094132794,
-    "smartPctHeld": 0.47776929921762373
+    "smartPctHeld": 0.47776929921762373,
+    "smartPctOpenAsOf": 0.6794680694992591
   },
   {
     "conditionId": "0x1c60f9adb1d786b6fe78d63fd9f82dbb293fa06241532fb5ba43f8d8411cde1e",
@@ -1470,7 +1574,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6896792286722385,
     "smartPctConfidence": 0.6847576700318706,
-    "smartPctHeld": 0.7762162403600856
+    "smartPctHeld": 0.7762162403600856,
+    "smartPctOpenAsOf": 0.54
   },
   {
     "conditionId": "0x99a0fdc1bb6308873bf87eb75a47e21c8340fe20fb6b033444c1d21392da10a9",
@@ -1483,7 +1588,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.3718160346734548,
     "smartPctConfidence": 0.33485860518682775,
-    "smartPctHeld": 0.7658741238346293
+    "smartPctHeld": 0.7658741238346293,
+    "smartPctOpenAsOf": 0.5601987173768003
   },
   {
     "conditionId": "0x23dbb60ade08c2664ac29488325afbc0136735bc7beb9180d9c0cb72620b0b13",
@@ -1496,7 +1602,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.8330482747752866,
     "smartPctConfidence": 0.7404079967375043,
-    "smartPctHeld": 0.7848455377383293
+    "smartPctHeld": 0.7848455377383293,
+    "smartPctOpenAsOf": 0.8345375205272373
   },
   {
     "conditionId": "0x94a2b2a1b9227e44fc464614e63dfca6d4082310291c35623c3d34b70aa53693",
@@ -1509,7 +1616,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.4164593594453813,
     "smartPctConfidence": 0.42736885126222773,
-    "smartPctHeld": 0.43007635478514533
+    "smartPctHeld": 0.43007635478514533,
+    "smartPctOpenAsOf": 0.4429751623094773
   },
   {
     "conditionId": "0x6509c26f04acbe80e73144486933fff507901867925f165421d66155193fce55",
@@ -1522,7 +1630,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6213750679046461,
     "smartPctConfidence": 0.6273854361525825,
-    "smartPctHeld": 0.6272825201238281
+    "smartPctHeld": 0.6272825201238281,
+    "smartPctOpenAsOf": 0.6072887909417709
   },
   {
     "conditionId": "0xa6e388d87a81a17dd8f2046479e11c50bf32bcf475ce75a3506c5cf19a09613c",
@@ -1535,7 +1644,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.2960468573940409,
     "smartPctConfidence": 0.186631772246008,
-    "smartPctHeld": 0.44698880692485154
+    "smartPctHeld": 0.44698880692485154,
+    "smartPctOpenAsOf": 0.5274646302584215
   },
   {
     "conditionId": "0x3088733a3d7f03d026035f6dd7df44a82c59eeb95545dda3889b65baa9a36e82",
@@ -1548,7 +1658,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.44786270998162886,
     "smartPctConfidence": 0.4200344753194471,
-    "smartPctHeld": 0.846
+    "smartPctHeld": 0.846,
+    "smartPctOpenAsOf": 0.475371
   },
   {
     "conditionId": "0x865303ccb9a48341d1bae33b3b4379ca86d5abbff3ce1e132716631cc0af3cce",
@@ -1561,7 +1672,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.1105250719391015,
     "smartPctConfidence": 0.1118363482920594,
-    "smartPctHeld": 0.09086432228452615
+    "smartPctHeld": 0.09086432228452615,
+    "smartPctOpenAsOf": 0.050000000000000044
   },
   {
     "conditionId": "0x43272c02b8407ed3f8d5b04fb4cb132d7a59c5df6ecc423afcf66f1c778d1887",
@@ -1574,7 +1686,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.0799780057031866,
     "smartPctConfidence": 0.06852890934982575,
-    "smartPctHeld": 0.06916724862750162
+    "smartPctHeld": 0.06916724862750162,
+    "smartPctOpenAsOf": 0.08631300824949352
   },
   {
     "conditionId": "0x5a965e943de13a4bdef4fb568d94341a751f02a2f652fa4fb8377d8b02f84606",
@@ -1587,7 +1700,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.1811624496895847,
     "smartPctConfidence": 0.18668652747281564,
-    "smartPctHeld": 0.18054553663340972
+    "smartPctHeld": 0.18054553663340972,
+    "smartPctOpenAsOf": 0.23864200000000002
   },
   {
     "conditionId": "0xf471786ca9608b18a61e1f555681428c80ad2a2695fdd2df69e796defff9f897",
@@ -1624,7 +1738,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.46310900163064017,
     "smartPctConfidence": 0.46955605189824406,
-    "smartPctHeld": 0.4440269927979064
+    "smartPctHeld": 0.4440269927979064,
+    "smartPctOpenAsOf": 0.31421574005745534
   },
   {
     "conditionId": "0x93f2e17cfd239c4667eb3d41ff04e2cd1ae6f3f663210cbc42ec1296ff880805",
@@ -1637,7 +1752,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5219226670327407,
     "smartPctConfidence": 0.5112918916711355,
-    "smartPctHeld": 0.5090311282374693
+    "smartPctHeld": 0.5090311282374693,
+    "smartPctOpenAsOf": 0.4965557733612665
   },
   {
     "conditionId": "0x35c73eb41a0ee54b49358c523a2d3335e9df5ee21bba9e526813a6fbaa0f70b6",
@@ -1650,7 +1766,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.41970287900126924,
     "smartPctConfidence": 0.4387721847137816,
-    "smartPctHeld": 0.4032284733483875
+    "smartPctHeld": 0.4032284733483875,
+    "smartPctOpenAsOf": 0.46498781105938003
   },
   {
     "conditionId": "0xa96e71186507bf493bd1fb8101418c369c6296a29b49514fdec3f7bfe7197909",
@@ -1675,7 +1792,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.18339233030745916,
     "smartPctConfidence": 0.1884339041162197,
-    "smartPctHeld": 0.19251570314109326
+    "smartPctHeld": 0.19251570314109326,
+    "smartPctOpenAsOf": 0.20188093052634618
   },
   {
     "conditionId": "0x65f204a8ebbaa472d668cc4fdbe4dd45249405a7e0acea43b7930a216e5bfdc7",
@@ -1688,7 +1806,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.8666590361460581,
     "smartPctConfidence": 0.8712764635872828,
-    "smartPctHeld": 0.909921405393462
+    "smartPctHeld": 0.909921405393462,
+    "smartPctOpenAsOf": 0.7063995357848
   },
   {
     "conditionId": "0x2135ffcb43ba9103bb6acf7116d2d5aa98bef6d9eb3dc9c85ea00cb79513f3ec",
@@ -1701,7 +1820,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.16788290652254853,
     "smartPctConfidence": 0.15253971193093713,
-    "smartPctHeld": 0.07748526876024749
+    "smartPctHeld": 0.07748526876024749,
+    "smartPctOpenAsOf": 0.230001
   },
   {
     "conditionId": "0x14fd8ab261d14215058b77a9541a5013ccc3d3eb677276a9de54445a31acd194",
@@ -1714,7 +1834,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.015629282181962717,
     "smartPctConfidence": 0.015445682369543703,
-    "smartPctHeld": 0.02309656641848833
+    "smartPctHeld": 0.02309656641848833,
+    "smartPctOpenAsOf": 0.02309656641848833
   },
   {
     "conditionId": "0x1db02ba50e2312a62b4104de691cc7a76065d8d0da40decf93eb1b914a3217b7",
@@ -1727,7 +1848,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.08820636424988779,
     "smartPctConfidence": 0.08967783705754978,
-    "smartPctHeld": 0.05593928525887843
+    "smartPctHeld": 0.05593928525887843,
+    "smartPctOpenAsOf": 0.08571842034246008
   },
   {
     "conditionId": "0x2226a3e40300238a813bddccb7cadef078ffce4c83e237d85a135e685f0b81b5",
@@ -1752,7 +1874,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.13713839347932333,
     "smartPctConfidence": 0.11262998720217228,
-    "smartPctHeld": 0.12324590180206432
+    "smartPctHeld": 0.12324590180206432,
+    "smartPctOpenAsOf": 0.14315702522280052
   },
   {
     "conditionId": "0x5d37825716832a4a54f89450932e89510f26cf4be59aeec3149d2c49e5fdf44d",
@@ -1765,7 +1888,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.31935840218691075,
     "smartPctConfidence": 0.3226992211231364,
-    "smartPctHeld": 0.18488308071802576
+    "smartPctHeld": 0.18488308071802576,
+    "smartPctOpenAsOf": 0.2729918965733375
   },
   {
     "conditionId": "0xf9f0965a3bd704ad9c184851242606ad35a4ffe733febf5074d4fbcc59d52eb8",
@@ -1778,7 +1902,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.428293935981363,
     "smartPctConfidence": 0.3996698501906132,
-    "smartPctHeld": 0.20839343164947033
+    "smartPctHeld": 0.20839343164947033,
+    "smartPctOpenAsOf": 0.4536646766982147
   },
   {
     "conditionId": "0x0fa5d80f8f8fec384b629d60a47c8c669ff7e6ea469edb9f91ccfd030b7f56d7",
@@ -1791,7 +1916,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.16553043555861985,
     "smartPctConfidence": 0.1792154053908877,
-    "smartPctHeld": 0.02092784153621398
+    "smartPctHeld": 0.02092784153621398,
+    "smartPctOpenAsOf": 0.019032999999999967
   },
   {
     "conditionId": "0xe208a07bd71069b04e3b89de92f71da8b155d45dc2e527dc46c3ceb2a63b307b",
@@ -1816,7 +1942,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.38355067112966046,
     "smartPctConfidence": 0.3939112050421938,
-    "smartPctHeld": 0.3960720241098475
+    "smartPctHeld": 0.3960720241098475,
+    "smartPctOpenAsOf": 0.4111133902577015
   },
   {
     "conditionId": "0x65414628f108533d689721c6b2576dd83da43644bcfd62506444f1591ef32c31",
@@ -1841,7 +1968,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5980376678409299,
     "smartPctConfidence": 0.5861083831893156,
-    "smartPctHeld": 0.595017456895945
+    "smartPctHeld": 0.595017456895945,
+    "smartPctOpenAsOf": 0.6833994644528543
   },
   {
     "conditionId": "0xf64f880b571d7a70d858649d30f0843aa57307e304aeb617349df74ce34d044e",
@@ -1854,7 +1982,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.13857112588125112,
     "smartPctConfidence": 0.06570309878288665,
-    "smartPctHeld": 0.02297
+    "smartPctHeld": 0.02297,
+    "smartPctOpenAsOf": 0.2585398598759165
   },
   {
     "conditionId": "0xb6b3d7a2037b3faa7e1306d741840d453432902d73cc9a146a035e40271eae73",
@@ -1867,7 +1996,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.17643597184408746,
     "smartPctConfidence": 0.16918158762076474,
-    "smartPctHeld": 0.1856108171904222
+    "smartPctHeld": 0.1856108171904222,
+    "smartPctOpenAsOf": 0.20438299999999998
   },
   {
     "conditionId": "0x713641f745d71f6ec61f906237ffca3c8583f251e49384429a63ceb0ccdb2d37",
@@ -1880,7 +2010,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.32374439292883134,
     "smartPctConfidence": 0.3361599813284086,
-    "smartPctHeld": 0.26424164973274666
+    "smartPctHeld": 0.26424164973274666,
+    "smartPctOpenAsOf": 0.286751
   },
   {
     "conditionId": "0x9bb9f7c70674e2043580bf634753858eded9b360252c06f891688b95a542ac46",
@@ -1905,7 +2036,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5384107293825964,
     "smartPctConfidence": 0.5262412521310219,
-    "smartPctHeld": 0.533716362079992
+    "smartPctHeld": 0.533716362079992,
+    "smartPctOpenAsOf": 0.5389449866776064
   },
   {
     "conditionId": "0x6b44bd667fad6cb5b3b68d8bd1055a038c77d9176dbd51f123879797cc3368a7",
@@ -1918,7 +2050,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.03862802584246408,
     "smartPctConfidence": 0.03830195183374201,
-    "smartPctHeld": 0.02323300720469314
+    "smartPctHeld": 0.02323300720469314,
+    "smartPctOpenAsOf": 0.03020541069653534
   },
   {
     "conditionId": "0x89389a6b1439856a8d366234c795d72865c927a1aa3cf9d4cc04a3a400defde1",
@@ -1931,7 +2064,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.17889425790767938,
     "smartPctConfidence": 0.17635109800297638,
-    "smartPctHeld": 0.126264
+    "smartPctHeld": 0.126264,
+    "smartPctOpenAsOf": 0.2081418693169483
   },
   {
     "conditionId": "0x5376e032a8f5a389b55aeafb39b6985bfb323f8392e304bc48b1b01e9cd39850",
@@ -1944,7 +2078,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.39078513760576855,
     "smartPctConfidence": 0.38817710489908414,
-    "smartPctHeld": 0.39473376217022454
+    "smartPctHeld": 0.39473376217022454,
+    "smartPctOpenAsOf": 0.3890630266318553
   },
   {
     "conditionId": "0x434719e5e807306706d17205f2bc15e4901184084c4e8ea472127f47a365bbdf",
@@ -1957,7 +2092,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.21328419272317645,
     "smartPctConfidence": 0.20989761807390334,
-    "smartPctHeld": 0.22
+    "smartPctHeld": 0.22,
+    "smartPctOpenAsOf": 0.21357833301328077
   },
   {
     "conditionId": "0x5159f1aeb43719d812fd7bdde72da589fafe0ab0cff7a861d9a20b2511571d96",
@@ -1970,7 +2106,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.4693854103377243,
     "smartPctConfidence": 0.43528298473485044,
-    "smartPctHeld": 0.564029680209884
+    "smartPctHeld": 0.564029680209884,
+    "smartPctOpenAsOf": 0.3233728487083699
   },
   {
     "conditionId": "0xeb4b5d1390278a728cea8024a464c2ed8f69c615e60325f1735ad961b0b6ed51",
@@ -1995,7 +2132,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.0786330935576234,
     "smartPctConfidence": 0.0786330935576234,
-    "smartPctHeld": 0.006
+    "smartPctHeld": 0.006,
+    "smartPctOpenAsOf": 0.06629734894377952
   },
   {
     "conditionId": "0x0fb006e0c06caa4db12f7e30ec8c2483d658f83eb57b2ee8eb478e39beca3dfd",
@@ -2008,7 +2146,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.33757867652843737,
     "smartPctConfidence": 0.33488756120016483,
-    "smartPctHeld": 0.19827826053932754
+    "smartPctHeld": 0.19827826053932754,
+    "smartPctOpenAsOf": 0.325042
   },
   {
     "conditionId": "0x46f19d5bedd6d601d597d308d86814245974014d8a108395a7690d7a099cacdd",
@@ -2021,7 +2160,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.2755018744223576,
     "smartPctConfidence": 0.2723273964927288,
-    "smartPctHeld": 0.10073038723601811
+    "smartPctHeld": 0.10073038723601811,
+    "smartPctOpenAsOf": 0.0362383113323801
   },
   {
     "conditionId": "0x2bef40a1f62d045527228e699990d1bd1f97906b2458a6f3e4a0daf11124060c",
@@ -2034,7 +2174,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.24354848325830258,
     "smartPctConfidence": 0.24068404789627815,
-    "smartPctHeld": 0.279996
+    "smartPctHeld": 0.279996,
+    "smartPctOpenAsOf": 0.279996
   },
   {
     "conditionId": "0x6fa13f31cceaf10ed3190df6e2aca0a93ab0d6fb46fd279003f17d4cdccee164",
@@ -2047,7 +2188,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5117784885741024,
     "smartPctConfidence": 0.4712258918427569,
-    "smartPctHeld": 0.7759112035883394
+    "smartPctHeld": 0.7759112035883394,
+    "smartPctOpenAsOf": 0.5775807011154229
   },
   {
     "conditionId": "0x70d706fe084905dbafb95dfff13b727e4073efc3ef590adc8330562bac5d26de",
@@ -2060,7 +2202,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.2548190896497249,
     "smartPctConfidence": 0.24825727238703535,
-    "smartPctHeld": 0.021
+    "smartPctHeld": 0.021,
+    "smartPctOpenAsOf": 0.29716071749748046
   },
   {
     "conditionId": "0xa2b9c5b881902c57a3ce9c8fe68848592136a728448b601bf09b4be6304394e5",
@@ -2085,7 +2228,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.33139114254964186,
     "smartPctConfidence": 0.331812622222302,
-    "smartPctHeld": 0.07321919666612817
+    "smartPctHeld": 0.07321919666612817,
+    "smartPctOpenAsOf": 0.3091876468045799
   },
   {
     "conditionId": "0x9967297556e4fd7f7e1e688a2e44d6fdbc42b0700576a1e4e67aa37764ac640a",
@@ -2098,7 +2242,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.37560546326788896,
     "smartPctConfidence": 0.3981092022209535,
-    "smartPctHeld": 0.11734000000000001
+    "smartPctHeld": 0.11734000000000001,
+    "smartPctOpenAsOf": 0.3713136559001383
   },
   {
     "conditionId": "0x18dccc229331c63d8360d1400ece2355627637547d8dcd54aa5f7f1b5580686e",
@@ -2111,7 +2256,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.9850461038087048,
     "smartPctConfidence": 0.985590521432424,
-    "smartPctHeld": 0.9855773669103517
+    "smartPctHeld": 0.9855773669103517,
+    "smartPctOpenAsOf": 0.9770459999999999
   },
   {
     "conditionId": "0xc5675bc58c8117391cc243780c1b709ce1ef744aa27779c78ee82f3dc974ca1b",
@@ -2136,7 +2282,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.10627074695686399,
     "smartPctConfidence": 0.11267484892970071,
-    "smartPctHeld": 0.013835969292636119
+    "smartPctHeld": 0.013835969292636119,
+    "smartPctOpenAsOf": 0.10787111124696255
   },
   {
     "conditionId": "0x36e8ca24d2a13435f519f15580d42b45cdbe3bc425fb39a7c2733260357af0fa",
@@ -2149,7 +2296,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.927396980584179,
     "smartPctConfidence": 0.9596051378535014,
-    "smartPctHeld": 0.9887126742709359
+    "smartPctHeld": 0.9887126742709359,
+    "smartPctOpenAsOf": 0.9652090197454964
   },
   {
     "conditionId": "0x1d54eb5eac2cee8f595f3097c65da7d07f8ab5dee63d7c0c6883eb70e1e9af30",
@@ -2162,7 +2310,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.04664333572141346,
     "smartPctConfidence": 0.04761172645043876,
-    "smartPctHeld": 0.04687066492283532
+    "smartPctHeld": 0.04687066492283532,
+    "smartPctOpenAsOf": 0.05856307221146222
   },
   {
     "conditionId": "0xb196a122933da9aff6cb8b0f3764d0dc5db1859f46c0481c711521eee8524291",
@@ -2175,7 +2324,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.13286826076776997,
     "smartPctConfidence": 0.11465813470076479,
-    "smartPctHeld": 0.06347798817513159
+    "smartPctHeld": 0.06347798817513159,
+    "smartPctOpenAsOf": 0.014417048519132681
   },
   {
     "conditionId": "0x68fbeb8d823552abf9d35f3ebdb8619a1a1d51b650da9101be62f09308fd18d2",
@@ -2188,7 +2338,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.16396235329608014,
     "smartPctConfidence": 0.16396235329608014,
-    "smartPctHeld": 0.1418953014388135
+    "smartPctHeld": 0.1418953014388135,
+    "smartPctOpenAsOf": 0.150869
   },
   {
     "conditionId": "0x053d22e12bfe8dd73b12fc1cf89858ecc0de76aede10fea3eca5c7877d8db40c",
@@ -2201,7 +2352,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.07303607462023487,
     "smartPctConfidence": 0.07328332912776041,
-    "smartPctHeld": 0.03679999317218085
+    "smartPctHeld": 0.03679999317218085,
+    "smartPctOpenAsOf": 0.07893311315011678
   },
   {
     "conditionId": "0x57165bc68af588cf16e499eecd6c040e458c939e0fb0dd4b193744a9d21aa5f2",
@@ -2214,7 +2366,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.1269827147988792,
     "smartPctConfidence": 0.1269827147988792,
-    "smartPctHeld": 0.027161181979686283
+    "smartPctHeld": 0.027161181979686283,
+    "smartPctOpenAsOf": 0.027161181979686283
   },
   {
     "conditionId": "0x46f15cb064fb468e39de360f14f5847898ef9b1489d15e9df702b92f1836598d",
@@ -2239,7 +2392,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.018440058431404678,
     "smartPctConfidence": 0.0183477178101255,
-    "smartPctHeld": 0.01897584358412348
+    "smartPctHeld": 0.01897584358412348,
+    "smartPctOpenAsOf": 0.01897584358412348
   },
   {
     "conditionId": "0x8e7a03cb1970e2ad6533b01892403516b6b3f5b5fa90ed7d104c28b27e40ba00",
@@ -2252,7 +2406,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6984350647194635,
     "smartPctConfidence": 0.7005736212746274,
-    "smartPctHeld": 0.976236
+    "smartPctHeld": 0.976236,
+    "smartPctOpenAsOf": 0.725787
   },
   {
     "conditionId": "0xdb7886829f415e00ab97b695a28b5747c6bce1f8ab09635a51ec6480e5d50314",
@@ -2265,7 +2420,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.22976018903932774,
     "smartPctConfidence": 0.23238215763660974,
-    "smartPctHeld": 0.2213836314192726
+    "smartPctHeld": 0.2213836314192726,
+    "smartPctOpenAsOf": 0.24990435201096362
   },
   {
     "conditionId": "0x5f879a52e5349db7f66d386ca75f1a9bb608fdd6a738a1582681613730b23281",
@@ -2278,7 +2434,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.08140403755738161,
     "smartPctConfidence": 0.06922533041960165,
-    "smartPctHeld": 0.0830846935541304
+    "smartPctHeld": 0.0830846935541304,
+    "smartPctOpenAsOf": 0.09092342301158829
   },
   {
     "conditionId": "0x0443a503a38b90446c8a3826db5ee1323144197ef2b4ed09bcdf545ac104dfcb",
@@ -2327,7 +2484,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.10550327141038873,
     "smartPctConfidence": 0.10308361210627245,
-    "smartPctHeld": 0.030426740224181723
+    "smartPctHeld": 0.030426740224181723,
+    "smartPctOpenAsOf": 0.1016319938144994
   },
   {
     "conditionId": "0x1ab70741c263b8374fd08b4cfb2cc5af0537d787e27e40a39d08a83dd67f06b4",
@@ -2340,7 +2498,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.27217083669582043,
     "smartPctConfidence": 0.23080825546450814,
-    "smartPctHeld": 0.4516911607522808
+    "smartPctHeld": 0.4516911607522808,
+    "smartPctOpenAsOf": 0.33569563283938636
   },
   {
     "conditionId": "0x8b9176d24ac65c3ec55f5113c290b7ce97dc026dc506db9f1444879ffcdadd6d",
@@ -2353,7 +2512,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.613167009420866,
     "smartPctConfidence": 0.6123672399168582,
-    "smartPctHeld": 0.6799999999999999
+    "smartPctHeld": 0.6799999999999999,
+    "smartPctOpenAsOf": 0.6023657669958467
   },
   {
     "conditionId": "0x1b1a75d6305f5edee255b3f368cca945bde401fea4b2a7e34f2fcca3b3e56cf0",
@@ -2366,7 +2526,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6082637639864339,
     "smartPctConfidence": 0.593201326765029,
-    "smartPctHeld": 0.85
+    "smartPctHeld": 0.85,
+    "smartPctOpenAsOf": 0.6107553501872272
   },
   {
     "conditionId": "0x17e2f3347e34d8a13572baf10c9b4eb3291217868a0fb84b37f36c80f8e2105a",
@@ -2379,7 +2540,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.4218388885822038,
     "smartPctConfidence": 0.41433835666567403,
-    "smartPctHeld": 0.36935329253109866
+    "smartPctHeld": 0.36935329253109866,
+    "smartPctOpenAsOf": 0.31999999999999995
   },
   {
     "conditionId": "0xeda0e0633f131b761cbe6c6e5e16ae347c48d9448a08c5826bfc2c794b63758e",
@@ -2392,7 +2554,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.0771081655591677,
     "smartPctConfidence": 0.0467119173591295,
-    "smartPctHeld": 0.028131744846071477
+    "smartPctHeld": 0.028131744846071477,
+    "smartPctOpenAsOf": 0.021368
   },
   {
     "conditionId": "0xbdb44ce1624dbf80fe70a96e7cb027b854aa44c52cf87a6bd0bc9ea2c332c3dc",
@@ -2405,7 +2568,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.4704178143991501,
     "smartPctConfidence": 0.4795017857692778,
-    "smartPctHeld": 0.37460432832123747
+    "smartPctHeld": 0.37460432832123747,
+    "smartPctOpenAsOf": 0.739999
   },
   {
     "conditionId": "0x0619980a29b1022ba9cbdcb7da731be0be8799ecf9ff2eb5c1ee9137235b0770",
@@ -2430,7 +2594,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.04331118199443587,
     "smartPctConfidence": 0.042856459882984164,
-    "smartPctHeld": 0.027316097942583672
+    "smartPctHeld": 0.027316097942583672,
+    "smartPctOpenAsOf": 0.03694399999999998
   },
   {
     "conditionId": "0x2bde6486e7067f48ee21344d8b5c1af458732536eb4d080932c88c3a7c2d2126",
@@ -2443,7 +2608,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.7486212840716377,
     "smartPctConfidence": 0.7242890174253874,
-    "smartPctHeld": 0.7687774549689598
+    "smartPctHeld": 0.7687774549689598,
+    "smartPctOpenAsOf": 0.8350016318452308
   },
   {
     "conditionId": "0xeeb1b35c595b19f9512c55f85fdf93f3625c3cec1a9b6bac6262921fbd87912e",
@@ -2456,7 +2622,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.04889254720175631,
     "smartPctConfidence": 0.05422259963853696,
-    "smartPctHeld": 0.0474021815178294
+    "smartPctHeld": 0.0474021815178294,
+    "smartPctOpenAsOf": 0.0040000000000000036
   },
   {
     "conditionId": "0x9d3f02264a94bafc676afd7add8b11442e6ec72dabaa69cefef835f0672275c7",
@@ -2469,7 +2636,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.37288841361322195,
     "smartPctConfidence": 0.3702433150897706,
-    "smartPctHeld": 0.09623880832927802
+    "smartPctHeld": 0.09623880832927802,
+    "smartPctOpenAsOf": 0.21161323975885224
   },
   {
     "conditionId": "0xde04b189b3f19eaccda02529a3ea67abfc46bff5c0c8fc42d8a2d0ed7b8f0d41",
@@ -2482,7 +2650,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.9473819398875323,
     "smartPctConfidence": 0.9754564011842898,
-    "smartPctHeld": 0.9918516961158187
+    "smartPctHeld": 0.9918516961158187,
+    "smartPctOpenAsOf": 0.9473819398875323
   },
   {
     "conditionId": "0x26ca74d41edc9e3a6643698fbe8eae446377e4579d2f55f505da4ff6a1cf0f66",
@@ -2495,7 +2664,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.10981653574383583,
     "smartPctConfidence": 0.10972324336134197,
-    "smartPctHeld": 0.05718583406089852
+    "smartPctHeld": 0.05718583406089852,
+    "smartPctOpenAsOf": 0.062147999999999974
   },
   {
     "conditionId": "0x6992fdf39435fb8aa0b765e24f98cb621fd1f7b6458865387c0ea303da2f0003",
@@ -2508,7 +2678,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.3684626986513956,
     "smartPctConfidence": 0.3684626986513956,
-    "smartPctHeld": 0.22624999999999995
+    "smartPctHeld": 0.22624999999999995,
+    "smartPctOpenAsOf": 0.22624999999999995
   },
   {
     "conditionId": "0x946bb3ec7e7d9bf146b4487be87e71ace99f1e0e9978cf36fbb5063c23900afb",
@@ -2521,7 +2692,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5088358603201362,
     "smartPctConfidence": 0.5088358603201362,
-    "smartPctHeld": 0.744442
+    "smartPctHeld": 0.744442,
+    "smartPctOpenAsOf": 0.5088358603201362
   },
   {
     "conditionId": "0x232342e2a9200b203703a816f9d99d1c6a872333567af16f43d67a255e1a6aa8",
@@ -2534,7 +2706,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6513160450908511,
     "smartPctConfidence": 0.668984159027488,
-    "smartPctHeld": 0.6357135124091089
+    "smartPctHeld": 0.6357135124091089,
+    "smartPctOpenAsOf": 0.6513160450908511
   },
   {
     "conditionId": "0x85980a4d08e4cf7911782b632108d17b124171c1e1610cf7861e260c6daf3538",
@@ -2547,7 +2720,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.05267368583171297,
     "smartPctConfidence": 0.055690116176753,
-    "smartPctHeld": 0.05267368583171297
+    "smartPctHeld": 0.05267368583171297,
+    "smartPctOpenAsOf": 0.01100000000000001
   },
   {
     "conditionId": "0xa8e8cdf6ed1a4132ce687c5cd5d0eec65f439e0c83ae7bad3463a0906aba7aa8",
@@ -2560,7 +2734,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5697910165107527,
     "smartPctConfidence": 0.4493421972058735,
-    "smartPctHeld": 0.732873871649161
+    "smartPctHeld": 0.732873871649161,
+    "smartPctOpenAsOf": 0.5697910165107527
   },
   {
     "conditionId": "0x6cb3ec9e0fb1c258898f648f8b33422f59ba3e8a71aee551449d7cb147bb8ead",
@@ -2573,7 +2748,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.17190327861326635,
     "smartPctConfidence": 0.17509577187156364,
-    "smartPctHeld": 0.07648585675549306
+    "smartPctHeld": 0.07648585675549306,
+    "smartPctOpenAsOf": 0.10794858354997659
   },
   {
     "conditionId": "0xc112ff35c760ee66738e288067c3de90a2b44a28a9e2f4488989d498be03b292",
@@ -2586,7 +2762,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.09061256919304535,
     "smartPctConfidence": 0.09026839314164092,
-    "smartPctHeld": 0.08326940393021705
+    "smartPctHeld": 0.08326940393021705,
+    "smartPctOpenAsOf": 0.09061256919304535
   },
   {
     "conditionId": "0xa7962b12241616d83dcb8c70fc33aa0f48b1ec46a3ad6a23db21d3885dedc4cb",
@@ -2599,7 +2776,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.02086172291882456,
     "smartPctConfidence": 0.02027581735787199,
-    "smartPctHeld": 0.016919770510471187
+    "smartPctHeld": 0.016919770510471187,
+    "smartPctOpenAsOf": 0.005558999999999981
   },
   {
     "conditionId": "0xa57a027158ce73973cdd13eed901c6e767a1b9e2f88c665dab8757a65b60d203",
@@ -2612,7 +2790,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.13299252296794128,
     "smartPctConfidence": 0.12272862237765447,
-    "smartPctHeld": 0.13385304052491892
+    "smartPctHeld": 0.13385304052491892,
+    "smartPctOpenAsOf": 0.13385304052491892
   },
   {
     "conditionId": "0x7b63040ad654500cc30bfde62c864ca1c247621b9bc89cb4416e9f9ee01e7d6e",
@@ -2625,7 +2804,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.03037101986817931,
     "smartPctConfidence": 0.02971894541972108,
-    "smartPctHeld": 0.030831853631758024
+    "smartPctHeld": 0.030831853631758024,
+    "smartPctOpenAsOf": 0.03037101986817931
   },
   {
     "conditionId": "0x281565cae359040475640be8bc20f4efe15245fe0251805fd338fb1a3e45ffae",
@@ -2638,7 +2818,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.6732745863476469,
     "smartPctConfidence": 0.48161858690143244,
-    "smartPctHeld": 0.9794520000000001
+    "smartPctHeld": 0.9794520000000001,
+    "smartPctOpenAsOf": 0.6732745863476469
   },
   {
     "conditionId": "0x73f7620da1d4a2ec2283ad55d72f5ff4666e8732ec04458f88dff6773d6be2c6",
@@ -2651,7 +2832,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.04407026588360636,
     "smartPctConfidence": 0.02877381518455291,
-    "smartPctHeld": 0.03189208160317976
+    "smartPctHeld": 0.03189208160317976,
+    "smartPctOpenAsOf": 0.04407026588360636
   },
   {
     "conditionId": "0x796e791e7058571e460278814fc7a3183752285338f1400087b98bef3c447908",
@@ -2664,7 +2846,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.022264372895097383,
     "smartPctConfidence": 0.017822682396919406,
-    "smartPctHeld": 0.016175754125022184
+    "smartPctHeld": 0.016175754125022184,
+    "smartPctOpenAsOf": 0.022264372895097383
   },
   {
     "conditionId": "0xc6158282b574047044e504aabb1bc1f86ed28097e62d69425cb4403847767945",
@@ -2677,7 +2860,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.061840359817321985,
     "smartPctConfidence": 0.0402327165944087,
-    "smartPctHeld": 0.032114453844336505
+    "smartPctHeld": 0.032114453844336505,
+    "smartPctOpenAsOf": 0.08326500000000003
   },
   {
     "conditionId": "0xcba24842ceac7a40d2a8b9adde1f4407999b6505193b9fd68156ae76fbffa706",
@@ -2690,7 +2874,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.5184932966412324,
     "smartPctConfidence": 0.43147078407834544,
-    "smartPctHeld": 0.43350378676636414
+    "smartPctHeld": 0.43350378676636414,
+    "smartPctOpenAsOf": 0.726606
   },
   {
     "conditionId": "0x4520e16130f3c360690085535b2fccb4f05a7eb673a6d0af20729af3dfb3a1c1",
@@ -2703,7 +2888,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.28142456176139446,
     "smartPctConfidence": 0.28142456176139446,
-    "smartPctHeld": 0.5
+    "smartPctHeld": 0.5,
+    "smartPctOpenAsOf": 0.28142456176139446
   },
   {
     "conditionId": "0xffdbbf2c3b9aa808abbcb35beb2b20a93572570aa5dd1bd1b630cade2f809f26",
@@ -2716,7 +2902,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.12216960066643218,
     "smartPctConfidence": 0.12216960066643218,
-    "smartPctHeld": 0.12329173800249697
+    "smartPctHeld": 0.12329173800249697,
+    "smartPctOpenAsOf": 0.12216960066643218
   },
   {
     "conditionId": "0xba8af64c1b08f322ca7f66f3cfdbdfd50c0eae6fc88d2fcf29c30ceb62682421",
@@ -2729,7 +2916,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.33509932056397573,
     "smartPctConfidence": 0.36044247622285885,
-    "smartPctHeld": 0.12500500000000003
+    "smartPctHeld": 0.12500500000000003,
+    "smartPctOpenAsOf": 0.12500500000000003
   },
   {
     "conditionId": "0xa5d0dfc81e6a87faa737df4ca52fae7e18b63d9f7568e364c6c7d8c45fb39e8b",
@@ -2742,7 +2930,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.27473079036137366,
     "smartPctConfidence": 0.2648515056988341,
-    "smartPctHeld": 0.27473079036137366
+    "smartPctHeld": 0.27473079036137366,
+    "smartPctOpenAsOf": 0.27473079036137366
   },
   {
     "conditionId": "0x7aa6ecf3de5537b7822a0d6041b713ecc4d8b5c9f58449e16509c8af43db86ef",
@@ -2755,7 +2944,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.42999731265782243,
     "smartPctConfidence": 0.4283926210606627,
-    "smartPctHeld": 0.42999731265782243
+    "smartPctHeld": 0.42999731265782243,
+    "smartPctOpenAsOf": 0.42999731265782243
   },
   {
     "conditionId": "0xbefea6668e49e328db4d5c792bc15cea309bbc06101dfd6ced1e0556ad3ea301",
@@ -2768,7 +2958,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.041779838146985764,
     "smartPctConfidence": 0.041764115534883094,
-    "smartPctHeld": 0.041359337509612085
+    "smartPctHeld": 0.041359337509612085,
+    "smartPctOpenAsOf": 0.041779838146985764
   },
   {
     "conditionId": "0x0d082a85f48a5226b1205acdb6e95ead2fe373acabcf6c471f5895f86f42a276",
@@ -2781,7 +2972,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.03184242692952798,
     "smartPctConfidence": 0.0362406650700144,
-    "smartPctHeld": 0.019340757685633477
+    "smartPctHeld": 0.019340757685633477,
+    "smartPctOpenAsOf": 0.03184242692952798
   },
   {
     "conditionId": "0x84c7382fc6881416a2b07b0ebe9da32daba8be44a48623a0c3fe4b22f816431a",
@@ -2794,7 +2986,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.04191686014420694,
     "smartPctConfidence": 0.045463626626636965,
-    "smartPctHeld": 0.03659143252590786
+    "smartPctHeld": 0.03659143252590786,
+    "smartPctOpenAsOf": 0.04191686014420694
   },
   {
     "conditionId": "0x9be56371f6a29d12769b2f196847ee825b9585ebb8bfa042136be031b081eba1",
@@ -2807,7 +3000,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.04259344992975698,
     "smartPctConfidence": 0.04204767152324588,
-    "smartPctHeld": 0.04609561970255101
+    "smartPctHeld": 0.04609561970255101,
+    "smartPctOpenAsOf": 0.04906974113507862
   },
   {
     "conditionId": "0x7061e7ce4d7744677b6c3a7d1db0f82eb90c342104167386619d75777a6083c1",
@@ -2820,7 +3014,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.37079093191528834,
     "smartPctConfidence": 0.37079093191528834,
-    "smartPctHeld": 0.37079093191528834
+    "smartPctHeld": 0.37079093191528834,
+    "smartPctOpenAsOf": 0.37079093191528834
   },
   {
     "conditionId": "0x3f0743b88ef23a678e1d07fd2fb92badcbbb17aeca7110f188533b081afbd6af",
@@ -2833,7 +3028,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.037117724835203474,
     "smartPctConfidence": 0.037117724835203474,
-    "smartPctHeld": 0.021676110127550323
+    "smartPctHeld": 0.021676110127550323,
+    "smartPctOpenAsOf": 0.037117724835203474
   },
   {
     "conditionId": "0xbf1d0865f793f94d78413696946f89327bda5ae44d82bf54f9ebb3edfb57bf56",
@@ -2846,7 +3042,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.24756084301880896,
     "smartPctConfidence": 0.23757868093995402,
-    "smartPctHeld": 0.042
+    "smartPctHeld": 0.042,
+    "smartPctOpenAsOf": 0.24756084301880896
   },
   {
     "conditionId": "0x99e5c683143a52e9f129ba97bd9d05a44435008296ac5f148735109a215e5c92",
@@ -2859,7 +3056,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.10396334869554566,
     "smartPctConfidence": 0.1034966867511633,
-    "smartPctHeld": 0.11863658572661302
+    "smartPctHeld": 0.11863658572661302,
+    "smartPctOpenAsOf": 0.11863658572661302
   },
   {
     "conditionId": "0x9772347ce628f4427ab437333679512aba5a98a4d14ff2a138f99fe7a40ba5fe",
@@ -2872,7 +3070,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.050142576389150366,
     "smartPctConfidence": 0.05296067285327232,
-    "smartPctHeld": 0.050142576389150366
+    "smartPctHeld": 0.050142576389150366,
+    "smartPctOpenAsOf": 0.058316000000000034
   },
   {
     "conditionId": "0xe202539dfbeced92dc4112f134a205c80ca6cf4db32bd82f05b291c297219fd8",
@@ -2885,7 +3084,8 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.026667854514772573,
     "smartPctConfidence": 0.02472127442215748,
-    "smartPctHeld": 0.023212176473827947
+    "smartPctHeld": 0.023212176473827947,
+    "smartPctOpenAsOf": 0.026667854514772573
   },
   {
     "conditionId": "0x649ad05a2868343271fe82ea692031d567ca1af652e3529788933157e94aa088",
@@ -2898,6 +3098,7 @@
     "methodologyVersion": "v1-2026-07-01",
     "smartPctSpecialty": 0.009669232454257503,
     "smartPctConfidence": 0.008683244466506125,
-    "smartPctHeld": 0.008714658827423569
+    "smartPctHeld": 0.008714658827423569,
+    "smartPctOpenAsOf": 0.009669232454257503
   }
 ]
