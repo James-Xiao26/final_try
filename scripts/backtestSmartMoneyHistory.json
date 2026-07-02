@@ -15,7 +15,8 @@
     "smartPctEqual": 0.6001504499999999,
     "participantCount": 15,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5948403829261114
+    "smartPctHeldConfidence": 0.5948403829261114,
+    "smartPctOpenAsOfConfidence": 0.6377347512686311
   },
   {
     "conditionId": "0x6114a8a3f9ac214f48a7e20d169f1c7a5c84082cb6f7058ed9fe1137b11fd0e7",
@@ -33,7 +34,8 @@
     "smartPctEqual": 0.4581068414634147,
     "participantCount": 43,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9663035805089938
+    "smartPctHeldConfidence": 0.9663035805089938,
+    "smartPctOpenAsOfConfidence": 0.24592765114328022
   },
   {
     "conditionId": "0x9352c559e9648ab4cab236087b64ca85c5b7123a4c7d9d7d4efde4a39c18056f",
@@ -51,7 +53,8 @@
     "smartPctEqual": 0.20517244680851068,
     "participantCount": 27,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.04817734208622916
+    "smartPctHeldConfidence": 0.04817734208622916,
+    "smartPctOpenAsOfConfidence": 0.024384421774057925
   },
   {
     "conditionId": "0x20af55ab35186377b81219db6cb8615240cba42cea41731091be9484a5f5b122",
@@ -69,7 +72,8 @@
     "smartPctEqual": 0.49346541935483873,
     "participantCount": 17,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.47425900000000004
+    "smartPctHeldConfidence": 0.47425900000000004,
+    "smartPctOpenAsOfConfidence": 0.5797471505526177
   },
   {
     "conditionId": "0x9769f78cbc95a5ed11895e6064bac471d8fd8f930b260cf581b68d3f58630d27",
@@ -87,7 +91,8 @@
     "smartPctEqual": 0.7513957931034482,
     "participantCount": 16,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9779865400019407
+    "smartPctHeldConfidence": 0.9779865400019407,
+    "smartPctOpenAsOfConfidence": 0.6772596915525836
   },
   {
     "conditionId": "0xda519921a7090298cbdc56ee838a403a5193c2b3f637aef3e154e52de7b5e79c",
@@ -105,7 +110,8 @@
     "smartPctEqual": 0.6524876666666667,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9713207730059696
+    "smartPctHeldConfidence": 0.9713207730059696,
+    "smartPctOpenAsOfConfidence": 0.6333134439206469
   },
   {
     "conditionId": "0xa48ee32a0cbe5bc1a48844bd14e1691701d3bf8f45f4dd8cb8d1d304561393b6",
@@ -123,7 +129,8 @@
     "smartPctEqual": 0.6343513333333334,
     "participantCount": 13,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.7393233032034077
+    "smartPctHeldConfidence": 0.7393233032034077,
+    "smartPctOpenAsOfConfidence": 0.5402391559621271
   },
   {
     "conditionId": "0x348cd9adf4f6855f58bd9c6dbf9ff251c4142ef77233a5dc95c65b4b61cd2187",
@@ -141,7 +148,8 @@
     "smartPctEqual": 0.2793667647058824,
     "participantCount": 30,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.07537734019636443
+    "smartPctHeldConfidence": 0.07537734019636443,
+    "smartPctOpenAsOfConfidence": 0.060659217067064515
   },
   {
     "conditionId": "0xc4c3dbcc37a957a817599b0bf9fb5bd6b62b19210b0f527fec57cb75c7ed150a",
@@ -159,7 +167,8 @@
     "smartPctEqual": 0.603079,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6785002585950892
+    "smartPctHeldConfidence": 0.6785002585950892,
+    "smartPctOpenAsOfConfidence": 0.9252069999999999
   },
   {
     "conditionId": "0x46666ceb4c63814f38a8c83784ae10e1c2e1ef52e2db648372bd86dea521cf64",
@@ -177,7 +186,8 @@
     "smartPctEqual": 0.103317,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.08966156104080643
+    "smartPctHeldConfidence": 0.08966156104080643,
+    "smartPctOpenAsOfConfidence": 0.14351463706829015
   },
   {
     "conditionId": "0x291ff8aa0b7439389820e49584499d6dc65cf617dde1a47c4b84d05f42c85639",
@@ -195,7 +205,8 @@
     "smartPctEqual": 0.49975166666666676,
     "participantCount": 8,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5467955216727208
+    "smartPctHeldConfidence": 0.5467955216727208,
+    "smartPctOpenAsOfConfidence": 0.6358626248688517
   },
   {
     "conditionId": "0xdfd4d487d004c266493bdf32551d7f018c7eb4b9325f42ac368dd5075eec36a9",
@@ -213,7 +224,8 @@
     "smartPctEqual": 0.6597367777777777,
     "participantCount": 8,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9109961060946181
+    "smartPctHeldConfidence": 0.9109961060946181,
+    "smartPctOpenAsOfConfidence": 0.6701100915764014
   },
   {
     "conditionId": "0xfbe85201ab2b4acff01cd5a3639039fc813d3448c64db081f70926bd9b9e74e9",
@@ -231,7 +243,8 @@
     "smartPctEqual": 0.6572272,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.8182857998406728
+    "smartPctHeldConfidence": 0.8182857998406728,
+    "smartPctOpenAsOfConfidence": 0.818035170220377
   },
   {
     "conditionId": "0x0c38dd9305e3205557885183f0730270779e7e426b0ec3e7743f23963b6d6e4a",
@@ -249,7 +262,8 @@
     "smartPctEqual": 0.03579850000000001,
     "participantCount": 5,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.03507966064915377
+    "smartPctHeldConfidence": 0.03507966064915377,
+    "smartPctOpenAsOfConfidence": 0.038570357590815924
   },
   {
     "conditionId": "0x1723b7ee4118dee6ae6be8802cb7b6e239c37d199997b20a8191e32553a5bd68",
@@ -267,7 +281,8 @@
     "smartPctEqual": 0.21400900000000003,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.022768642295306916
+    "smartPctHeldConfidence": 0.022768642295306916,
+    "smartPctOpenAsOfConfidence": 0.024099
   },
   {
     "conditionId": "0x258031a51215d328eac2db15bdf45abdee1a23d38d66e12462a83c34cf31b5c8",
@@ -285,7 +300,8 @@
     "smartPctEqual": 0.7396513846153846,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.783377283450449
+    "smartPctHeldConfidence": 0.783377283450449,
+    "smartPctOpenAsOfConfidence": 0.7799739236623933
   },
   {
     "conditionId": "0x0b4cc3b739e1dfe5d73274740e7308b6fb389c5af040c3a174923d928d134bee",
@@ -315,7 +331,8 @@
     "smartPctEqual": 0.45549028,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.42012373963407157
+    "smartPctHeldConfidence": 0.42012373963407157,
+    "smartPctOpenAsOfConfidence": 0.36463
   },
   {
     "conditionId": "0x649bd3dc845f647aa8c9a739ad8de245b853224961afd01127de0071c13f84b3",
@@ -333,7 +350,8 @@
     "smartPctEqual": 0.5933326666666666,
     "participantCount": 4,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.6533460184085998
+    "smartPctHeldConfidence": 0.6533460184085998,
+    "smartPctOpenAsOfConfidence": 0.6543277017352572
   },
   {
     "conditionId": "0x2a7a6ab8f4984f1ae82eacd7fb408832a50e63162ac6b98fff1fe094b8e9d3b5",
@@ -351,7 +369,8 @@
     "smartPctEqual": 0.6685828571428571,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6410354649003713
+    "smartPctHeldConfidence": 0.6410354649003713,
+    "smartPctOpenAsOfConfidence": 0.643350859973823
   },
   {
     "conditionId": "0x04b6d6630d49e6513355ff045c96439c929335cb0d18da7792dea6c2fc717ead",
@@ -369,7 +388,8 @@
     "smartPctEqual": 0.6827223333333333,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6485083442159673
+    "smartPctHeldConfidence": 0.6485083442159673,
+    "smartPctOpenAsOfConfidence": 0.6528683336536203
   },
   {
     "conditionId": "0xd90bf5f45f24c5de7881707cb5374f3d991388a2d220fa7e0fe2be912cd7642a",
@@ -387,7 +407,8 @@
     "smartPctEqual": 0.4163955384615385,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3649871778068406
+    "smartPctHeldConfidence": 0.3649871778068406,
+    "smartPctOpenAsOfConfidence": 0.35
   },
   {
     "conditionId": "0x26c10c27cde58e2d6214d65ab562d8142d34723b3b6ec3f40836d24f6d22dfc9",
@@ -405,7 +426,8 @@
     "smartPctEqual": 0.475663375,
     "participantCount": 5,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.4820754456196091
+    "smartPctHeldConfidence": 0.4820754456196091,
+    "smartPctOpenAsOfConfidence": 0.4819146178764006
   },
   {
     "conditionId": "0x4cd77d456c83e7d8c569a8fb8f6396c3f40154f657e6d970733e2b1b6a7110ff",
@@ -423,7 +445,8 @@
     "smartPctEqual": 0.7361059999999999,
     "participantCount": 5,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.7047045037816997
+    "smartPctHeldConfidence": 0.7047045037816997,
+    "smartPctOpenAsOfConfidence": 0.7076805456209158
   },
   {
     "conditionId": "0xcc5ffe6f0dd2ebbdae948dff2ebb541c17fb03eecd9e152bd0c91646d4e0049a",
@@ -441,7 +464,8 @@
     "smartPctEqual": 0.7844523999999999,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.4605887911057203
+    "smartPctHeldConfidence": 0.4605887911057203,
+    "smartPctOpenAsOfConfidence": 0.5363203438731191
   },
   {
     "conditionId": "0x7d9a8b8c29c55a7b5dce59aa1556be274bb5c6fb2ee431237c3f656603c96583",
@@ -459,7 +483,8 @@
     "smartPctEqual": 0.3226918461538461,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.2780828798579779
+    "smartPctHeldConfidence": 0.2780828798579779,
+    "smartPctOpenAsOfConfidence": 0.28658204001028487
   },
   {
     "conditionId": "0xbee2cd40473495f713c69b9dfbce9fc2837fa4011568222c83c83bb773e35053",
@@ -477,7 +502,8 @@
     "smartPctEqual": 0.4493467142857142,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.8169478095488205
+    "smartPctHeldConfidence": 0.8169478095488205,
+    "smartPctOpenAsOfConfidence": 0.32225998274293666
   },
   {
     "conditionId": "0xd86a816093fcd0a0e1ca440bc5ce199bd3c5a8d6139e044b076958164f8c5423",
@@ -495,7 +521,8 @@
     "smartPctEqual": 0.4995908690476192,
     "participantCount": 41,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9675556517874259
+    "smartPctHeldConfidence": 0.9675556517874259,
+    "smartPctOpenAsOfConfidence": 0.34828966699787123
   },
   {
     "conditionId": "0x6619036865c2d27f1b1c00cd565ce74f6aa72ef93be29c315be36941d3559c59",
@@ -513,7 +540,8 @@
     "smartPctEqual": 0.7953077777777778,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.871687
+    "smartPctHeldConfidence": 0.871687,
+    "smartPctOpenAsOfConfidence": 0.75
   },
   {
     "conditionId": "0x0e4a0c937b8934c2475613b6322b3f8edc8dedc24762e01e42b0e6f87424a089",
@@ -531,7 +559,8 @@
     "smartPctEqual": 0.21957266279069768,
     "participantCount": 43,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.08694943442169274
+    "smartPctHeldConfidence": 0.08694943442169274,
+    "smartPctOpenAsOfConfidence": 0.23443857603483337
   },
   {
     "conditionId": "0x3733a1b647e7364095736ab0966465d896a84cf3b6bc1695ca1f26c3239b3868",
@@ -549,7 +578,8 @@
     "smartPctEqual": 0.19834196,
     "participantCount": 23,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.13853946904551317
+    "smartPctHeldConfidence": 0.13853946904551317,
+    "smartPctOpenAsOfConfidence": 0.20390549189806667
   },
   {
     "conditionId": "0x22e7b5e35423e76842dd3a5e1a21d13793811080d5e7b2896d0c001bd5e97d54",
@@ -567,7 +597,8 @@
     "smartPctEqual": 0.4605224285714286,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3957417815342058
+    "smartPctHeldConfidence": 0.3957417815342058,
+    "smartPctOpenAsOfConfidence": 0.46730780946801254
   },
   {
     "conditionId": "0x421bc1929df1429cf2cb94f80c1ce6a3ed0d1f0b7a2749b9890075f94eb549e9",
@@ -585,7 +616,8 @@
     "smartPctEqual": 0.19910404444444443,
     "participantCount": 27,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3609192942210357
+    "smartPctHeldConfidence": 0.3609192942210357,
+    "smartPctOpenAsOfConfidence": 0.40909846194880123
   },
   {
     "conditionId": "0x4ba348328e4d4ddee9e6734c9a369b2e8138611651f9f6dc8f59dea51df6c734",
@@ -603,7 +635,8 @@
     "smartPctEqual": 0.35603747999999996,
     "participantCount": 15,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.24238578426273902
+    "smartPctHeldConfidence": 0.24238578426273902,
+    "smartPctOpenAsOfConfidence": 0.39255317377364535
   },
   {
     "conditionId": "0xa743ce4a2a42aa232c2caa41aa27837ff1cde07781a1e9a726342065c3d86ba6",
@@ -621,7 +654,8 @@
     "smartPctEqual": 0.5379444166666666,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.45057718270116337
+    "smartPctHeldConfidence": 0.45057718270116337,
+    "smartPctOpenAsOfConfidence": 0.5825159306456067
   },
   {
     "conditionId": "0xdb22a7749b831aa07a52cbc83213e6c8ceb88226b224a831512f4460011bb0a1",
@@ -639,7 +673,8 @@
     "smartPctEqual": 0.31554608333333334,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.13249699419401223
+    "smartPctHeldConfidence": 0.13249699419401223,
+    "smartPctOpenAsOfConfidence": 0.292621236544862
   },
   {
     "conditionId": "0x652002aa13ba253abd033a6a7d06457fe2a08309c7c5324598d677624cdabec3",
@@ -657,7 +692,8 @@
     "smartPctEqual": 0.4768859333333334,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6557110218934266
+    "smartPctHeldConfidence": 0.6557110218934266,
+    "smartPctOpenAsOfConfidence": 0.5501033801194555
   },
   {
     "conditionId": "0xe3033b163d0e0e30cb3154049f28295dada348030e5c6cdfe58ed0d4e393c7e9",
@@ -675,7 +711,8 @@
     "smartPctEqual": 0.4580522666666666,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.4051704117697534
+    "smartPctHeldConfidence": 0.4051704117697534,
+    "smartPctOpenAsOfConfidence": 0.43015603935055824
   },
   {
     "conditionId": "0xb7dd41c16cd5b59e543ffcdab6a0d876f5ccef5329ea42ef1798d80c9a2b8499",
@@ -693,7 +730,8 @@
     "smartPctEqual": 0.36146255882352935,
     "participantCount": 21,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.36584981233753155
+    "smartPctHeldConfidence": 0.36584981233753155,
+    "smartPctOpenAsOfConfidence": 0.3546393882466777
   },
   {
     "conditionId": "0xbcacd5a055f5a9ced6f69f122216c073dd6987d08253fc07bbcc168fa5b81d55",
@@ -711,7 +749,8 @@
     "smartPctEqual": 0.142675675,
     "participantCount": 25,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.08585228003729051
+    "smartPctHeldConfidence": 0.08585228003729051,
+    "smartPctOpenAsOfConfidence": 0.1303514181450722
   },
   {
     "conditionId": "0x924a2942747dd75703321a7c8d809c68f6a514c3b0f2a2e64274e02310634669",
@@ -729,7 +768,8 @@
     "smartPctEqual": 0.28013476190476194,
     "participantCount": 34,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.06400371914234021
+    "smartPctHeldConfidence": 0.06400371914234021,
+    "smartPctOpenAsOfConfidence": 0.20999999999999996
   },
   {
     "conditionId": "0x518a5b030b205706b8ffe6bbad9bd3de59548348e5c0471827f5de21e513333c",
@@ -747,7 +787,8 @@
     "smartPctEqual": 0.22083665079365075,
     "participantCount": 32,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.08685729182404488
+    "smartPctHeldConfidence": 0.08685729182404488,
+    "smartPctOpenAsOfConfidence": 0.16111245924787962
   },
   {
     "conditionId": "0x6747bae2269c348786d0c0c0f4286ac006f13f16325d4dcbab954b46de029f19",
@@ -765,7 +806,8 @@
     "smartPctEqual": 0.9462187142857142,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9653683397853573
+    "smartPctHeldConfidence": 0.9653683397853573,
+    "smartPctOpenAsOfConfidence": 0.9649536571341012
   },
   {
     "conditionId": "0xfa59099fbda1e0f0058ed3cbd57e939fe90ab6d9b57d53bd488bcadf75c191d4",
@@ -783,7 +825,8 @@
     "smartPctEqual": 0.30145941666666665,
     "participantCount": 17,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.0362791366230967
+    "smartPctHeldConfidence": 0.0362791366230967,
+    "smartPctOpenAsOfConfidence": 0.36517733809066727
   },
   {
     "conditionId": "0x1d2787cb8aed975d092b2799ed6f4083e9445f7420cdc09e9d47e7d54356c6cd",
@@ -801,7 +844,8 @@
     "smartPctEqual": 0.18761747619047622,
     "participantCount": 32,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.006848992208563668
+    "smartPctHeldConfidence": 0.006848992208563668,
+    "smartPctOpenAsOfConfidence": 0.09424955911325275
   },
   {
     "conditionId": "0xceb6dfaa2cf5abc9d47ebc867b984a7715104944249274e8a483a2e17473e5f5",
@@ -819,7 +863,8 @@
     "smartPctEqual": 0.23190643902439018,
     "participantCount": 24,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.09203174170980444
+    "smartPctHeldConfidence": 0.09203174170980444,
+    "smartPctOpenAsOfConfidence": 0.2447287983364476
   },
   {
     "conditionId": "0xbbc6689d0f6d57ea42168836712237c7308b3e0118c8914d31b6126d0f3254c5",
@@ -837,7 +882,8 @@
     "smartPctEqual": 0.23337319512195126,
     "participantCount": 24,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3407164240763344
+    "smartPctHeldConfidence": 0.3407164240763344,
+    "smartPctOpenAsOfConfidence": 0.44004648952434583
   },
   {
     "conditionId": "0xc0be7b1f19f9b658778c2be7e6bc67596a00f347ab64392d0f5d387534c7c3b4",
@@ -855,7 +901,8 @@
     "smartPctEqual": 0.5001859545454547,
     "participantCount": 26,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.45873944637498615
+    "smartPctHeldConfidence": 0.45873944637498615,
+    "smartPctOpenAsOfConfidence": 0.5261080283896543
   },
   {
     "conditionId": "0x52bda1b8d68c469eb3176f2052f4da7cacc65a814c51f53294637d124af6afde",
@@ -885,7 +932,8 @@
     "smartPctEqual": 0.6110685217391304,
     "participantCount": 29,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.8199035029756978
+    "smartPctHeldConfidence": 0.8199035029756978,
+    "smartPctOpenAsOfConfidence": 0.72
   },
   {
     "conditionId": "0x68beecc857017df8663fa36c0c86310dec7305aa88fe830c94651391314afc1c",
@@ -903,7 +951,8 @@
     "smartPctEqual": 0.17280119047619047,
     "participantCount": 16,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.13295253072329635
+    "smartPctHeldConfidence": 0.13295253072329635,
+    "smartPctOpenAsOfConfidence": 0.19376159904693008
   },
   {
     "conditionId": "0x4c5701bcde0b8fb7d7f48c8e9d20245a6caa58c61a77f981fad98f2bfa0b1bc7",
@@ -921,7 +970,8 @@
     "smartPctEqual": 0.5484853454545455,
     "participantCount": 30,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.8129189086660265
+    "smartPctHeldConfidence": 0.8129189086660265,
+    "smartPctOpenAsOfConfidence": 0.6881496563507044
   },
   {
     "conditionId": "0x858071dbcd97be6e31f8467cba92fcb09d1d767d46da407e4434438a188b04a2",
@@ -939,7 +989,8 @@
     "smartPctEqual": 0.0926258181818182,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.14165226811509976
+    "smartPctHeldConfidence": 0.14165226811509976,
+    "smartPctOpenAsOfConfidence": 0.16727400000000003
   },
   {
     "conditionId": "0x6d0e09d0f04572d9b1adad84703458b0297bc5603b69dccbde93147ee4443246",
@@ -957,7 +1008,8 @@
     "smartPctEqual": 0.8167906933333335,
     "participantCount": 38,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.8995086540235528
+    "smartPctHeldConfidence": 0.8995086540235528,
+    "smartPctOpenAsOfConfidence": 0.8642219162282142
   },
   {
     "conditionId": "0x80059ff4e694f878c0498f6f3a067ee7ca62dc2fc46251a4287b58355ce47bc5",
@@ -975,7 +1027,8 @@
     "smartPctEqual": 0.3530078064516129,
     "participantCount": 23,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3465345348839498
+    "smartPctHeldConfidence": 0.3465345348839498,
+    "smartPctOpenAsOfConfidence": 0.408391599803498
   },
   {
     "conditionId": "0x306d10d4a4d51b41910dbc779ca00908bd917c131541c5c42bbbc736258d2d56",
@@ -993,7 +1046,8 @@
     "smartPctEqual": 0.16421454545454547,
     "participantCount": 21,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.17043042901174246
+    "smartPctHeldConfidence": 0.17043042901174246,
+    "smartPctOpenAsOfConfidence": 0.1656803189277744
   },
   {
     "conditionId": "0xffff6c984d7adab19e799c46d1a478d5ab6483479b41f9639d04617f07a8bab0",
@@ -1011,7 +1065,8 @@
     "smartPctEqual": 0.10905011111111111,
     "participantCount": 6,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.04849682983740652
+    "smartPctHeldConfidence": 0.04849682983740652,
+    "smartPctOpenAsOfConfidence": 0.05130703720234674
   },
   {
     "conditionId": "0x7cb525e831729325d651017f81cbcb6f1adde5011c7b2283babea00b4ae93ae7",
@@ -1029,7 +1084,8 @@
     "smartPctEqual": 0.036323718750000025,
     "participantCount": 17,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.03417559269019256
+    "smartPctHeldConfidence": 0.03417559269019256,
+    "smartPctOpenAsOfConfidence": 0.035115560372021265
   },
   {
     "conditionId": "0x3c6bcb7da14ea576e5af25547dbd96f2bb24ac34e748e76aecff2ee9195dd1ac",
@@ -1047,7 +1103,8 @@
     "smartPctEqual": 0.19493202777777785,
     "participantCount": 22,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.18969395109678538
+    "smartPctHeldConfidence": 0.18969395109678538,
+    "smartPctOpenAsOfConfidence": 0.21187525379217048
   },
   {
     "conditionId": "0x676e7cda423f5826bcbb3c141e808ad7c66bc2d055e4d0aca79c26779712062c",
@@ -1065,7 +1122,8 @@
     "smartPctEqual": 0.16584178571428573,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.023003943325832787
+    "smartPctHeldConfidence": 0.023003943325832787,
+    "smartPctOpenAsOfConfidence": 0.023003943325832787
   },
   {
     "conditionId": "0x2de8d7b9d103366e37f3a448db8289c5c571dec5c0b9eeddbc673546d4bd9322",
@@ -1083,7 +1141,8 @@
     "smartPctEqual": 0.36914814285714287,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.996887
+    "smartPctHeldConfidence": 0.996887,
+    "smartPctOpenAsOfConfidence": 0.2695924218802979
   },
   {
     "conditionId": "0x5efa976ebe94080bbda7e45605333ff8f30156cc91604d66c41eb52fd3e25f3e",
@@ -1101,7 +1160,8 @@
     "smartPctEqual": 0.1027741111111111,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.12803540469171118
+    "smartPctHeldConfidence": 0.12803540469171118,
+    "smartPctOpenAsOfConfidence": 0.12803540469171118
   },
   {
     "conditionId": "0x16608c4fdd7cb41292f6d42c1c02b43ac22593f1c198a104847a3479848d7abe",
@@ -1119,7 +1179,8 @@
     "smartPctEqual": 0.3477845,
     "participantCount": 17,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.44110926196972794
+    "smartPctHeldConfidence": 0.44110926196972794,
+    "smartPctOpenAsOfConfidence": 0.42324723132459213
   },
   {
     "conditionId": "0xd8664606498aba2a8ccab56656860cb3f02d74de80e974ab87a9f940e65d4d5e",
@@ -1137,7 +1198,8 @@
     "smartPctEqual": 0.24889013636363638,
     "participantCount": 13,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.33340424649209294
+    "smartPctHeldConfidence": 0.33340424649209294,
+    "smartPctOpenAsOfConfidence": 0.1165775852716577
   },
   {
     "conditionId": "0xab1209b73e1ce9ebb4905dad781496385b5102c048889502b174ed733de1506a",
@@ -1155,7 +1217,8 @@
     "smartPctEqual": 0.3794288571428571,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.797947
+    "smartPctHeldConfidence": 0.797947,
+    "smartPctOpenAsOfConfidence": 0.4692309977941181
   },
   {
     "conditionId": "0xfedc055699e34eac5f8cd6a1fb1d19e40d87c8e6920b59e741edcb41f8bbdf7d",
@@ -1173,7 +1236,8 @@
     "smartPctEqual": 0.3207627,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.23278045369524428
+    "smartPctHeldConfidence": 0.23278045369524428,
+    "smartPctOpenAsOfConfidence": 0.39019807696581765
   },
   {
     "conditionId": "0x724a93f3e0ed0a6c83d2b4f2bc60839b39a92cc2c7cbac0169447f48d72537ab",
@@ -1191,7 +1255,8 @@
     "smartPctEqual": 0.7429394166666666,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.82868587435351
+    "smartPctHeldConfidence": 0.82868587435351,
+    "smartPctOpenAsOfConfidence": 0.8104409854168574
   },
   {
     "conditionId": "0x1600d32f2f6c318c11436529c522bc3004164d997a4657feb02541d34e09423e",
@@ -1209,7 +1274,8 @@
     "smartPctEqual": 0.53245575,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.417481
+    "smartPctHeldConfidence": 0.417481,
+    "smartPctOpenAsOfConfidence": 0.6456307306750285
   },
   {
     "conditionId": "0x51a7c8afb7a0e09b8b47643171d90f400de23a176c4ea06f6552d6e53213839c",
@@ -1227,7 +1293,8 @@
     "smartPctEqual": 0.3479733529411765,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.652530560503137
+    "smartPctHeldConfidence": 0.652530560503137,
+    "smartPctOpenAsOfConfidence": 0.466322545977589
   },
   {
     "conditionId": "0xd9933a54c518e773050255ea9dba01a71e1a41f49311ed078ae4a6f7e76b1625",
@@ -1245,7 +1312,8 @@
     "smartPctEqual": 0.3156733684210526,
     "participantCount": 12,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.8691635788720214
+    "smartPctHeldConfidence": 0.8691635788720214,
+    "smartPctOpenAsOfConfidence": 0.110709
   },
   {
     "conditionId": "0x339727bd072a1756e1ff56b4512702e28ed0e30818fc28e0c9e39fafea56a578",
@@ -1263,7 +1331,8 @@
     "smartPctEqual": 0.1105669,
     "participantCount": 8,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.011
+    "smartPctHeldConfidence": 0.011,
+    "smartPctOpenAsOfConfidence": 0.1395965232186106
   },
   {
     "conditionId": "0x876047c0df88886ddbe468fe811bc75a667da45a552d798e626ecfc5c60d52d9",
@@ -1281,7 +1350,8 @@
     "smartPctEqual": 0.093876,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.11157905763023732
+    "smartPctHeldConfidence": 0.11157905763023732,
+    "smartPctOpenAsOfConfidence": 0.09686370917735382
   },
   {
     "conditionId": "0x5c0e75027a5561ea72a0776b00086be32fb4af8e758d26be217ac6c9efcdadf9",
@@ -1299,7 +1369,8 @@
     "smartPctEqual": 0.07823525,
     "participantCount": 4,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.002
+    "smartPctHeldConfidence": 0.002,
+    "smartPctOpenAsOfConfidence": 0.10280462663890252
   },
   {
     "conditionId": "0x3094a2b925483a06aa72945a1472e311e5eb6be75284f61e0c008e279508ddf6",
@@ -1317,7 +1388,8 @@
     "smartPctEqual": 0.39062685714285716,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.33559368929730354
+    "smartPctHeldConfidence": 0.33559368929730354,
+    "smartPctOpenAsOfConfidence": 0.32499
   },
   {
     "conditionId": "0xc88e812beb27442554b9231273f6cdda7c96022afc1a5b2a841f03c17dbceaaf",
@@ -1335,7 +1407,8 @@
     "smartPctEqual": 0.6861583333333333,
     "participantCount": 12,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.8812232260589274
+    "smartPctHeldConfidence": 0.8812232260589274,
+    "smartPctOpenAsOfConfidence": 0.7037673907376727
   },
   {
     "conditionId": "0x27182c8b13f2a6284754660cbb3c6350a04f7aa4afe04d24dad481947014d90d",
@@ -1353,7 +1426,8 @@
     "smartPctEqual": 0.43191650000000004,
     "participantCount": 15,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.04
+    "smartPctHeldConfidence": 0.04,
+    "smartPctOpenAsOfConfidence": 0.42736438204303934
   },
   {
     "conditionId": "0x366f89649caea042c96ee741b185461ec7faa408a2664ec44469a0061924b537",
@@ -1371,7 +1445,8 @@
     "smartPctEqual": 0.1700627037037037,
     "participantCount": 17,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.106339177681049
+    "smartPctHeldConfidence": 0.106339177681049,
+    "smartPctOpenAsOfConfidence": 0.1766663223261912
   },
   {
     "conditionId": "0xf526b2fbff94ae996818e76c8b54cc99ffbfa0a1a9972a48253ada65e32786f7",
@@ -1389,7 +1464,8 @@
     "smartPctEqual": 0.2287915714285714,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.036733092430608946
+    "smartPctHeldConfidence": 0.036733092430608946,
+    "smartPctOpenAsOfConfidence": 0.290001
   },
   {
     "conditionId": "0xa1d97efb8a19de58d995edf58b882c4f99ef356c8a564af8daf888a7610edea1",
@@ -1407,7 +1483,8 @@
     "smartPctEqual": 0.07869240000000001,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.07348384081957123
+    "smartPctHeldConfidence": 0.07348384081957123,
+    "smartPctOpenAsOfConfidence": 0.07496650511568471
   },
   {
     "conditionId": "0x2f6a547524c1d290f8a2bbff80be2b0e8ca1b3b716dd3a0e74bf8ddb3e3fd6b7",
@@ -1425,7 +1502,8 @@
     "smartPctEqual": 0.1881287,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.060179
+    "smartPctHeldConfidence": 0.060179,
+    "smartPctOpenAsOfConfidence": 0.19860715831631165
   },
   {
     "conditionId": "0x6a8cfe84d17693425f27831db5949d7511f3393d4624b182ac6956164cd32b10",
@@ -1443,7 +1521,8 @@
     "smartPctEqual": 0.30185285185185184,
     "participantCount": 15,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.048220659577283345
+    "smartPctHeldConfidence": 0.048220659577283345,
+    "smartPctOpenAsOfConfidence": 0.249999
   },
   {
     "conditionId": "0xd39905267d79b715f078279ef41f311b791c6e2c7361fea38011492b632212ef",
@@ -1461,7 +1540,8 @@
     "smartPctEqual": 0.13266754545454545,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.14759926705669787
+    "smartPctHeldConfidence": 0.14759926705669787,
+    "smartPctOpenAsOfConfidence": 0.1812363737824279
   },
   {
     "conditionId": "0xfef657b2f9ed83dd3db24c61d115203e836f9967289cd3281b6b91dcd7338104",
@@ -1479,7 +1559,8 @@
     "smartPctEqual": 0.21327228571428572,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.36946348788895644
+    "smartPctHeldConfidence": 0.36946348788895644,
+    "smartPctOpenAsOfConfidence": 0.3208843819203409
   },
   {
     "conditionId": "0x4d0c4865bdecc5f7971dbab47bb6c069d93909dec75bdff52fb766ae6094a6d6",
@@ -1497,7 +1578,8 @@
     "smartPctEqual": 0.5728789642857144,
     "participantCount": 17,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.49934992635651265
+    "smartPctHeldConfidence": 0.49934992635651265,
+    "smartPctOpenAsOfConfidence": 0.4675848959506068
   },
   {
     "conditionId": "0xbeab83146920be8f52b52fdbcb3464b24dc553f7b47eb4249243385b0faad271",
@@ -1515,7 +1597,8 @@
     "smartPctEqual": 0.1461907857142857,
     "participantCount": 12,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.16034415194526128
+    "smartPctHeldConfidence": 0.16034415194526128,
+    "smartPctOpenAsOfConfidence": 0.16982218826183973
   },
   {
     "conditionId": "0x8b369e10358094a99ffe7f85a81a8e8ca68c611eee0fe63a2efa790ad045bcd6",
@@ -1533,7 +1616,8 @@
     "smartPctEqual": 0.4558605918367346,
     "participantCount": 26,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3237928645416062
+    "smartPctHeldConfidence": 0.3237928645416062,
+    "smartPctOpenAsOfConfidence": 0.31651162592575094
   },
   {
     "conditionId": "0xa70fc3695a65833b91b45df6db6015096f3e1471b70352ca411b4209010e7633",
@@ -1551,7 +1635,8 @@
     "smartPctEqual": 0.4343726363636364,
     "participantCount": 20,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.579838107300569
+    "smartPctHeldConfidence": 0.579838107300569,
+    "smartPctOpenAsOfConfidence": 0.2782134178378806
   },
   {
     "conditionId": "0xb2e7dd21dd889b9b56447857f03ea6188ebcef50599c3c1556c2f9141772d7bb",
@@ -1569,7 +1654,8 @@
     "smartPctEqual": 0.13546516666666666,
     "participantCount": 8,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.09019942756535405
+    "smartPctHeldConfidence": 0.09019942756535405,
+    "smartPctOpenAsOfConfidence": 0.14070288672262604
   },
   {
     "conditionId": "0x71c49500d051a9b32b9aa5bc22e0a6925a8b2282840c3e62e0a3afcd0403ba03",
@@ -1587,7 +1673,8 @@
     "smartPctEqual": 0.18429453333333337,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.19879412017708045
+    "smartPctHeldConfidence": 0.19879412017708045,
+    "smartPctOpenAsOfConfidence": 0.19879412017708045
   },
   {
     "conditionId": "0x656ee3fe28d2f23b12f3e5616161274a1456dc5e355fd97d3ad1d07c7c972f48",
@@ -1605,7 +1692,8 @@
     "smartPctEqual": 0.8380009999999999,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.810634
+    "smartPctHeldConfidence": 0.810634,
+    "smartPctOpenAsOfConfidence": 0.8002968164531913
   },
   {
     "conditionId": "0xf7ad79d04f2dc95740b512d657957bf16b521342ae41be894fa44c56b8b1d1ab",
@@ -1623,7 +1711,8 @@
     "smartPctEqual": 0.27028450000000004,
     "participantCount": 12,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.028591973676539612
+    "smartPctHeldConfidence": 0.028591973676539612,
+    "smartPctOpenAsOfConfidence": 0.28099833578229305
   },
   {
     "conditionId": "0x92485347d2c139beb425df7bee78b98805d0eab1eb0cc953cf000e9a287eab7e",
@@ -1641,7 +1730,8 @@
     "smartPctEqual": 0.7317530000000001,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.03300000000000003
+    "smartPctHeldConfidence": 0.03300000000000003,
+    "smartPctOpenAsOfConfidence": 0.562149319263873
   },
   {
     "conditionId": "0xd7540d64e03b1894ececcbb54c02b88d9c5c0e854ba66ec4e1ece20477994ac5",
@@ -1659,7 +1749,8 @@
     "smartPctEqual": 0.8640941562500002,
     "participantCount": 24,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9660495859925525
+    "smartPctHeldConfidence": 0.9660495859925525,
+    "smartPctOpenAsOfConfidence": 0.8499999999999999
   },
   {
     "conditionId": "0x4997c22d314ed5e9f3712e46eb4847441b51fa730d10ad26240afa85f5d902be",
@@ -1677,7 +1768,8 @@
     "smartPctEqual": 0.9071462631578948,
     "participantCount": 13,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.8787684911677744
+    "smartPctHeldConfidence": 0.8787684911677744,
+    "smartPctOpenAsOfConfidence": 0.8801203909860479
   },
   {
     "conditionId": "0x1eeb910620bfa52c348ca5b166c33230a0b142bec858d4fa46df18aeecbcecc0",
@@ -1695,7 +1787,8 @@
     "smartPctEqual": 0.8607057499999999,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.8913241286289538
+    "smartPctHeldConfidence": 0.8913241286289538,
+    "smartPctOpenAsOfConfidence": 0.8913241286289538
   },
   {
     "conditionId": "0x53098776eb95dbbd2e899c4fcd787a043ba725f55433948da2fbd00abdfcd3ae",
@@ -1713,7 +1806,8 @@
     "smartPctEqual": 0.06798930769230771,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.060775000000000017
+    "smartPctHeldConfidence": 0.060775000000000017,
+    "smartPctOpenAsOfConfidence": 0.07050043269186174
   },
   {
     "conditionId": "0x789c947a9415600d30d56a4aae88d4111996679b0caed166d0c96242fdce92a2",
@@ -1731,7 +1825,8 @@
     "smartPctEqual": 0.028648947368421076,
     "participantCount": 14,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.020048385097794198
+    "smartPctHeldConfidence": 0.020048385097794198,
+    "smartPctOpenAsOfConfidence": 0.02355609861323822
   },
   {
     "conditionId": "0xb4067f81957ef1458e9712000807a4525c595f3c25a0c933ec2f69c0efb2e878",
@@ -1749,7 +1844,8 @@
     "smartPctEqual": 0.0358332857142857,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.029560750646935672
+    "smartPctHeldConfidence": 0.029560750646935672,
+    "smartPctOpenAsOfConfidence": 0.032
   },
   {
     "conditionId": "0xe546672750517f62c45a5a00067481981e62b9c20fa8220203232c9dc8fd2093",
@@ -1767,7 +1863,8 @@
     "smartPctEqual": 0.40798294444444444,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5369876811693309
+    "smartPctHeldConfidence": 0.5369876811693309,
+    "smartPctOpenAsOfConfidence": 0.4852287839671008
   },
   {
     "conditionId": "0xa93b28a6384aefff4e7d5adb2061c444e4a0e95b8ad17755f9cee123c7099b35",
@@ -1785,7 +1882,8 @@
     "smartPctEqual": 0.43601685714285715,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.22338137533572228
+    "smartPctHeldConfidence": 0.22338137533572228,
+    "smartPctOpenAsOfConfidence": 0.2543575357950101
   },
   {
     "conditionId": "0x7434b22007745d99095c102119fdb6b975d34869212e9dda4c6c5c48db0683a7",
@@ -1803,7 +1901,8 @@
     "smartPctEqual": 0.036324,
     "participantCount": 8,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.03396877884774323
+    "smartPctHeldConfidence": 0.03396877884774323,
+    "smartPctOpenAsOfConfidence": 0.03382321176865251
   },
   {
     "conditionId": "0x02f8dd15d4c674a75fccbd0e00f0cf1256101c45ef41f6d0c5dfde9c36d4141e",
@@ -1821,7 +1920,8 @@
     "smartPctEqual": 0.5022391739130435,
     "participantCount": 12,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6971207154986864
+    "smartPctHeldConfidence": 0.6971207154986864,
+    "smartPctOpenAsOfConfidence": 0.44006167942267105
   },
   {
     "conditionId": "0xb412664463bbfe21be44b1963291205ab332afd4f7f6e0d027aec1ba7a9e6793",
@@ -1839,7 +1939,8 @@
     "smartPctEqual": 0.2246236923076923,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.14985328324723496
+    "smartPctHeldConfidence": 0.14985328324723496,
+    "smartPctOpenAsOfConfidence": 0.2093285416046871
   },
   {
     "conditionId": "0xffe381a80c1e36f9e0b03a542aa8fe56e74a67d2566a4e29396d4427aa4244c9",
@@ -1857,7 +1958,8 @@
     "smartPctEqual": 0.11839342105263158,
     "participantCount": 12,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.053504833441482755
+    "smartPctHeldConfidence": 0.053504833441482755,
+    "smartPctOpenAsOfConfidence": 0.1065184768273636
   },
   {
     "conditionId": "0xe31a6c763685129123cb6a0f729bfce04b768c5a22cb09c5610406df1a302465",
@@ -1875,7 +1977,8 @@
     "smartPctEqual": 0.3209762666666666,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.08489369859658749
+    "smartPctHeldConfidence": 0.08489369859658749,
+    "smartPctOpenAsOfConfidence": 0.577014
   },
   {
     "conditionId": "0xd839785e6d4e4fdd44ef0e90f315eecccde47578924491e6ae74499e9f62d29e",
@@ -1893,7 +1996,8 @@
     "smartPctEqual": 0.2946146,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.2360908846152163
+    "smartPctHeldConfidence": 0.2360908846152163,
+    "smartPctOpenAsOfConfidence": 0.2976994954963766
   },
   {
     "conditionId": "0x6897736d782ce70f47126dfcec6669073f563d6e757e60bc61c0367370d6f73e",
@@ -1911,7 +2015,8 @@
     "smartPctEqual": 0.08138209090909089,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.042655000000000005
+    "smartPctHeldConfidence": 0.042655000000000005,
+    "smartPctOpenAsOfConfidence": 0.042655000000000005
   },
   {
     "conditionId": "0x23408daff185f6c89d91bd279ce97142c573454277d72ae882a9d9fd1ae79af4",
@@ -1929,7 +2034,8 @@
     "smartPctEqual": 0.8758143333333334,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9670180964174493
+    "smartPctHeldConfidence": 0.9670180964174493,
+    "smartPctOpenAsOfConfidence": 0.8932586512339785
   },
   {
     "conditionId": "0x1480b819d03d4b6388d70e848b0384adf38c38d955cb783cdbcf6d4a436dee14",
@@ -1947,7 +2053,8 @@
     "smartPctEqual": 0.7133240666666666,
     "participantCount": 19,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9275746648704781
+    "smartPctHeldConfidence": 0.9275746648704781,
+    "smartPctOpenAsOfConfidence": 0.6161463427259455
   },
   {
     "conditionId": "0xfcde02af15efe40e336d67f0ef9aa49e9d40c37b92961fb890afc4afdbfe54d6",
@@ -1965,7 +2072,8 @@
     "smartPctEqual": 0.7228368333333334,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6746772162760427
+    "smartPctHeldConfidence": 0.6746772162760427,
+    "smartPctOpenAsOfConfidence": 0.6872504612345061
   },
   {
     "conditionId": "0x773abaa5fe55e5cde51a261f444b7921652a4e059ead6b3be9fe56499c2d4609",
@@ -1983,7 +2091,8 @@
     "smartPctEqual": 0.26802895238095237,
     "participantCount": 23,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5107089260349209
+    "smartPctHeldConfidence": 0.5107089260349209,
+    "smartPctOpenAsOfConfidence": 0.3736837169353265
   },
   {
     "conditionId": "0x6e9f90a6f471b52d03499a81586ca478519474eb152f1327c8c767f020d62529",
@@ -2001,7 +2110,8 @@
     "smartPctEqual": 0.388259,
     "participantCount": 7,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.49948552406836383
+    "smartPctHeldConfidence": 0.49948552406836383,
+    "smartPctOpenAsOfConfidence": 0.3876738181196282
   },
   {
     "conditionId": "0xac084d6558622409fda664dc5446a50a880900f311a4d1e8ff2c4ad8f0fb6f93",
@@ -2019,7 +2129,8 @@
     "smartPctEqual": 0.5251568333333333,
     "participantCount": 4,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.4857949534554195
+    "smartPctHeldConfidence": 0.4857949534554195,
+    "smartPctOpenAsOfConfidence": 0.4645518927187146
   },
   {
     "conditionId": "0x1c60f9adb1d786b6fe78d63fd9f82dbb293fa06241532fb5ba43f8d8411cde1e",
@@ -2037,7 +2148,8 @@
     "smartPctEqual": 0.585244,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.7171149253598711
+    "smartPctHeldConfidence": 0.7171149253598711,
+    "smartPctOpenAsOfConfidence": 0.54
   },
   {
     "conditionId": "0x99a0fdc1bb6308873bf87eb75a47e21c8340fe20fb6b033444c1d21392da10a9",
@@ -2055,7 +2167,8 @@
     "smartPctEqual": 0.4465740666666667,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.609092875603956
+    "smartPctHeldConfidence": 0.609092875603956,
+    "smartPctOpenAsOfConfidence": 0.3642346984128398
   },
   {
     "conditionId": "0x23dbb60ade08c2664ac29488325afbc0136735bc7beb9180d9c0cb72620b0b13",
@@ -2073,7 +2186,8 @@
     "smartPctEqual": 0.8142659999999999,
     "participantCount": 5,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.44881506533793325
+    "smartPctHeldConfidence": 0.44881506533793325,
+    "smartPctOpenAsOfConfidence": 0.744508931806737
   },
   {
     "conditionId": "0x94a2b2a1b9227e44fc464614e63dfca6d4082310291c35623c3d34b70aa53693",
@@ -2091,7 +2205,8 @@
     "smartPctEqual": 0.38207566666666665,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.4093217702280447
+    "smartPctHeldConfidence": 0.4093217702280447,
+    "smartPctOpenAsOfConfidence": 0.41307344112706557
   },
   {
     "conditionId": "0x6509c26f04acbe80e73144486933fff507901867925f165421d66155193fce55",
@@ -2109,7 +2224,8 @@
     "smartPctEqual": 0.49636941666666673,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6894165380284724
+    "smartPctHeldConfidence": 0.6894165380284724,
+    "smartPctOpenAsOfConfidence": 0.6485952288546359
   },
   {
     "conditionId": "0xa6e388d87a81a17dd8f2046479e11c50bf32bcf475ce75a3506c5cf19a09613c",
@@ -2127,7 +2243,8 @@
     "smartPctEqual": 0.6593184285714285,
     "participantCount": 5,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.784791
+    "smartPctHeldConfidence": 0.784791,
+    "smartPctOpenAsOfConfidence": 0.6739532649094773
   },
   {
     "conditionId": "0x3088733a3d7f03d026035f6dd7df44a82c59eeb95545dda3889b65baa9a36e82",
@@ -2145,7 +2262,8 @@
     "smartPctEqual": 0.4781435,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.846
+    "smartPctHeldConfidence": 0.846,
+    "smartPctOpenAsOfConfidence": 0.4270351464695739
   },
   {
     "conditionId": "0x865303ccb9a48341d1bae33b3b4379ca86d5abbff3ce1e132716631cc0af3cce",
@@ -2163,7 +2281,8 @@
     "smartPctEqual": 0.14612355555555553,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.14428031105943687
+    "smartPctHeldConfidence": 0.14428031105943687,
+    "smartPctOpenAsOfConfidence": 0.14428031105943687
   },
   {
     "conditionId": "0x43272c02b8407ed3f8d5b04fb4cb132d7a59c5df6ecc423afcf66f1c778d1887",
@@ -2181,7 +2300,8 @@
     "smartPctEqual": 0.165143125,
     "participantCount": 7,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.052728579814499695
+    "smartPctHeldConfidence": 0.052728579814499695,
+    "smartPctOpenAsOfConfidence": 0.06140945636970205
   },
   {
     "conditionId": "0x5a965e943de13a4bdef4fb568d94341a751f02a2f652fa4fb8377d8b02f84606",
@@ -2199,7 +2319,8 @@
     "smartPctEqual": 0.19485819999999998,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.1925877231870508
+    "smartPctHeldConfidence": 0.1925877231870508,
+    "smartPctOpenAsOfConfidence": 0.2048082084660202
   },
   {
     "conditionId": "0xf471786ca9608b18a61e1f555681428c80ad2a2695fdd2df69e796defff9f897",
@@ -2217,7 +2338,8 @@
     "smartPctEqual": 0.3298674285714286,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.307192
+    "smartPctHeldConfidence": 0.307192,
+    "smartPctOpenAsOfConfidence": 0.3051740478419285
   },
   {
     "conditionId": "0xd4d841659e8b1fe050980ec9b7deae31accc10e529082fe9468ef9699d11aec2",
@@ -2247,7 +2369,8 @@
     "smartPctEqual": 0.42252749999999994,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3190644488901806
+    "smartPctHeldConfidence": 0.3190644488901806,
+    "smartPctOpenAsOfConfidence": 0.3123503513034941
   },
   {
     "conditionId": "0x93f2e17cfd239c4667eb3d41ff04e2cd1ae6f3f663210cbc42ec1296ff880805",
@@ -2265,7 +2388,8 @@
     "smartPctEqual": 0.49604461538461536,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.4926823985444476
+    "smartPctHeldConfidence": 0.4926823985444476,
+    "smartPctOpenAsOfConfidence": 0.46884304048975234
   },
   {
     "conditionId": "0x35c73eb41a0ee54b49358c523a2d3335e9df5ee21bba9e526813a6fbaa0f70b6",
@@ -2283,7 +2407,8 @@
     "smartPctEqual": 0.4046246666666667,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.40328214194182044
+    "smartPctHeldConfidence": 0.40328214194182044,
+    "smartPctOpenAsOfConfidence": 0.537049
   },
   {
     "conditionId": "0xa96e71186507bf493bd1fb8101418c369c6296a29b49514fdec3f7bfe7197909",
@@ -2313,7 +2438,8 @@
     "smartPctEqual": 0.23907738461538458,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.19880154128285948
+    "smartPctHeldConfidence": 0.19880154128285948,
+    "smartPctOpenAsOfConfidence": 0.21522229914933644
   },
   {
     "conditionId": "0x65f204a8ebbaa472d668cc4fdbe4dd45249405a7e0acea43b7930a216e5bfdc7",
@@ -2331,7 +2457,8 @@
     "smartPctEqual": 0.8626851666666667,
     "participantCount": 8,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9135901996597355
+    "smartPctHeldConfidence": 0.9135901996597355,
+    "smartPctOpenAsOfConfidence": 0.7670745323110946
   },
   {
     "conditionId": "0x2135ffcb43ba9103bb6acf7116d2d5aa98bef6d9eb3dc9c85ea00cb79513f3ec",
@@ -2349,7 +2476,8 @@
     "smartPctEqual": 0.2016789677419355,
     "participantCount": 17,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.07229775708030405
+    "smartPctHeldConfidence": 0.07229775708030405,
+    "smartPctOpenAsOfConfidence": 0.23000100000000004
   },
   {
     "conditionId": "0x14fd8ab261d14215058b77a9541a5013ccc3d3eb677276a9de54445a31acd194",
@@ -2367,7 +2495,8 @@
     "smartPctEqual": 0.015547454545454526,
     "participantCount": 6,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.019771251949513426
+    "smartPctHeldConfidence": 0.019771251949513426,
+    "smartPctOpenAsOfConfidence": 0.018327955880983376
   },
   {
     "conditionId": "0x1db02ba50e2312a62b4104de691cc7a76065d8d0da40decf93eb1b914a3217b7",
@@ -2385,7 +2514,8 @@
     "smartPctEqual": 0.14762673913043478,
     "participantCount": 13,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.08429987333448868
+    "smartPctHeldConfidence": 0.08429987333448868,
+    "smartPctOpenAsOfConfidence": 0.17778158353562518
   },
   {
     "conditionId": "0x2226a3e40300238a813bddccb7cadef078ffce4c83e237d85a135e685f0b81b5",
@@ -2403,7 +2533,8 @@
     "smartPctEqual": 0.1409144,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.0018569999999999975
+    "smartPctHeldConfidence": 0.0018569999999999975,
+    "smartPctOpenAsOfConfidence": 0.11679600908829207
   },
   {
     "conditionId": "0x7eceae72d7d7b3e175fa872c728526e6fec4714288a4bda91fe818e298e69a6f",
@@ -2421,7 +2552,8 @@
     "smartPctEqual": 0.29785585714285717,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.09065731440115199
+    "smartPctHeldConfidence": 0.09065731440115199,
+    "smartPctOpenAsOfConfidence": 0.29170509403256734
   },
   {
     "conditionId": "0x5d37825716832a4a54f89450932e89510f26cf4be59aeec3149d2c49e5fdf44d",
@@ -2439,7 +2571,8 @@
     "smartPctEqual": 0.27589175,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.1862756089964755
+    "smartPctHeldConfidence": 0.1862756089964755,
+    "smartPctOpenAsOfConfidence": 0.26786409120505145
   },
   {
     "conditionId": "0xf9f0965a3bd704ad9c184851242606ad35a4ffe733febf5074d4fbcc59d52eb8",
@@ -2457,7 +2590,8 @@
     "smartPctEqual": 0.4378094444444446,
     "participantCount": 15,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.077142
+    "smartPctHeldConfidence": 0.077142,
+    "smartPctOpenAsOfConfidence": 0.4433125156740429
   },
   {
     "conditionId": "0x0fa5d80f8f8fec384b629d60a47c8c669ff7e6ea469edb9f91ccfd030b7f56d7",
@@ -2501,7 +2635,8 @@
     "smartPctEqual": 0.37454545454545457,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.35079305302501274
+    "smartPctHeldConfidence": 0.35079305302501274,
+    "smartPctOpenAsOfConfidence": 0.3949498932923052
   },
   {
     "conditionId": "0x65414628f108533d689721c6b2576dd83da43644bcfd62506444f1591ef32c31",
@@ -2519,7 +2654,8 @@
     "smartPctEqual": 0.5690767777777778,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9896310000000001
+    "smartPctHeldConfidence": 0.9896310000000001,
+    "smartPctOpenAsOfConfidence": 0.381224
   },
   {
     "conditionId": "0xa573400b588079857899fce1e5a68da2d086f63fd35cbdd626df397e19e9995e",
@@ -2537,7 +2673,8 @@
     "smartPctEqual": 0.6209486206896552,
     "participantCount": 16,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6075235190099287
+    "smartPctHeldConfidence": 0.6075235190099287,
+    "smartPctOpenAsOfConfidence": 0.6785480115860266
   },
   {
     "conditionId": "0xf64f880b571d7a70d858649d30f0843aa57307e304aeb617349df74ce34d044e",
@@ -2555,7 +2692,8 @@
     "smartPctEqual": 0.26056342857142856,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.05924399999999996
+    "smartPctHeldConfidence": 0.05924399999999996,
+    "smartPctOpenAsOfConfidence": 0.12731252899548895
   },
   {
     "conditionId": "0xb6b3d7a2037b3faa7e1306d741840d453432902d73cc9a146a035e40271eae73",
@@ -2573,7 +2711,8 @@
     "smartPctEqual": 0.18752253333333335,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.13706085457954842
+    "smartPctHeldConfidence": 0.13706085457954842,
+    "smartPctOpenAsOfConfidence": 0.17170036539398492
   },
   {
     "conditionId": "0x713641f745d71f6ec61f906237ffca3c8583f251e49384429a63ceb0ccdb2d37",
@@ -2591,7 +2730,8 @@
     "smartPctEqual": 0.2929392727272727,
     "participantCount": 8,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.23361802317809457
+    "smartPctHeldConfidence": 0.23361802317809457,
+    "smartPctOpenAsOfConfidence": 0.29178213407847814
   },
   {
     "conditionId": "0x9bb9f7c70674e2043580bf634753858eded9b360252c06f891688b95a542ac46",
@@ -2609,7 +2749,8 @@
     "smartPctEqual": 0.34128549999999996,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.30768104767878934
+    "smartPctHeldConfidence": 0.30768104767878934,
+    "smartPctOpenAsOfConfidence": 0.281742130121203
   },
   {
     "conditionId": "0x215be7e1cbc744ce1a85fb891db92b53f933712b5a556e556657c3254f63d260",
@@ -2627,7 +2768,8 @@
     "smartPctEqual": 0.5432444444444445,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5176546348759746
+    "smartPctHeldConfidence": 0.5176546348759746,
+    "smartPctOpenAsOfConfidence": 0.5376809199150562
   },
   {
     "conditionId": "0x6b44bd667fad6cb5b3b68d8bd1055a038c77d9176dbd51f123879797cc3368a7",
@@ -2645,7 +2787,8 @@
     "smartPctEqual": 0.04060300000000002,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.03348446081966564
+    "smartPctHeldConfidence": 0.03348446081966564,
+    "smartPctOpenAsOfConfidence": 0.03390399594535774
   },
   {
     "conditionId": "0x89389a6b1439856a8d366234c795d72865c927a1aa3cf9d4cc04a3a400defde1",
@@ -2663,7 +2806,8 @@
     "smartPctEqual": 0.16787699999999997,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.133
+    "smartPctHeldConfidence": 0.133,
+    "smartPctOpenAsOfConfidence": 0.09089184002444464
   },
   {
     "conditionId": "0x5376e032a8f5a389b55aeafb39b6985bfb323f8392e304bc48b1b01e9cd39850",
@@ -2681,7 +2825,8 @@
     "smartPctEqual": 0.40222211111111106,
     "participantCount": 6,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.3910312388305123
+    "smartPctHeldConfidence": 0.3910312388305123,
+    "smartPctOpenAsOfConfidence": 0.3885268207117631
   },
   {
     "conditionId": "0x434719e5e807306706d17205f2bc15e4901184084c4e8ea472127f47a365bbdf",
@@ -2699,7 +2844,8 @@
     "smartPctEqual": 0.22432911111111112,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.22
+    "smartPctHeldConfidence": 0.22,
+    "smartPctOpenAsOfConfidence": 0.21377517789577205
   },
   {
     "conditionId": "0x5159f1aeb43719d812fd7bdde72da589fafe0ab0cff7a861d9a20b2511571d96",
@@ -2717,7 +2863,8 @@
     "smartPctEqual": 0.5173745555555556,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5430009811566948
+    "smartPctHeldConfidence": 0.5430009811566948,
+    "smartPctOpenAsOfConfidence": 0.3243027765840527
   },
   {
     "conditionId": "0xeb4b5d1390278a728cea8024a464c2ed8f69c615e60325f1735ad961b0b6ed51",
@@ -2735,7 +2882,8 @@
     "smartPctEqual": 0.6445543333333333,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.829999
+    "smartPctHeldConfidence": 0.829999,
+    "smartPctOpenAsOfConfidence": 0.6738658786825853
   },
   {
     "conditionId": "0xf105ea1a83605540617366526881a245bd0fb586e0cfe15c1582d0d3ee579558",
@@ -2753,7 +2901,8 @@
     "smartPctEqual": 0.03980439999999998,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.006
+    "smartPctHeldConfidence": 0.006,
+    "smartPctOpenAsOfConfidence": 0.04688341853796369
   },
   {
     "conditionId": "0x0fb006e0c06caa4db12f7e30ec8c2483d658f83eb57b2ee8eb478e39beca3dfd",
@@ -2771,7 +2920,8 @@
     "smartPctEqual": 0.3281821818181818,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.28336519667636195
+    "smartPctHeldConfidence": 0.28336519667636195,
+    "smartPctOpenAsOfConfidence": 0.34352129436594375
   },
   {
     "conditionId": "0x46f19d5bedd6d601d597d308d86814245974014d8a108395a7690d7a099cacdd",
@@ -2789,7 +2939,8 @@
     "smartPctEqual": 0.20558857142857143,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.16853903080260557
+    "smartPctHeldConfidence": 0.16853903080260557,
+    "smartPctOpenAsOfConfidence": 0.17700099999999996
   },
   {
     "conditionId": "0x2bef40a1f62d045527228e699990d1bd1f97906b2458a6f3e4a0daf11124060c",
@@ -2807,7 +2958,8 @@
     "smartPctEqual": 0.3334389523809524,
     "participantCount": 13,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.279996
+    "smartPctHeldConfidence": 0.279996,
+    "smartPctOpenAsOfConfidence": 0.279996
   },
   {
     "conditionId": "0x6fa13f31cceaf10ed3190df6e2aca0a93ab0d6fb46fd279003f17d4cdccee164",
@@ -2825,7 +2977,8 @@
     "smartPctEqual": 0.6311684782608695,
     "participantCount": 13,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.7723162159799551
+    "smartPctHeldConfidence": 0.7723162159799551,
+    "smartPctOpenAsOfConfidence": 0.5728408598226227
   },
   {
     "conditionId": "0x70d706fe084905dbafb95dfff13b727e4073efc3ef590adc8330562bac5d26de",
@@ -2843,7 +2996,8 @@
     "smartPctEqual": 0.3651324285714286,
     "participantCount": 12,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3835057378902498
+    "smartPctHeldConfidence": 0.3835057378902498,
+    "smartPctOpenAsOfConfidence": 0.021
   },
   {
     "conditionId": "0xa2b9c5b881902c57a3ce9c8fe68848592136a728448b601bf09b4be6304394e5",
@@ -2861,7 +3015,8 @@
     "smartPctEqual": 0.6265045555555555,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9372469999999999
+    "smartPctHeldConfidence": 0.9372469999999999,
+    "smartPctOpenAsOfConfidence": 0.5466392185523944
   },
   {
     "conditionId": "0x1e25feaca6587256a7d830023b797279561de33ceb29845186f3d29d3569743d",
@@ -2879,7 +3034,8 @@
     "smartPctEqual": 0.26126390909090913,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.07033496590284477
+    "smartPctHeldConfidence": 0.07033496590284477,
+    "smartPctOpenAsOfConfidence": 0.29015854771417154
   },
   {
     "conditionId": "0x9967297556e4fd7f7e1e688a2e44d6fdbc42b0700576a1e4e67aa37764ac640a",
@@ -2897,7 +3053,8 @@
     "smartPctEqual": 0.357044,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.11734
+    "smartPctHeldConfidence": 0.11734,
+    "smartPctOpenAsOfConfidence": 0.3869338538250834
   },
   {
     "conditionId": "0x18dccc229331c63d8360d1400ece2355627637547d8dcd54aa5f7f1b5580686e",
@@ -2915,7 +3072,8 @@
     "smartPctEqual": 0.9861201111111111,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9808637720524397
+    "smartPctHeldConfidence": 0.9808637720524397,
+    "smartPctOpenAsOfConfidence": 0.9789867425336753
   },
   {
     "conditionId": "0xc5675bc58c8117391cc243780c1b709ce1ef744aa27779c78ee82f3dc974ca1b",
@@ -2933,7 +3091,8 @@
     "smartPctEqual": 0.18976462500000002,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.043211
+    "smartPctHeldConfidence": 0.043211,
+    "smartPctOpenAsOfConfidence": 0.15325521434952885
   },
   {
     "conditionId": "0x48fbf70c1713e71a405052bc4641e26dbba435fa557672c4040763c901cbf606",
@@ -2951,7 +3110,8 @@
     "smartPctEqual": 0.019751625000000012,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.018368958027841997
+    "smartPctHeldConfidence": 0.018368958027841997,
+    "smartPctOpenAsOfConfidence": 0.01868430445077637
   },
   {
     "conditionId": "0x36e8ca24d2a13435f519f15580d42b45cdbe3bc425fb39a7c2733260357af0fa",
@@ -2969,7 +3129,8 @@
     "smartPctEqual": 0.9598144166666668,
     "participantCount": 8,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9927372554538014
+    "smartPctHeldConfidence": 0.9927372554538014,
+    "smartPctOpenAsOfConfidence": 0.959819789344186
   },
   {
     "conditionId": "0x1d54eb5eac2cee8f595f3097c65da7d07f8ab5dee63d7c0c6883eb70e1e9af30",
@@ -2987,7 +3148,8 @@
     "smartPctEqual": 0.08007127272727273,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.13640872561636258
+    "smartPctHeldConfidence": 0.13640872561636258,
+    "smartPctOpenAsOfConfidence": 0.13510967696239143
   },
   {
     "conditionId": "0xb196a122933da9aff6cb8b0f3764d0dc5db1859f46c0481c711521eee8524291",
@@ -3005,7 +3167,8 @@
     "smartPctEqual": 0.16905010000000004,
     "participantCount": 8,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.09444707175429366
+    "smartPctHeldConfidence": 0.09444707175429366,
+    "smartPctOpenAsOfConfidence": 0.012329750282129147
   },
   {
     "conditionId": "0x68fbeb8d823552abf9d35f3ebdb8619a1a1d51b650da9101be62f09308fd18d2",
@@ -3023,7 +3186,8 @@
     "smartPctEqual": 0.1260621,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.14526138606027544
+    "smartPctHeldConfidence": 0.14526138606027544,
+    "smartPctOpenAsOfConfidence": 0.150869
   },
   {
     "conditionId": "0x053d22e12bfe8dd73b12fc1cf89858ecc0de76aede10fea3eca5c7877d8db40c",
@@ -3041,7 +3205,8 @@
     "smartPctEqual": 0.0836068,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.062476
+    "smartPctHeldConfidence": 0.062476,
+    "smartPctOpenAsOfConfidence": 0.0836260619785902
   },
   {
     "conditionId": "0x57165bc68af588cf16e499eecd6c040e458c939e0fb0dd4b193744a9d21aa5f2",
@@ -3059,7 +3224,8 @@
     "smartPctEqual": 0.05970916666666667,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.018927287155321167
+    "smartPctHeldConfidence": 0.018927287155321167,
+    "smartPctOpenAsOfConfidence": 0.018927287155321167
   },
   {
     "conditionId": "0x46f15cb064fb468e39de360f14f5847898ef9b1489d15e9df702b92f1836598d",
@@ -3077,7 +3243,8 @@
     "smartPctEqual": 0.164971125,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.15000000000000002
+    "smartPctHeldConfidence": 0.15000000000000002,
+    "smartPctOpenAsOfConfidence": 0.16658645630634347
   },
   {
     "conditionId": "0x0189df05ed7bf84d799213b01a79571e305c03b2ac5359cfbb3a323448ba20fa",
@@ -3095,7 +3262,8 @@
     "smartPctEqual": 0.06232581818181822,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.019046970101293068
+    "smartPctHeldConfidence": 0.019046970101293068,
+    "smartPctOpenAsOfConfidence": 0.019075329361783633
   },
   {
     "conditionId": "0x8e7a03cb1970e2ad6533b01892403516b6b3f5b5fa90ed7d104c28b27e40ba00",
@@ -3113,7 +3281,8 @@
     "smartPctEqual": 0.5923625,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5248182413186938
+    "smartPctHeldConfidence": 0.5248182413186938,
+    "smartPctOpenAsOfConfidence": 0.5248182413186938
   },
   {
     "conditionId": "0xdb7886829f415e00ab97b695a28b5747c6bce1f8ab09635a51ec6480e5d50314",
@@ -3131,7 +3300,8 @@
     "smartPctEqual": 0.19892483333333333,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.21329871091570057
+    "smartPctHeldConfidence": 0.21329871091570057,
+    "smartPctOpenAsOfConfidence": 0.21978189424996003
   },
   {
     "conditionId": "0x5f879a52e5349db7f66d386ca75f1a9bb608fdd6a738a1582681613730b23281",
@@ -3149,7 +3319,8 @@
     "smartPctEqual": 0.13882339999999999,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.15243756009541246
+    "smartPctHeldConfidence": 0.15243756009541246,
+    "smartPctOpenAsOfConfidence": 0.13725135970598332
   },
   {
     "conditionId": "0x0443a503a38b90446c8a3826db5ee1323144197ef2b4ed09bcdf545ac104dfcb",
@@ -3167,7 +3338,8 @@
     "smartPctEqual": 0.21116680000000004,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.029
+    "smartPctHeldConfidence": 0.029,
+    "smartPctOpenAsOfConfidence": 0.19170586112680277
   },
   {
     "conditionId": "0xa37173a88dc5622e1c42e9f8f5a9d20d70b9b99e52cb76e64fb0ad95503fcaef",
@@ -3185,7 +3357,8 @@
     "smartPctEqual": 0.339272,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.14
+    "smartPctHeldConfidence": 0.14,
+    "smartPctOpenAsOfConfidence": 0.14
   },
   {
     "conditionId": "0x9a8757bf4ecee8ba364603c3195d63c37c4d2700b69f8e4c5f751850bc330c9a",
@@ -3203,7 +3376,8 @@
     "smartPctEqual": 0.18432279999999998,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.18600000000000005
+    "smartPctHeldConfidence": 0.18600000000000005,
+    "smartPctOpenAsOfConfidence": 0.18600000000000005
   },
   {
     "conditionId": "0x5a27ddbd2965784c01ef0a53d440a9cfc08e815f63f0d923ed8734af36872add",
@@ -3221,7 +3395,8 @@
     "smartPctEqual": 0.10212166666666668,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.03100082154808624
+    "smartPctHeldConfidence": 0.03100082154808624,
+    "smartPctOpenAsOfConfidence": 0.11725240558730994
   },
   {
     "conditionId": "0x1ab70741c263b8374fd08b4cfb2cc5af0537d787e27e40a39d08a83dd67f06b4",
@@ -3239,7 +3414,8 @@
     "smartPctEqual": 0.2088925,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.45394816910177893
+    "smartPctHeldConfidence": 0.45394816910177893,
+    "smartPctOpenAsOfConfidence": 0.33187286899616975
   },
   {
     "conditionId": "0x8b9176d24ac65c3ec55f5113c290b7ce97dc026dc506db9f1444879ffcdadd6d",
@@ -3257,7 +3433,8 @@
     "smartPctEqual": 0.6543324,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.7
+    "smartPctHeldConfidence": 0.7,
+    "smartPctOpenAsOfConfidence": 0.6380590535883793
   },
   {
     "conditionId": "0x1b1a75d6305f5edee255b3f368cca945bde401fea4b2a7e34f2fcca3b3e56cf0",
@@ -3275,7 +3452,8 @@
     "smartPctEqual": 0.7148490769230769,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.85
+    "smartPctHeldConfidence": 0.85,
+    "smartPctOpenAsOfConfidence": 0.6561242777377804
   },
   {
     "conditionId": "0x17e2f3347e34d8a13572baf10c9b4eb3291217868a0fb84b37f36c80f8e2105a",
@@ -3293,7 +3471,8 @@
     "smartPctEqual": 0.4295636666666667,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3385237955051148
+    "smartPctHeldConfidence": 0.3385237955051148,
+    "smartPctOpenAsOfConfidence": 0.31999999999999995
   },
   {
     "conditionId": "0xeda0e0633f131b761cbe6c6e5e16ae347c48d9448a08c5826bfc2c794b63758e",
@@ -3325,7 +3504,8 @@
     "smartPctEqual": 0.5352793333333333,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3745996941557207
+    "smartPctHeldConfidence": 0.3745996941557207,
+    "smartPctOpenAsOfConfidence": 0.739999
   },
   {
     "conditionId": "0x0619980a29b1022ba9cbdcb7da731be0be8799ecf9ff2eb5c1ee9137235b0770",
@@ -3343,7 +3523,8 @@
     "smartPctEqual": 0.46390000000000003,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5
+    "smartPctHeldConfidence": 0.5,
+    "smartPctOpenAsOfConfidence": 0.425729
   },
   {
     "conditionId": "0xb37e5f6ece2db9165517b62e3257e0da5d3e79713883cb71c74013fe912e8a4d",
@@ -3361,7 +3542,8 @@
     "smartPctEqual": 0.04338450000000001,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.036375000000000046
+    "smartPctHeldConfidence": 0.036375000000000046,
+    "smartPctOpenAsOfConfidence": 0.03694399999999998
   },
   {
     "conditionId": "0x2bde6486e7067f48ee21344d8b5c1af458732536eb4d080932c88c3a7c2d2126",
@@ -3379,7 +3561,8 @@
     "smartPctEqual": 0.7446735384615385,
     "participantCount": 8,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.866283
+    "smartPctHeldConfidence": 0.866283,
+    "smartPctOpenAsOfConfidence": 0.7032135288193677
   },
   {
     "conditionId": "0xeeb1b35c595b19f9512c55f85fdf93f3625c3cec1a9b6bac6262921fbd87912e",
@@ -3397,7 +3580,8 @@
     "smartPctEqual": 0.18399999999999997,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.0040000000000000036
+    "smartPctHeldConfidence": 0.0040000000000000036,
+    "smartPctOpenAsOfConfidence": 0.0040000000000000036
   },
   {
     "conditionId": "0x9d3f02264a94bafc676afd7add8b11442e6ec72dabaa69cefef835f0672275c7",
@@ -3415,7 +3599,8 @@
     "smartPctEqual": 0.37053263636363637,
     "participantCount": 24,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.10593296131720865
+    "smartPctHeldConfidence": 0.10593296131720865,
+    "smartPctOpenAsOfConfidence": 0.15999247441747083
   },
   {
     "conditionId": "0xde04b189b3f19eaccda02529a3ea67abfc46bff5c0c8fc42d8a2d0ed7b8f0d41",
@@ -3433,7 +3618,8 @@
     "smartPctEqual": 0.87960375,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9950000000000001
+    "smartPctHeldConfidence": 0.9950000000000001,
+    "smartPctOpenAsOfConfidence": 0.6116164161113999
   },
   {
     "conditionId": "0x26ca74d41edc9e3a6643698fbe8eae446377e4579d2f55f505da4ff6a1cf0f66",
@@ -3451,7 +3637,8 @@
     "smartPctEqual": 0.17879199999999998,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.03029223086220838
+    "smartPctHeldConfidence": 0.03029223086220838,
+    "smartPctOpenAsOfConfidence": 0.038
   },
   {
     "conditionId": "0x6992fdf39435fb8aa0b765e24f98cb621fd1f7b6458865387c0ea303da2f0003",
@@ -3469,7 +3656,8 @@
     "smartPctEqual": 0.38001216666666665,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.22624999999999995
+    "smartPctHeldConfidence": 0.22624999999999995,
+    "smartPctOpenAsOfConfidence": 0.22624999999999995
   },
   {
     "conditionId": "0x946bb3ec7e7d9bf146b4487be87e71ace99f1e0e9978cf36fbb5063c23900afb",
@@ -3487,7 +3675,8 @@
     "smartPctEqual": 0.5099426,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.662758412639341
+    "smartPctHeldConfidence": 0.662758412639341,
+    "smartPctOpenAsOfConfidence": 0.662758412639341
   },
   {
     "conditionId": "0x232342e2a9200b203703a816f9d99d1c6a872333567af16f43d67a255e1a6aa8",
@@ -3505,7 +3694,8 @@
     "smartPctEqual": 0.6511508749999999,
     "participantCount": 6,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.6587324031581034
+    "smartPctHeldConfidence": 0.6587324031581034,
+    "smartPctOpenAsOfConfidence": 0.6699638415894933
   },
   {
     "conditionId": "0x85980a4d08e4cf7911782b632108d17b124171c1e1610cf7861e260c6daf3538",
@@ -3523,7 +3713,8 @@
     "smartPctEqual": 0.0530505,
     "participantCount": 4,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.05759224594344864
+    "smartPctHeldConfidence": 0.05759224594344864,
+    "smartPctOpenAsOfConfidence": 0.05773857402997517
   },
   {
     "conditionId": "0xa8e8cdf6ed1a4132ce687c5cd5d0eec65f439e0c83ae7bad3463a0906aba7aa8",
@@ -3541,7 +3732,8 @@
     "smartPctEqual": 0.5013219999999999,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.8200000000000001
+    "smartPctHeldConfidence": 0.8200000000000001,
+    "smartPctOpenAsOfConfidence": 0.42969642410644043
   },
   {
     "conditionId": "0x6cb3ec9e0fb1c258898f648f8b33422f59ba3e8a71aee551449d7cb147bb8ead",
@@ -3559,7 +3751,8 @@
     "smartPctEqual": 0.22922311764705877,
     "participantCount": 12,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.14381900000000003
+    "smartPctHeldConfidence": 0.14381900000000003,
+    "smartPctOpenAsOfConfidence": 0.1692384493653731
   },
   {
     "conditionId": "0xc112ff35c760ee66738e288067c3de90a2b44a28a9e2f4488989d498be03b292",
@@ -3577,7 +3770,8 @@
     "smartPctEqual": 0.10570080000000001,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.08775652425997091
+    "smartPctHeldConfidence": 0.08775652425997091,
+    "smartPctOpenAsOfConfidence": 0.10242361769936854
   },
   {
     "conditionId": "0xa7962b12241616d83dcb8c70fc33aa0f48b1ec46a3ad6a23db21d3885dedc4cb",
@@ -3609,7 +3803,8 @@
     "smartPctEqual": 0.13341257142857146,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.13108235471496685
+    "smartPctHeldConfidence": 0.13108235471496685,
+    "smartPctOpenAsOfConfidence": 0.13108235471496685
   },
   {
     "conditionId": "0x7b63040ad654500cc30bfde62c864ca1c247621b9bc89cb4416e9f9ee01e7d6e",
@@ -3641,7 +3836,8 @@
     "smartPctEqual": 0.7591952857142857,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9748440605758287
+    "smartPctHeldConfidence": 0.9748440605758287,
+    "smartPctOpenAsOfConfidence": 0.7926689706766678
   },
   {
     "conditionId": "0x73f7620da1d4a2ec2283ad55d72f5ff4666e8732ec04458f88dff6773d6be2c6",
@@ -3659,7 +3855,8 @@
     "smartPctEqual": 0.029660200000000005,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.030333084937054364
+    "smartPctHeldConfidence": 0.030333084937054364,
+    "smartPctOpenAsOfConfidence": 0.028513885849451113
   },
   {
     "conditionId": "0x796e791e7058571e460278814fc7a3183752285338f1400087b98bef3c447908",
@@ -3705,7 +3902,8 @@
     "smartPctEqual": 0.5503153333333333,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5
+    "smartPctHeldConfidence": 0.5,
+    "smartPctOpenAsOfConfidence": 0.5364969669597305
   },
   {
     "conditionId": "0x4520e16130f3c360690085535b2fccb4f05a7eb673a6d0af20729af3dfb3a1c1",
@@ -3723,7 +3921,8 @@
     "smartPctEqual": 0.31407675,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5
+    "smartPctHeldConfidence": 0.5,
+    "smartPctOpenAsOfConfidence": 0.3056362356137071
   },
   {
     "conditionId": "0xffdbbf2c3b9aa808abbcb35beb2b20a93572570aa5dd1bd1b630cade2f809f26",
@@ -3741,7 +3940,8 @@
     "smartPctEqual": 0.1357651428571429,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.12604857612047204
+    "smartPctHeldConfidence": 0.12604857612047204,
+    "smartPctOpenAsOfConfidence": 0.1276988585809908
   },
   {
     "conditionId": "0xba8af64c1b08f322ca7f66f3cfdbdfd50c0eae6fc88d2fcf29c30ceb62682421",
@@ -3759,7 +3959,8 @@
     "smartPctEqual": 0.23052575000000003,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.12500500000000003
+    "smartPctHeldConfidence": 0.12500500000000003,
+    "smartPctOpenAsOfConfidence": 0.13103655272801878
   },
   {
     "conditionId": "0xa5d0dfc81e6a87faa737df4ca52fae7e18b63d9f7568e364c6c7d8c45fb39e8b",
@@ -3777,7 +3978,8 @@
     "smartPctEqual": 0.3138598,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.34525919122307075
+    "smartPctHeldConfidence": 0.34525919122307075,
+    "smartPctOpenAsOfConfidence": 0.34525919122307075
   },
   {
     "conditionId": "0x7aa6ecf3de5537b7822a0d6041b713ecc4d8b5c9f58449e16509c8af43db86ef",
@@ -3809,7 +4011,8 @@
     "smartPctEqual": 0.044140999999999986,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.032705
+    "smartPctHeldConfidence": 0.032705,
+    "smartPctOpenAsOfConfidence": 0.03799358630981629
   },
   {
     "conditionId": "0x0d082a85f48a5226b1205acdb6e95ead2fe373acabcf6c471f5895f86f42a276",
@@ -3827,7 +4030,8 @@
     "smartPctEqual": 0.029525249999999982,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.033324173866703576
+    "smartPctHeldConfidence": 0.033324173866703576,
+    "smartPctOpenAsOfConfidence": 0.03357957308230191
   },
   {
     "conditionId": "0x84c7382fc6881416a2b07b0ebe9da32daba8be44a48623a0c3fe4b22f816431a",
@@ -3859,7 +4063,8 @@
     "smartPctEqual": 0.10899499999999998,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.040403587338136863
+    "smartPctHeldConfidence": 0.040403587338136863,
+    "smartPctOpenAsOfConfidence": 0.044
   },
   {
     "conditionId": "0x7061e7ce4d7744677b6c3a7d1db0f82eb90c342104167386619d75777a6083c1",
@@ -3877,7 +4082,8 @@
     "smartPctEqual": 0.3699995,
     "participantCount": 4,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.367684368613694
+    "smartPctHeldConfidence": 0.367684368613694,
+    "smartPctOpenAsOfConfidence": 0.367684368613694
   },
   {
     "conditionId": "0x3f0743b88ef23a678e1d07fd2fb92badcbbb17aeca7110f188533b081afbd6af",
@@ -3909,7 +4115,8 @@
     "smartPctEqual": 0.2828594285714286,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.31866311304497136
+    "smartPctHeldConfidence": 0.31866311304497136,
+    "smartPctOpenAsOfConfidence": 0.3444476474407919
   },
   {
     "conditionId": "0x99e5c683143a52e9f129ba97bd9d05a44435008296ac5f148735109a215e5c92",
@@ -3941,7 +4148,8 @@
     "smartPctEqual": 0.034105333333333356,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.057274797166680665
+    "smartPctHeldConfidence": 0.057274797166680665,
+    "smartPctOpenAsOfConfidence": 0.058316000000000034
   },
   {
     "conditionId": "0xe202539dfbeced92dc4112f134a205c80ca6cf4db32bd82f05b291c297219fd8",
@@ -3987,7 +4195,8 @@
     "smartPctEqual": 0.012500000000000002,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.015000000000000013
+    "smartPctHeldConfidence": 0.015000000000000013,
+    "smartPctOpenAsOfConfidence": 0.015000000000000013
   },
   {
     "conditionId": "0x087713ab2905e789c42c3fafdf747512f8d7883b7fab1ac554b703310c09d869",
@@ -4005,7 +4214,8 @@
     "smartPctEqual": 0.7167835,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.7478944842585559
+    "smartPctHeldConfidence": 0.7478944842585559,
+    "smartPctOpenAsOfConfidence": 0.7478944842585559
   },
   {
     "conditionId": "0xe5bd80313b8859e3f5761568ac9498866ea9d4419e4d1b6a877a9a9bd2754cb4",
@@ -4023,7 +4233,8 @@
     "smartPctEqual": 0.11071520000000001,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.008
+    "smartPctHeldConfidence": 0.008,
+    "smartPctOpenAsOfConfidence": 0.008
   },
   {
     "conditionId": "0x32cfa52198e85e070d1b17d1b53c5c3a6aaae7736cdc33fa6aa04d353f0c2811",
@@ -4041,7 +4252,8 @@
     "smartPctEqual": 0.015284,
     "participantCount": 4,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.013136054325578964
+    "smartPctHeldConfidence": 0.013136054325578964,
+    "smartPctOpenAsOfConfidence": 0.011877
   },
   {
     "conditionId": "0xcdb1f0400949238a63d3e88243d2ada08cd9c2a71985ced9f0cfd5e66354cf90",
@@ -4059,7 +4271,8 @@
     "smartPctEqual": 0.10327766666666667,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.015
+    "smartPctHeldConfidence": 0.015,
+    "smartPctOpenAsOfConfidence": 0.03689123835356289
   },
   {
     "conditionId": "0x7b52405ad0e0d31bfe970940b67d77f24ecedeab8a2361c11148c02a006e325c",
@@ -4077,7 +4290,8 @@
     "smartPctEqual": 0.02331850000000001,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.02280414193112151
+    "smartPctHeldConfidence": 0.02280414193112151,
+    "smartPctOpenAsOfConfidence": 0.02376308829210337
   },
   {
     "conditionId": "0x37a6de1b21803e5f3fb1965116218215d79963af4f7e51659696366267a63a03",
@@ -4095,7 +4309,8 @@
     "smartPctEqual": 0.018685200000000006,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.017759638718878562
+    "smartPctHeldConfidence": 0.017759638718878562,
+    "smartPctOpenAsOfConfidence": 0.018325434712246538
   },
   {
     "conditionId": "0x7412d284c8f63791fec807f9b1f61c6fe61163621775a3dc8686cd2575272abe",
@@ -4113,7 +4328,8 @@
     "smartPctEqual": 0.006888666666666668,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.002
+    "smartPctHeldConfidence": 0.002,
+    "smartPctOpenAsOfConfidence": 0.002
   },
   {
     "conditionId": "0xd1747284d6048b2a3dcfbee489db405f36de18f9590197dd0e5c9f0c246bf050",
@@ -4131,7 +4347,8 @@
     "smartPctEqual": 0.022142333333333347,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.009427
+    "smartPctHeldConfidence": 0.009427,
+    "smartPctOpenAsOfConfidence": 0.030134617812424866
   },
   {
     "conditionId": "0xae6d3d20bc8f742922dc40880cd8a8671c10385a9912fa7cd670fba0643dfe96",
@@ -4149,7 +4366,8 @@
     "smartPctEqual": 0.2593370666666666,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.12
+    "smartPctHeldConfidence": 0.12,
+    "smartPctOpenAsOfConfidence": 0.21597379226222743
   },
   {
     "conditionId": "0x221e0b7d9646f5a4262509e8c4c856299c422e21571018dcb3d5bd288d70afd0",
@@ -4167,7 +4385,8 @@
     "smartPctEqual": 0.7225166000000001,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.8983419260956077
+    "smartPctHeldConfidence": 0.8983419260956077,
+    "smartPctOpenAsOfConfidence": 0.6900122034633871
   },
   {
     "conditionId": "0xa0b56d7e621c7cbcfa47fe1a9c24f3409e189180fd6bda55b7a8113129839afc",
@@ -4185,7 +4404,8 @@
     "smartPctEqual": 0.038092,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.06334600000000001
+    "smartPctHeldConfidence": 0.06334600000000001,
+    "smartPctOpenAsOfConfidence": 0.046084916722607595
   },
   {
     "conditionId": "0x2cd24d17f5680dc6e7b7d67c712a223ae85550745597e81bd2d2b8d073443951",
@@ -4203,7 +4423,8 @@
     "smartPctEqual": 0.25963841666666665,
     "participantCount": 14,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.14286900000000002
+    "smartPctHeldConfidence": 0.14286900000000002,
+    "smartPctOpenAsOfConfidence": 0.14286900000000002
   },
   {
     "conditionId": "0x2358809f9f612f8fb4f224b342ba2841ca644a6e3c46adb4c3bcee910cc31632",
@@ -4221,7 +4442,8 @@
     "smartPctEqual": 0.7676362,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.8840533773624235
+    "smartPctHeldConfidence": 0.8840533773624235,
+    "smartPctOpenAsOfConfidence": 0.7466577496475598
   },
   {
     "conditionId": "0x9b14ba5cc37a35c0db2c9849e631d98195670be4a0f91233a81529f22a7a5949",
@@ -4239,7 +4461,8 @@
     "smartPctEqual": 0.16276125000000002,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.176039
+    "smartPctHeldConfidence": 0.176039,
+    "smartPctOpenAsOfConfidence": 0.18486177115194233
   },
   {
     "conditionId": "0x6fcf23c85dfa27beb42badb8427921136b0b396d90bff69e8269652d5583cb1e",
@@ -4257,7 +4480,8 @@
     "smartPctEqual": 0.3047305,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.30515808523908416
+    "smartPctHeldConfidence": 0.30515808523908416,
+    "smartPctOpenAsOfConfidence": 0.30503685440386885
   },
   {
     "conditionId": "0xdf9b5fe5a7cac5e2c26cd36a08bb1456d61ba7e00c96868e57d38b5775c78ae9",
@@ -4275,7 +4499,8 @@
     "smartPctEqual": 0.40744499999999995,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.45831199999999994
+    "smartPctHeldConfidence": 0.45831199999999994,
+    "smartPctOpenAsOfConfidence": 0.45831199999999994
   },
   {
     "conditionId": "0x1d57ae7d429a50e47843a712d7caf62e76b724310707faa892c1146c8e6a6742",
@@ -4293,7 +4518,8 @@
     "smartPctEqual": 0.492,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.4344811184790366
+    "smartPctHeldConfidence": 0.4344811184790366,
+    "smartPctOpenAsOfConfidence": 0.4344811184790366
   },
   {
     "conditionId": "0xdac6e67bfc09e630711ceb1be0be8f19c472344ca4353b608cc3b9282e61ec95",
@@ -4311,7 +4537,8 @@
     "smartPctEqual": 0.183,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.049999999999999996
+    "smartPctHeldConfidence": 0.049999999999999996,
+    "smartPctOpenAsOfConfidence": 0.049999999999999996
   },
   {
     "conditionId": "0x16c981b47490212bbb7d70edcccc419a84ff5771bc85c1b7abae37128975953e",
@@ -4329,7 +4556,8 @@
     "smartPctEqual": 0.436925,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.5930104634011418
+    "smartPctHeldConfidence": 0.5930104634011418,
+    "smartPctOpenAsOfConfidence": 0.5930104634011418
   },
   {
     "conditionId": "0xbc28e92d1fa999e842caf926cff56a580fb477f26d8c44c99aa29beb78062241",
@@ -4347,7 +4575,8 @@
     "smartPctEqual": 0.5879994,
     "participantCount": 4,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.5997301272345009
+    "smartPctHeldConfidence": 0.5997301272345009,
+    "smartPctOpenAsOfConfidence": 0.5997301272345009
   },
   {
     "conditionId": "0xe019971a21471bafef51fa115830d095f2c5a28d828d8ee6317efc8cab867bc4",
@@ -4365,7 +4594,8 @@
     "smartPctEqual": 0.49749950000000004,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.64
+    "smartPctHeldConfidence": 0.64,
+    "smartPctOpenAsOfConfidence": 0.6491791702185131
   },
   {
     "conditionId": "0x2576d8fe9a5ed75f58c2ef34bad961916d4799254c8d248734aee5cf5224eb07",
@@ -4383,7 +4613,8 @@
     "smartPctEqual": 0.01319999999999999,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.01252872138258797
+    "smartPctHeldConfidence": 0.01252872138258797,
+    "smartPctOpenAsOfConfidence": 0.01252872138258797
   },
   {
     "conditionId": "0xf480b4ea858af172baf1d8c4d2d0281ee8d2694ed9f40b12b3630c5328dfb3f6",
@@ -4401,7 +4632,8 @@
     "smartPctEqual": 0.4280130999999999,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.030303
+    "smartPctHeldConfidence": 0.030303,
+    "smartPctOpenAsOfConfidence": 0.4467062950983604
   },
   {
     "conditionId": "0x86a503e3386a391e7cd8d04731c0cf5c408da5437395e885f4cf67716f4ebb63",
@@ -4419,7 +4651,8 @@
     "smartPctEqual": 0.6586332500000001,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6662512409575042
+    "smartPctHeldConfidence": 0.6662512409575042,
+    "smartPctOpenAsOfConfidence": 0.6662512409575042
   },
   {
     "conditionId": "0x9b95141b43a6392c672c3afb44f45fbf1255a17f6958cea0e248e87b64faca57",
@@ -4437,7 +4670,8 @@
     "smartPctEqual": 0.44276950000000004,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.51
+    "smartPctHeldConfidence": 0.51,
+    "smartPctOpenAsOfConfidence": 0.517192800426627
   },
   {
     "conditionId": "0x0d14f5dc9fb3250ec888b1ac8d9fe9a0ce06f9d3ea60fdf138e8690622fea84c",
@@ -4455,7 +4689,8 @@
     "smartPctEqual": 0.026739833333333334,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.011592457539600597
+    "smartPctHeldConfidence": 0.011592457539600597,
+    "smartPctOpenAsOfConfidence": 0.01275028825359491
   },
   {
     "conditionId": "0x03bc660a4df5faeaee8e66d0e7bc4f2200b543340b7f7a5c83bfa1fecafa9ead",
@@ -4473,7 +4708,8 @@
     "smartPctEqual": 0.94869625,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.997207437065364
+    "smartPctHeldConfidence": 0.997207437065364,
+    "smartPctOpenAsOfConfidence": 0.99715
   },
   {
     "conditionId": "0x57c1e8de9d359a76055fe1be95e46a1e72d0537811dcc2ccf070cdfa73d8ba33",
@@ -4491,7 +4727,8 @@
     "smartPctEqual": 0.7561418666666666,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.838372270152622
+    "smartPctHeldConfidence": 0.838372270152622,
+    "smartPctOpenAsOfConfidence": 0.8627325545495894
   },
   {
     "conditionId": "0x6972edb1b3f8cd8192651a665fc424dff846efe1c4a2376f628d4b20c704144c",
@@ -4509,7 +4746,8 @@
     "smartPctEqual": 0.1321665,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.006388574209187499
+    "smartPctHeldConfidence": 0.006388574209187499,
+    "smartPctOpenAsOfConfidence": 0.006388574209187499
   },
   {
     "conditionId": "0x5e614739363bbfc399469102c600e4e8260032d41e59e0bc12ebc0e71231642d",
@@ -4527,7 +4765,8 @@
     "smartPctEqual": 0.1304165,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.002
+    "smartPctHeldConfidence": 0.002,
+    "smartPctOpenAsOfConfidence": 0.002
   },
   {
     "conditionId": "0xd0dbdc94b28c5cffeef64ed6b13e5f0f2324fb177e5ffaa634b48c88fe18d5e7",
@@ -4545,7 +4784,8 @@
     "smartPctEqual": 0.10581339999999999,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.004401746475460527
+    "smartPctHeldConfidence": 0.004401746475460527,
+    "smartPctOpenAsOfConfidence": 0.004
   },
   {
     "conditionId": "0xb2a1c0c2a5ddd15fb8ba2dea1a808ef32c61108bb1a5911281006e8076b6714b",
@@ -4563,7 +4803,8 @@
     "smartPctEqual": 0.709890857142857,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.93
+    "smartPctHeldConfidence": 0.93,
+    "smartPctOpenAsOfConfidence": 0.7974027618424963
   },
   {
     "conditionId": "0xc6ddb19f848ac363330d0a690cfe6818d4c51e837161a41d42675eda27767ed0",
@@ -4581,7 +4822,8 @@
     "smartPctEqual": 0.32366933333333336,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.48246900000000004
+    "smartPctHeldConfidence": 0.48246900000000004,
+    "smartPctOpenAsOfConfidence": 0.35300200000000004
   },
   {
     "conditionId": "0xaa145cf5714455f546afe53037b8712df749ba96c04820c2d41f37f877f29697",
@@ -4599,7 +4841,8 @@
     "smartPctEqual": 0.28569072,
     "participantCount": 15,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.09771988765588724
+    "smartPctHeldConfidence": 0.09771988765588724,
+    "smartPctOpenAsOfConfidence": 0.1701144416490296
   },
   {
     "conditionId": "0x1b5e5ebc0cf5c7c55d557f2be51276efbddb59ff5c038692be4501f17fa53944",
@@ -4617,7 +4860,8 @@
     "smartPctEqual": 0.11403775000000002,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.092499
+    "smartPctHeldConfidence": 0.092499,
+    "smartPctOpenAsOfConfidence": 0.092499
   },
   {
     "conditionId": "0x54bafc87ad1e9e90b91b3ab84181ac4d345a4a39a5438a9be0415799ca08a348",
@@ -4635,7 +4879,8 @@
     "smartPctEqual": 0.6721131666666667,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.713622792855579
+    "smartPctHeldConfidence": 0.713622792855579,
+    "smartPctOpenAsOfConfidence": 0.6907618986292844
   },
   {
     "conditionId": "0x2e13faf4bd0345be6fa1380b516f15845befbd4a027f981976d6a44ef6a7234e",
@@ -4653,7 +4898,8 @@
     "smartPctEqual": 0.5173300000000001,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.54972
+    "smartPctHeldConfidence": 0.54972,
+    "smartPctOpenAsOfConfidence": 0.54972
   },
   {
     "conditionId": "0xc35f382694bc66e67f6e0f0a8b28c992756960fd8ef2cfc6568d04df528d6ef1",
@@ -4671,7 +4917,8 @@
     "smartPctEqual": 0.4140988333333333,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.551187
+    "smartPctHeldConfidence": 0.551187,
+    "smartPctOpenAsOfConfidence": 0.551187
   },
   {
     "conditionId": "0x0842399b1d5e90288b1bc17ce671e947dba095247347149f3c2749ef542556a6",
@@ -4689,7 +4936,8 @@
     "smartPctEqual": 0.29261174999999995,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.490703
+    "smartPctHeldConfidence": 0.490703,
+    "smartPctOpenAsOfConfidence": 0.490703
   },
   {
     "conditionId": "0x01e6a091de6901308e9b936debef526d0232fe1c3fab4adef3185289a34038ce",
@@ -4707,7 +4955,8 @@
     "smartPctEqual": 0.23104949999999996,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.2167389999999999
+    "smartPctHeldConfidence": 0.2167389999999999,
+    "smartPctOpenAsOfConfidence": 0.2167389999999999
   },
   {
     "conditionId": "0x6b75f56f0d4d1f8f26f51486c2a7119a8b096f555019f24ded22a600560c1c6f",
@@ -4725,7 +4974,8 @@
     "smartPctEqual": 0.40667949999999997,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.737649
+    "smartPctHeldConfidence": 0.737649,
+    "smartPctOpenAsOfConfidence": 0.737649
   },
   {
     "conditionId": "0xc49142a0a94b68377bbc3f2e7f7f53a400274e2dcd4536cfa343be55a3c1fdf8",
@@ -4743,7 +4993,8 @@
     "smartPctEqual": 0.4666890000000001,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3282104777283373
+    "smartPctHeldConfidence": 0.3282104777283373,
+    "smartPctOpenAsOfConfidence": 0.45417630390918046
   },
   {
     "conditionId": "0x173be8afaedec7e17be529389b825fa2171aa7e6dff36fc5ad26698195dd2227",
@@ -4761,7 +5012,8 @@
     "smartPctEqual": 0.4525,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.45
+    "smartPctHeldConfidence": 0.45,
+    "smartPctOpenAsOfConfidence": 0.45
   },
   {
     "conditionId": "0x6bf0cbc0938ea215ef8660f2aa37475ae8b82950edc5527185864a8d60b236fc",
@@ -4779,7 +5031,8 @@
     "smartPctEqual": 0.7605133333333334,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.7
+    "smartPctHeldConfidence": 0.7,
+    "smartPctOpenAsOfConfidence": 0.6984258533431981
   },
   {
     "conditionId": "0x46dd571d8c32bd58dcc553ae6c2a1ae8dda6d1ec69943bc0f771ea5c35132ca5",
@@ -4797,7 +5050,8 @@
     "smartPctEqual": 0.34526428571428575,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.289999
+    "smartPctHeldConfidence": 0.289999,
+    "smartPctOpenAsOfConfidence": 0.35108442893804875
   },
   {
     "conditionId": "0x35481add6852622436ba70d466479e5d4ea676c9ba8c3961917e39fd1047061d",
@@ -4815,7 +5069,8 @@
     "smartPctEqual": 0.6049254000000001,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.551682
+    "smartPctHeldConfidence": 0.551682,
+    "smartPctOpenAsOfConfidence": 0.6142894962213332
   },
   {
     "conditionId": "0xbfca16aab43bd662a6dc667c5c3605f6802c23de429ceb7a87db4add503f286a",
@@ -4833,7 +5088,8 @@
     "smartPctEqual": 0.11961530000000002,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.04621607153105497
+    "smartPctHeldConfidence": 0.04621607153105497,
+    "smartPctOpenAsOfConfidence": 0.12249155739256984
   },
   {
     "conditionId": "0xb2953e0ded8ee0d8f3b6284ac4f33a790f37c78b931c588466436e60089a6591",
@@ -4851,7 +5107,8 @@
     "smartPctEqual": 0.2848784166666667,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.173333
+    "smartPctHeldConfidence": 0.173333,
+    "smartPctOpenAsOfConfidence": 0.16506720444757808
   },
   {
     "conditionId": "0x54644fe42bf2db082bd02694ba14f6acd0b610cf0559287166933523cef6c47e",
@@ -4869,7 +5126,8 @@
     "smartPctEqual": 0.3253889285714286,
     "participantCount": 8,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.36667793890782885
+    "smartPctHeldConfidence": 0.36667793890782885,
+    "smartPctOpenAsOfConfidence": 0.5017566614533873
   },
   {
     "conditionId": "0x46c09232d356fdbe5e4e543ce1a4e90c84a6e3bd4668a24852fd25563e36b32a",
@@ -4887,7 +5145,8 @@
     "smartPctEqual": 0.6545192307692308,
     "participantCount": 10,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.2723702147221613
+    "smartPctHeldConfidence": 0.2723702147221613,
+    "smartPctOpenAsOfConfidence": 0.65
   },
   {
     "conditionId": "0xbdb17bc42314c7879e6bde4a15136a9a0f16605f6e530462b9dad774d1e63d86",
@@ -4905,7 +5164,8 @@
     "smartPctEqual": 0.05281624999999999,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.067499
+    "smartPctHeldConfidence": 0.067499,
+    "smartPctOpenAsOfConfidence": 0.067499
   },
   {
     "conditionId": "0xc5331256bff341491df0656772c4245a99a483c58eeda2faa70fa6bb8b7b0405",
@@ -4923,7 +5183,8 @@
     "smartPctEqual": 0.032850875,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.024235422750826418
+    "smartPctHeldConfidence": 0.024235422750826418,
+    "smartPctOpenAsOfConfidence": 0.024087857704622847
   },
   {
     "conditionId": "0x6c31c73a5447ef744d271098ce51594afa5a521fe367c07f7138c868703d693f",
@@ -4941,7 +5202,8 @@
     "smartPctEqual": 0.3393867894736842,
     "participantCount": 11,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.375584095469709
+    "smartPctHeldConfidence": 0.375584095469709,
+    "smartPctOpenAsOfConfidence": 0.375584095469709
   },
   {
     "conditionId": "0x3a9ef67522be6f0e4dcb97ac56e064efe6b14e54713ee2050418d311883c31ba",
@@ -4959,7 +5221,8 @@
     "smartPctEqual": 0.1604704,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.10441667294217612
+    "smartPctHeldConfidence": 0.10441667294217612,
+    "smartPctOpenAsOfConfidence": 0.1720876832933588
   },
   {
     "conditionId": "0x053f95738ace6c99e1571e0461feed7392fb646efa0d37ec775237e14152ecc6",
@@ -4977,7 +5240,8 @@
     "smartPctEqual": 0.538309875,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5651026407748977
+    "smartPctHeldConfidence": 0.5651026407748977,
+    "smartPctOpenAsOfConfidence": 0.561546765283029
   },
   {
     "conditionId": "0x15a8fb9d5342c2bbeaf738c890869a713f30b2788011d6519146840ae0811f61",
@@ -4995,7 +5259,8 @@
     "smartPctEqual": 0.49666666666666665,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.49633976293334026
+    "smartPctHeldConfidence": 0.49633976293334026,
+    "smartPctOpenAsOfConfidence": 0.49633976293334026
   },
   {
     "conditionId": "0x9562655a13bfd6179211737302289ae38a3d0e597c65ec11780a092f6c865e10",
@@ -5013,7 +5278,8 @@
     "smartPctEqual": 0.6262605,
     "participantCount": 5,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.6419451108219332
+    "smartPctHeldConfidence": 0.6419451108219332,
+    "smartPctOpenAsOfConfidence": 0.6465141016787703
   },
   {
     "conditionId": "0xb3d1d36db4cbb35a8e0cd35fd94c2709b4f4ccdb31932843af587b7e6b4c024e",
@@ -5031,7 +5297,8 @@
     "smartPctEqual": 0.7280912500000001,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.61
+    "smartPctHeldConfidence": 0.61,
+    "smartPctOpenAsOfConfidence": 0.640974036314263
   },
   {
     "conditionId": "0x6f304b711b5a19172b8af9e6cf21150abd839108a803b7853e896c3bd87f4318",
@@ -5049,7 +5316,8 @@
     "smartPctEqual": 0.43999999999999995,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.44
+    "smartPctHeldConfidence": 0.44,
+    "smartPctOpenAsOfConfidence": 0.43999999999999995
   },
   {
     "conditionId": "0xff8c930d1d882a7c0e80852535badf1fe1bf831de3f4b3606c109bc556b5e927",
@@ -5067,7 +5335,8 @@
     "smartPctEqual": 0.19333333333333333,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.1993773402696136
+    "smartPctHeldConfidence": 0.1993773402696136,
+    "smartPctOpenAsOfConfidence": 0.19888802465568237
   },
   {
     "conditionId": "0x6c5d0f491c20cb5ba6adaee566a4655f7da7a94212015fcd082fceadebb2168a",
@@ -5085,7 +5354,8 @@
     "smartPctEqual": 0.632803,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5106787225160931
+    "smartPctHeldConfidence": 0.5106787225160931,
+    "smartPctOpenAsOfConfidence": 0.5487964564129214
   },
   {
     "conditionId": "0xda9243da774d9bcd9bd73cfda75f7cffc2be99af858c69d47ecf09cc9ab7629d",
@@ -5103,7 +5373,8 @@
     "smartPctEqual": 0.8200000000000001,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.7961229445199633
+    "smartPctHeldConfidence": 0.7961229445199633,
+    "smartPctOpenAsOfConfidence": 0.7949698182457574
   },
   {
     "conditionId": "0x7b4a222d184dc38b8825e8e0336ea4fab4497fa5289f277b687d84004b4f666a",
@@ -5121,7 +5392,8 @@
     "smartPctEqual": 0.5605876000000001,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.560925321323958
+    "smartPctHeldConfidence": 0.560925321323958,
+    "smartPctOpenAsOfConfidence": 0.5610601100629826
   },
   {
     "conditionId": "0xcc02ec8059f1a6a877b29d1de039027768cb7d8989d0bb390abe2c459d2ff560",
@@ -5139,7 +5411,8 @@
     "smartPctEqual": 0.43198800000000004,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.43338350780807844
+    "smartPctHeldConfidence": 0.43338350780807844,
+    "smartPctOpenAsOfConfidence": 0.43411406862232943
   },
   {
     "conditionId": "0x0f3062f421a43ab9af2f3dc9c3eef48e2aab38a4c9858aca7651947642c4c964",
@@ -5157,7 +5430,8 @@
     "smartPctEqual": 0.5978939230769231,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.160279
+    "smartPctHeldConfidence": 0.160279,
+    "smartPctOpenAsOfConfidence": 0.160279
   },
   {
     "conditionId": "0x189c38e8bf3733572f401f8d578099f7233baef3d5fcb438b4eeb0b73bacc787",
@@ -5175,7 +5449,8 @@
     "smartPctEqual": 0.21163122222222222,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.04246712142188132
+    "smartPctHeldConfidence": 0.04246712142188132,
+    "smartPctOpenAsOfConfidence": 0.2599970166200502
   },
   {
     "conditionId": "0xa025157628d2824a12bb4b3aa8476cbe1ffebfb7d983d9fc7dfaf906381084f8",
@@ -5193,7 +5468,8 @@
     "smartPctEqual": 0.4487755,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.21451351828473147
+    "smartPctHeldConfidence": 0.21451351828473147,
+    "smartPctOpenAsOfConfidence": 0.21451351828473147
   },
   {
     "conditionId": "0x3982b6b324e34f850076855826649019133e5799ddb30479547c474947539d11",
@@ -5211,7 +5487,8 @@
     "smartPctEqual": 0.16578361538461545,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.14793316184753702
+    "smartPctHeldConfidence": 0.14793316184753702,
+    "smartPctOpenAsOfConfidence": 0.1814233230874088
   },
   {
     "conditionId": "0x4bab360a81b57047b48c0dd7c6c1377706129e3e6b9fa3f079cc28d310ec4cec",
@@ -5229,7 +5506,8 @@
     "smartPctEqual": 0.33701891666666667,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.05102799999999997
+    "smartPctHeldConfidence": 0.05102799999999997,
+    "smartPctOpenAsOfConfidence": 0.18084108557638215
   },
   {
     "conditionId": "0x2509daa236d3aea83c910be4e00f50027dd72e6fa0d350536d07cd079f58d7ab",
@@ -5247,7 +5525,8 @@
     "smartPctEqual": 0.13407975,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.10219699999999998
+    "smartPctHeldConfidence": 0.10219699999999998,
+    "smartPctOpenAsOfConfidence": 0.13669395698892553
   },
   {
     "conditionId": "0x178b29c0bb3a1c482f37f42e2420a1aa686b960ef0004e9ed07d7f46581779c9",
@@ -5265,7 +5544,8 @@
     "smartPctEqual": 0.7334525714285715,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9969999999999999
+    "smartPctHeldConfidence": 0.9969999999999999,
+    "smartPctOpenAsOfConfidence": 0.661792713437559
   },
   {
     "conditionId": "0x42973552f8bcfc9269fba8492766f2c20a22243cbba154cf695acaff88ec96c7",
@@ -5283,7 +5563,8 @@
     "smartPctEqual": 0.5379107777777778,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9971169999999999
+    "smartPctHeldConfidence": 0.9971169999999999,
+    "smartPctOpenAsOfConfidence": 0.5686618646845066
   },
   {
     "conditionId": "0x5b4be999538e689a0f20055c215e5df11df4da7a6ca7a4bcd8b913ae922d6efb",
@@ -5301,7 +5582,8 @@
     "smartPctEqual": 0.5427157272727273,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.886445
+    "smartPctHeldConfidence": 0.886445,
+    "smartPctOpenAsOfConfidence": 0.467869
   },
   {
     "conditionId": "0xa77b0fe6af6adbf62a04d4bdbf9fb7a0eac951b506dbc6b68ecf452c41ce333f",
@@ -5319,7 +5601,8 @@
     "smartPctEqual": 0.0344154,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.053771670540387825
+    "smartPctHeldConfidence": 0.053771670540387825,
+    "smartPctOpenAsOfConfidence": 0.03465432643930419
   },
   {
     "conditionId": "0x35aa9df78e99b9edbc77d1448d4548396073064f923591d8cb8cc9cf5c22e7f0",
@@ -5337,7 +5620,8 @@
     "smartPctEqual": 0.4800356666666667,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.41382061884255467
+    "smartPctHeldConfidence": 0.41382061884255467,
+    "smartPctOpenAsOfConfidence": 0.42634627221655813
   },
   {
     "conditionId": "0xe70fd51f42e61fc309d8e57019a7b76c8dc7bd19b473351d56ff1e125ae0d9d4",
@@ -5355,7 +5639,8 @@
     "smartPctEqual": 0.4633333333333333,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.53
+    "smartPctHeldConfidence": 0.53,
+    "smartPctOpenAsOfConfidence": 0.489049755490507
   },
   {
     "conditionId": "0xa17b3bd2dd411f60fe59e19a53e99dbc4ca8301b6ec43dba885a19e207b9bd38",
@@ -5373,7 +5658,8 @@
     "smartPctEqual": 0.6687236000000001,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.6654776257614434
+    "smartPctHeldConfidence": 0.6654776257614434,
+    "smartPctOpenAsOfConfidence": 0.6667893799248386
   },
   {
     "conditionId": "0xd82e290278038064d836ea912e3989fb7bae996b73d5a5e6910e3c5ac01ae136",
@@ -5391,7 +5677,8 @@
     "smartPctEqual": 0.2506752857142857,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.22999992040442765
+    "smartPctHeldConfidence": 0.22999992040442765,
+    "smartPctOpenAsOfConfidence": 0.229999
   },
   {
     "conditionId": "0xb5d74986f330add103bee7f51eda6c1182256bbcb43d189f2293cb2ab73dda21",
@@ -5409,7 +5696,8 @@
     "smartPctEqual": 0.5,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.51
+    "smartPctHeldConfidence": 0.51,
+    "smartPctOpenAsOfConfidence": 0.5076651218800493
   },
   {
     "conditionId": "0x65f5760095b3b903c895b320765ccdd4074b72750458b09fde516f6254bcec67",
@@ -5427,7 +5715,8 @@
     "smartPctEqual": 0.6479999999999999,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.96
+    "smartPctHeldConfidence": 0.96,
+    "smartPctOpenAsOfConfidence": 0.8882674368243663
   },
   {
     "conditionId": "0x7a00c50eb4e76f5bc25b38a83c029dfde5faa9268e4ade490c931a384f8d157a",
@@ -5445,7 +5734,8 @@
     "smartPctEqual": 0.09725049999999999,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.21582178547744535
+    "smartPctHeldConfidence": 0.21582178547744535,
+    "smartPctOpenAsOfConfidence": 0.10700895859587134
   },
   {
     "conditionId": "0x9586c8a756737566608c7821cbb4eccd165a02f64502e7302bf14b13063e5e86",
@@ -5463,7 +5753,8 @@
     "smartPctEqual": 0.218056,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.15725795827328956
+    "smartPctHeldConfidence": 0.15725795827328956,
+    "smartPctOpenAsOfConfidence": 0.15725795827328956
   },
   {
     "conditionId": "0xadba518e3da8a4986a9a215cdbda8b093e22e85413b2a79d6832f92d6e921a6a",
@@ -5481,7 +5772,8 @@
     "smartPctEqual": 0.19666766666666669,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.13
+    "smartPctHeldConfidence": 0.13,
+    "smartPctOpenAsOfConfidence": 0.13
   },
   {
     "conditionId": "0x4788c5625061cf39da5265dec7d29103d5c8adf774d49b1ffae9025c4563dc9a",
@@ -5499,7 +5791,8 @@
     "smartPctEqual": 0.16700720000000002,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.12216800000000005
+    "smartPctHeldConfidence": 0.12216800000000005,
+    "smartPctOpenAsOfConfidence": 0.14360173752459116
   },
   {
     "conditionId": "0x3cdf6fa07ce061ab6cdd26c7386b21d0b4c2cb3226d0a069cd8b597fdc667676",
@@ -5517,7 +5810,8 @@
     "smartPctEqual": 0.47783700000000007,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9502885117142971
+    "smartPctHeldConfidence": 0.9502885117142971,
+    "smartPctOpenAsOfConfidence": 0.27
   },
   {
     "conditionId": "0x35d8c42a467d4e485ffba50c5d2d984ed0793f4935319ca923b494798051c8ef",
@@ -5535,7 +5829,8 @@
     "smartPctEqual": 0.353519875,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.314466
+    "smartPctHeldConfidence": 0.314466,
+    "smartPctOpenAsOfConfidence": 0.1864
   },
   {
     "conditionId": "0x05ccbc3b7861349dc2fc0ce2c2bca9fd9671675171d7070abdf087ba1d7f085b",
@@ -5553,7 +5848,8 @@
     "smartPctEqual": 0.46812240000000005,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.991082
+    "smartPctHeldConfidence": 0.991082,
+    "smartPctOpenAsOfConfidence": 0.177513
   },
   {
     "conditionId": "0x4b7cd5d0a2bbdd7830376ba250f5c82a16180b2c584cf75bd949d8e842f1b5d3",
@@ -5571,7 +5867,8 @@
     "smartPctEqual": 0.735337875,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6899989999999999
+    "smartPctHeldConfidence": 0.6899989999999999,
+    "smartPctOpenAsOfConfidence": 0.7490712378608241
   },
   {
     "conditionId": "0xcccb7e7613a087c132b69cbf3a02bece3fdcb824c1da54ae79acc8d4a562d902",
@@ -5589,7 +5886,8 @@
     "smartPctEqual": 0.1601368,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.0536511603021005
+    "smartPctHeldConfidence": 0.0536511603021005,
+    "smartPctOpenAsOfConfidence": 0.09342477840463533
   },
   {
     "conditionId": "0x5487fc543cadf8ac873dd38c02ff9bb3c91e4eefed159a3acac7f1f8adbcef33",
@@ -5607,7 +5905,8 @@
     "smartPctEqual": 0.6102775,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.625555
+    "smartPctHeldConfidence": 0.625555,
+    "smartPctOpenAsOfConfidence": 0.6275449907078641
   },
   {
     "conditionId": "0x3904885b86a86a2e20b76d92e3eb91ba5e9d6cd3ed294ee759c5f638fe8ec9bb",
@@ -5625,7 +5924,8 @@
     "smartPctEqual": 0.3834756666666667,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.382205332301856
+    "smartPctHeldConfidence": 0.382205332301856,
+    "smartPctOpenAsOfConfidence": 0.4111996687516949
   },
   {
     "conditionId": "0x58078283e2356f9b9537b42e7479d7785b83bcd6f18002de8a2526c499eda837",
@@ -5643,7 +5943,8 @@
     "smartPctEqual": 0.1986498,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.01
+    "smartPctHeldConfidence": 0.01,
+    "smartPctOpenAsOfConfidence": 0.3065772716752142
   },
   {
     "conditionId": "0x9a0da0f25f94fce088c88803b296d48dd19717370dbafa97484f3ddac70ee4dc",
@@ -5661,7 +5962,8 @@
     "smartPctEqual": 0.17958955555555556,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.23777960128766376
+    "smartPctHeldConfidence": 0.23777960128766376,
+    "smartPctOpenAsOfConfidence": 0.2413588762094082
   },
   {
     "conditionId": "0xf03529a209d7dc8d9bf461a1960804d793d4a6262b94a20c36e3199bef042767",
@@ -5679,7 +5981,8 @@
     "smartPctEqual": 0.5563976,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.4689065722261042
+    "smartPctHeldConfidence": 0.4689065722261042,
+    "smartPctOpenAsOfConfidence": 0.6876688833434583
   },
   {
     "conditionId": "0x814657a16a3c5b39834864251372e30f68ddcd0f040c5c6a83a52cddb2c35226",
@@ -5697,7 +6000,8 @@
     "smartPctEqual": 0.2235395555555556,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.15819375859220905
+    "smartPctHeldConfidence": 0.15819375859220905,
+    "smartPctOpenAsOfConfidence": 0.29965600000000014
   },
   {
     "conditionId": "0x734c6c32a62f8a27035a222e45fc388d59eeffe89bb31ab26054bc29bcc3eee7",
@@ -5715,7 +6019,8 @@
     "smartPctEqual": 0.06568375,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.023380999999999996
+    "smartPctHeldConfidence": 0.023380999999999996,
+    "smartPctOpenAsOfConfidence": 0.023380999999999996
   },
   {
     "conditionId": "0xe51f231db21003948460569107975a20ed138b642b2952c4f0798da8c64d8591",
@@ -5733,7 +6038,8 @@
     "smartPctEqual": 0.154443,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.14638059836480338
+    "smartPctHeldConfidence": 0.14638059836480338,
+    "smartPctOpenAsOfConfidence": 0.14638059836480338
   },
   {
     "conditionId": "0xc783e5cf132c6b6dc677cb1172958272feb2f51ffcbfa28a69dbc69d72385efa",
@@ -5751,7 +6057,8 @@
     "smartPctEqual": 0.304325,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.41285192694575396
+    "smartPctHeldConfidence": 0.41285192694575396,
+    "smartPctOpenAsOfConfidence": 0.41285192694575396
   },
   {
     "conditionId": "0x3af18e81b4fa35ed8b18ccba4da82873fadc55473318d8cf08291baee52b2369",
@@ -5769,7 +6076,8 @@
     "smartPctEqual": 0.5815364000000001,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.38938806368844975
+    "smartPctHeldConfidence": 0.38938806368844975,
+    "smartPctOpenAsOfConfidence": 0.38938806368844975
   },
   {
     "conditionId": "0x8aed35d66a2094c1221c040489e5507065f7c38381d8874e436a0ce9ff029315",
@@ -5787,7 +6095,8 @@
     "smartPctEqual": 0.044802666666666685,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.00907
+    "smartPctHeldConfidence": 0.00907,
+    "smartPctOpenAsOfConfidence": 0.00907
   },
   {
     "conditionId": "0x2c01f20a44b5d4dd7d7e784da6dfa2da56a2dc26aa572715e20050102e88afcb",
@@ -5805,7 +6114,8 @@
     "smartPctEqual": 0.11283833333333333,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.10142899999999999
+    "smartPctHeldConfidence": 0.10142899999999999,
+    "smartPctOpenAsOfConfidence": 0.10142899999999999
   },
   {
     "conditionId": "0x4c93a2644e21bacc088f233bb4322db229d3bc1695026f066412d827001c59e6",
@@ -5823,7 +6133,8 @@
     "smartPctEqual": 0.055420857142857126,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.05207303995924052
+    "smartPctHeldConfidence": 0.05207303995924052,
+    "smartPctOpenAsOfConfidence": 0.056131988135740135
   },
   {
     "conditionId": "0x4e57f63e885b3a851c1c0c4041b39032a488a363e3dd44520a4ba78b9ddade49",
@@ -5841,7 +6152,8 @@
     "smartPctEqual": 0.068617625,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.02560231714347447
+    "smartPctHeldConfidence": 0.02560231714347447,
+    "smartPctOpenAsOfConfidence": 0.08849591132118867
   },
   {
     "conditionId": "0x3e1363efbf76899943f61797d0ffc2de5c47a716e2ec66189f45ab65b28078f9",
@@ -5859,7 +6171,8 @@
     "smartPctEqual": 0.2214924285714286,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.2780156083746855
+    "smartPctHeldConfidence": 0.2780156083746855,
+    "smartPctOpenAsOfConfidence": 0.10184
   },
   {
     "conditionId": "0xbeb0f6a30678fc03706bf563c2edbc6cb6f88877bfe77648184373c03e25e323",
@@ -5877,7 +6190,8 @@
     "smartPctEqual": 0.43614400000000003,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.835
+    "smartPctHeldConfidence": 0.835,
+    "smartPctOpenAsOfConfidence": 0.3573524853546706
   },
   {
     "conditionId": "0xbcf8a1105392d88cdd573deaa65df33e1f89fc87d250fd6f5513b60ee51f548a",
@@ -5895,7 +6209,8 @@
     "smartPctEqual": 0.52572175,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5001448755835289
+    "smartPctHeldConfidence": 0.5001448755835289,
+    "smartPctOpenAsOfConfidence": 0.5001448755835289
   },
   {
     "conditionId": "0x15fa6bf8e2106d0d39e2fb2dcf7239eb31036a672280838f8d02bc4e0286e3c1",
@@ -5913,7 +6228,8 @@
     "smartPctEqual": 0.3465113999999999,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.43
+    "smartPctHeldConfidence": 0.43,
+    "smartPctOpenAsOfConfidence": 0.326983840320128
   },
   {
     "conditionId": "0xdc6f95f94d2db24a1904537cb8cf83e0b25fa47bac926112891eef0df8fd06f2",
@@ -5931,7 +6247,8 @@
     "smartPctEqual": 0.20405949999999998,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.04719772596662518
+    "smartPctHeldConfidence": 0.04719772596662518,
+    "smartPctOpenAsOfConfidence": 0.050000000000000044
   },
   {
     "conditionId": "0x0923f4cd56ffdd032deca9984f9779303b58c6ef9317c0c6490acccb477ba150",
@@ -5949,7 +6266,8 @@
     "smartPctEqual": 0.6333878333333334,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.47278472649849523
+    "smartPctHeldConfidence": 0.47278472649849523,
+    "smartPctOpenAsOfConfidence": 0.47278472649849523
   },
   {
     "conditionId": "0x1a37b2cff571f43662ad4b3ec4963052dcff73d7754e04c042095e1c2d573c53",
@@ -5967,7 +6285,8 @@
     "smartPctEqual": 0.5221445,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5240288489147575
+    "smartPctHeldConfidence": 0.5240288489147575,
+    "smartPctOpenAsOfConfidence": 0.5236340877811427
   },
   {
     "conditionId": "0x6622b219b4b0796651304f85f279b18797edd2a818be471ecd82dd2d7d8d4ac7",
@@ -5985,7 +6304,8 @@
     "smartPctEqual": 0.27999999999999997,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.14
+    "smartPctHeldConfidence": 0.14,
+    "smartPctOpenAsOfConfidence": 0.24215706127117861
   },
   {
     "conditionId": "0x8530b96422523df2024c4242021b58da538c5e94ba525e8f9893c3fc2f469160",
@@ -6003,7 +6323,8 @@
     "smartPctEqual": 0.7220046,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.6793173145384821
+    "smartPctHeldConfidence": 0.6793173145384821,
+    "smartPctOpenAsOfConfidence": 0.6929765365038134
   },
   {
     "conditionId": "0x0fb23b9a75c931152a17dcc8f659fd401c6e911f47a0e4088d5394581be0b3bd",
@@ -6021,7 +6342,8 @@
     "smartPctEqual": 0.23639033333333334,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.28
+    "smartPctHeldConfidence": 0.28,
+    "smartPctOpenAsOfConfidence": 0.22774402172356725
   },
   {
     "conditionId": "0x9da373eeb210ca0e986b6432708202a98e6f5e65d78e9120aae0ad82eebbce77",
@@ -6039,7 +6361,8 @@
     "smartPctEqual": 0.31840440000000003,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.31680076784377764
+    "smartPctHeldConfidence": 0.31680076784377764,
+    "smartPctOpenAsOfConfidence": 0.31637821552456086
   },
   {
     "conditionId": "0x061ba73e9efc41f013fbb9547b68c8dcb29d598e70a7fd87e91684bde2c4be9c",
@@ -6057,7 +6380,8 @@
     "smartPctEqual": 0.119914,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.0871992703467871
+    "smartPctHeldConfidence": 0.0871992703467871,
+    "smartPctOpenAsOfConfidence": 0.09495191608990965
   },
   {
     "conditionId": "0x63111e350c79af92e1a56ed535541fa19b981a2b5e413b7c476dd9d473414aaa",
@@ -6075,7 +6399,8 @@
     "smartPctEqual": 0.48,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.339999
+    "smartPctHeldConfidence": 0.339999,
+    "smartPctOpenAsOfConfidence": 0.6240605485504928
   },
   {
     "conditionId": "0x8ff9faf0ff030925d920a79ab8012493c53dfc817d27e1c0ca75653258ff266d",
@@ -6093,7 +6418,8 @@
     "smartPctEqual": 0.7077431,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.85
+    "smartPctHeldConfidence": 0.85,
+    "smartPctOpenAsOfConfidence": 0.6459698859968929
   },
   {
     "conditionId": "0x006a87540dbfafe19a9d13d2622c4e01873150ff22f05a664574c469abc3dc60",
@@ -6111,7 +6437,8 @@
     "smartPctEqual": 0.7793362500000001,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.867344
+    "smartPctHeldConfidence": 0.867344,
+    "smartPctOpenAsOfConfidence": 0.7588448748928204
   },
   {
     "conditionId": "0xe62fae605b198e206617acaa2294678705b340728f1ff4f7b09c7ecd12a1eb66",
@@ -6129,7 +6456,8 @@
     "smartPctEqual": 0.39089066666666666,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.38070965389496836
+    "smartPctHeldConfidence": 0.38070965389496836,
+    "smartPctOpenAsOfConfidence": 0.3817558120461737
   },
   {
     "conditionId": "0xe754eb3cccfefec349400e3f531d4f3adc44fba4c519799ae69e9aa810cd487e",
@@ -6147,7 +6475,8 @@
     "smartPctEqual": 0.4002408333333333,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3303628743380969
+    "smartPctHeldConfidence": 0.3303628743380969,
+    "smartPctOpenAsOfConfidence": 0.37843671485247476
   },
   {
     "conditionId": "0xf8f1cb6660fb074b4fe436df7adeb3a611c8dffafc97bb7fc8feb621db4741b5",
@@ -6165,7 +6494,8 @@
     "smartPctEqual": 0.39179277777777777,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.45639167688247195
+    "smartPctHeldConfidence": 0.45639167688247195,
+    "smartPctOpenAsOfConfidence": 0.36158906748958575
   },
   {
     "conditionId": "0x250c1689f275f8123a012fef3bd87505d573c82f02de694eb968b762ec21b4d5",
@@ -6183,7 +6513,8 @@
     "smartPctEqual": 0.6414891428571429,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6548160186173058
+    "smartPctHeldConfidence": 0.6548160186173058,
+    "smartPctOpenAsOfConfidence": 0.6678104297090667
   },
   {
     "conditionId": "0x92410744b32432595f784c83740ecef014ff508e8c56c8152405c6d64880ac00",
@@ -6201,7 +6532,8 @@
     "smartPctEqual": 0.06138,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.010995312848160453
+    "smartPctHeldConfidence": 0.010995312848160453,
+    "smartPctOpenAsOfConfidence": 0.011155000000000026
   },
   {
     "conditionId": "0xb03509e2e8b492b3ff06da25ba298dd86cb94356995487405e6c98404da5d961",
@@ -6219,7 +6551,8 @@
     "smartPctEqual": 0.1446412,
     "participantCount": 7,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.07716641868454367
+    "smartPctHeldConfidence": 0.07716641868454367,
+    "smartPctOpenAsOfConfidence": 0.16293325751843682
   },
   {
     "conditionId": "0x0008c221e7c6144fc68b08c1c02772772dca41f77a25a56f3acd5688ec450d98",
@@ -6237,7 +6570,8 @@
     "smartPctEqual": 0.07516866666666669,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.006044
+    "smartPctHeldConfidence": 0.006044,
+    "smartPctOpenAsOfConfidence": 0.0520277755391837
   },
   {
     "conditionId": "0x680c54c81634efefe3758d4baec2544fe368a4d6cefe4821774a6e18b4d73ec8",
@@ -6255,7 +6589,8 @@
     "smartPctEqual": 0.10235533333333334,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.007953245033700207
+    "smartPctHeldConfidence": 0.007953245033700207,
+    "smartPctOpenAsOfConfidence": 0.05835709859190624
   },
   {
     "conditionId": "0xc8f7591181f4059ffbdcc4c85b1e9e76f029bef0eb6cc46a80bd5617b947de74",
@@ -6273,7 +6608,8 @@
     "smartPctEqual": 0.17395149999999995,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.19286620076804487
+    "smartPctHeldConfidence": 0.19286620076804487,
+    "smartPctOpenAsOfConfidence": 0.047384
   },
   {
     "conditionId": "0x575e86314d77231f25c16834b4f501221f215399a79fa6f5760b0a1eb7f1e5d3",
@@ -6291,7 +6627,8 @@
     "smartPctEqual": 0.20128738461538462,
     "participantCount": 9,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.2994804309110188
+    "smartPctHeldConfidence": 0.2994804309110188,
+    "smartPctOpenAsOfConfidence": 0.22000552646481208
   },
   {
     "conditionId": "0x269b4de59b444c57f166f690b1ce8c388bf26167c6a68f7613ab5b05e86375a8",
@@ -6309,7 +6646,8 @@
     "smartPctEqual": 0.0708406,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.03934961862271489
+    "smartPctHeldConfidence": 0.03934961862271489,
+    "smartPctOpenAsOfConfidence": 0.04323678379329006
   },
   {
     "conditionId": "0x7e73076eac0e6fc7a7efc7ff40079a2d934b6c9b6873e4d93631802717bba170",
@@ -6327,7 +6665,8 @@
     "smartPctEqual": 0.73,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.61
+    "smartPctHeldConfidence": 0.61,
+    "smartPctOpenAsOfConfidence": 0.61
   },
   {
     "conditionId": "0x4815b9206b324492a71047496aadea8eb20e39b363792a6f8e828643361f5aa6",
@@ -6345,7 +6684,8 @@
     "smartPctEqual": 0.4598236,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.7256000864691676
+    "smartPctHeldConfidence": 0.7256000864691676,
+    "smartPctOpenAsOfConfidence": 0.5373985394523279
   },
   {
     "conditionId": "0x0efcc493f7e7578cd5808b29e08c2535dee61c2a1fe841696e76e7892b29cca8",
@@ -6363,7 +6703,8 @@
     "smartPctEqual": 0.63225,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.8943727962898388
+    "smartPctHeldConfidence": 0.8943727962898388,
+    "smartPctOpenAsOfConfidence": 0.6470409502613274
   },
   {
     "conditionId": "0x3c169e95aea67be5fac1529b3ad8e891fe97ec54d1f272fab43b02cce948f6c2",
@@ -6381,7 +6722,8 @@
     "smartPctEqual": 0.1917815,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.07999999999999996
+    "smartPctHeldConfidence": 0.07999999999999996,
+    "smartPctOpenAsOfConfidence": 0.030303
   },
   {
     "conditionId": "0xc7373d242a34de5c184ffdc9707e7b179ea6aa8f8600686ca2ddecbdbec9457b",
@@ -6399,7 +6741,8 @@
     "smartPctEqual": 0.1422048,
     "participantCount": 4,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.2278657284069161
+    "smartPctHeldConfidence": 0.2278657284069161,
+    "smartPctOpenAsOfConfidence": 0.002763
   },
   {
     "conditionId": "0xb60c044bba6f7958768691345df1e102448a5b7ef16e4a08879bb10483fb4567",
@@ -6417,7 +6760,8 @@
     "smartPctEqual": 0.8269555,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.76
+    "smartPctHeldConfidence": 0.76,
+    "smartPctOpenAsOfConfidence": 0.8800000000000001
   },
   {
     "conditionId": "0xfa40932295e57674d1988b9ec901f86e0a472c26e2d7baf232a84a13100708b5",
@@ -6435,7 +6779,8 @@
     "smartPctEqual": 0.21916525000000003,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.07662500000000005
+    "smartPctHeldConfidence": 0.07662500000000005,
+    "smartPctOpenAsOfConfidence": 0.17045840972067153
   },
   {
     "conditionId": "0x61c020db75fac30d0b3ee73acb481e94d6aee3790828650aa9f0b50d43fedca5",
@@ -6453,7 +6798,8 @@
     "smartPctEqual": 0.58563475,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5799295971213037
+    "smartPctHeldConfidence": 0.5799295971213037,
+    "smartPctOpenAsOfConfidence": 0.5448345800226712
   },
   {
     "conditionId": "0x608b260059adb2315f3a649419ab8f684f0d741db319aae9c08f93fe2a268f31",
@@ -6471,7 +6817,8 @@
     "smartPctEqual": 0.30134439999999996,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.012
+    "smartPctHeldConfidence": 0.012,
+    "smartPctOpenAsOfConfidence": 0.3229308577648535
   },
   {
     "conditionId": "0x0e2e5c0146c730a2e4ef8031c9128b4efef451a9f4832f42b46997926f9e1303",
@@ -6489,7 +6836,8 @@
     "smartPctEqual": 0.345705,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.25078597295369115
+    "smartPctHeldConfidence": 0.25078597295369115,
+    "smartPctOpenAsOfConfidence": 0.2960631455152028
   },
   {
     "conditionId": "0x65f5c4e3c6853a68fb50b59054dfe4c9e5ca5b705e04ed008185648334d1931d",
@@ -6507,7 +6855,8 @@
     "smartPctEqual": 0.41028359999999997,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.21
+    "smartPctHeldConfidence": 0.21,
+    "smartPctOpenAsOfConfidence": 0.21
   },
   {
     "conditionId": "0x4d1ee0c046938319f654f99c6aca2380c1f6d88a65887dd360fda3d0509eddb4",
@@ -6525,7 +6874,8 @@
     "smartPctEqual": 0.039374400000000004,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.0352573772184034
+    "smartPctHeldConfidence": 0.0352573772184034,
+    "smartPctOpenAsOfConfidence": 0.03899161159536896
   },
   {
     "conditionId": "0xb48363f308db61eeb28aff5788cdb7f6fd03907714b27ac50e0aad17c4b08ed0",
@@ -6543,7 +6893,8 @@
     "smartPctEqual": 0.8055695,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.7980574192670752
+    "smartPctHeldConfidence": 0.7980574192670752,
+    "smartPctOpenAsOfConfidence": 0.7901914414850568
   },
   {
     "conditionId": "0xb1bdbb044eb10d751a7245adb9a9265b60d193cb79107ea3a746f4bd1b2adfba",
@@ -6561,7 +6912,8 @@
     "smartPctEqual": 0.10542333333333335,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.07877
+    "smartPctHeldConfidence": 0.07877,
+    "smartPctOpenAsOfConfidence": 0.074527
   },
   {
     "conditionId": "0x1708d08a38715edbd0ad4e1a72cddd71866dd24875046fdaeb0cc1b519b06540",
@@ -6579,7 +6931,8 @@
     "smartPctEqual": 0.7311643333333334,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9045318323691136
+    "smartPctHeldConfidence": 0.9045318323691136,
+    "smartPctOpenAsOfConfidence": 0.7329665100207734
   },
   {
     "conditionId": "0xc00920db6f5e84821a61bd31578499bbc9bd125949572b589b7a9e4b0f13bad3",
@@ -6597,7 +6950,8 @@
     "smartPctEqual": 0.7050718333333333,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6032872057523931
+    "smartPctHeldConfidence": 0.6032872057523931,
+    "smartPctOpenAsOfConfidence": 0.6533096004200816
   },
   {
     "conditionId": "0x3ceb5b631318be5000758200590efe2b308a581d6787c3e7bc050bfd8f627627",
@@ -6615,7 +6969,8 @@
     "smartPctEqual": 0.5920004000000001,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6599999999999999
+    "smartPctHeldConfidence": 0.6599999999999999,
+    "smartPctOpenAsOfConfidence": 0.6555602376186975
   },
   {
     "conditionId": "0x3f4b9f2f79e5664cacdf4afacde6c45e59a9e4abedf7b8d10bf5f07307f9566f",
@@ -6633,7 +6988,8 @@
     "smartPctEqual": 0.10035960000000002,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.1
+    "smartPctHeldConfidence": 0.1,
+    "smartPctOpenAsOfConfidence": 0.14729461080789719
   },
   {
     "conditionId": "0xd2c03593d3bca01405e8b7952138cd66bc87414caab295baf764940c83f9c93b",
@@ -6651,7 +7007,8 @@
     "smartPctEqual": 0.44999999999999996,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.43999999999999995
+    "smartPctHeldConfidence": 0.43999999999999995,
+    "smartPctOpenAsOfConfidence": 0.43999999999999995
   },
   {
     "conditionId": "0x17c1591393e9bfcaa68c89086af37ffc1b44db673c56c8bebe07480759c6038a",
@@ -6669,7 +7026,8 @@
     "smartPctEqual": 0.008588399999999986,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.008649993595722397
+    "smartPctHeldConfidence": 0.008649993595722397,
+    "smartPctOpenAsOfConfidence": 0.009015697219807899
   },
   {
     "conditionId": "0x41ba322441190c465ec75e5866c6a5a3d429cf4d1efe2682026e8dcd5dbc37db",
@@ -6687,7 +7045,8 @@
     "smartPctEqual": 0.08680944444444444,
     "participantCount": 5,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.04390217579177277
+    "smartPctHeldConfidence": 0.04390217579177277,
+    "smartPctOpenAsOfConfidence": 0.04390217579177277
   },
   {
     "conditionId": "0x1c5ecd69199f6ff69425ba9e18d8aa90bb20fb847e949bee98da149ce5888b5f",
@@ -6705,7 +7064,8 @@
     "smartPctEqual": 0.20223566666666667,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.18240129579691883
+    "smartPctHeldConfidence": 0.18240129579691883,
+    "smartPctOpenAsOfConfidence": 0.2308974255838176
   },
   {
     "conditionId": "0x3fe18d2b6303ee3a7e406aab679dbc0b0f7504dc6b477a31c69c6ffb04e9e11c",
@@ -6723,7 +7083,8 @@
     "smartPctEqual": 0.3343862857142857,
     "participantCount": 6,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.062996
+    "smartPctHeldConfidence": 0.062996,
+    "smartPctOpenAsOfConfidence": 0.062996
   },
   {
     "conditionId": "0x667c01a18ac1efb8300ce2c4d9fd573275cb633344148675beee8e097db193c4",
@@ -6741,7 +7102,8 @@
     "smartPctEqual": 0.032490666666666675,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.03511552839097272
+    "smartPctHeldConfidence": 0.03511552839097272,
+    "smartPctOpenAsOfConfidence": 0.03511552839097272
   },
   {
     "conditionId": "0xe690620297dfea974d20df84b4cf90460e46a26ec864353482717b90509a3c0b",
@@ -6759,7 +7121,8 @@
     "smartPctEqual": 0.6441827499999999,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.620001
+    "smartPctHeldConfidence": 0.620001,
+    "smartPctOpenAsOfConfidence": 0.6493232750929869
   },
   {
     "conditionId": "0xde92d563a6d742a4750c8c83a9c490ee5b02bd5d972a1765ab41c0f9095ef6c0",
@@ -6777,7 +7140,8 @@
     "smartPctEqual": 0.6439994,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.91
+    "smartPctHeldConfidence": 0.91,
+    "smartPctOpenAsOfConfidence": 0.91
   },
   {
     "conditionId": "0xb20e3b1a6dbd07c23c82efe9fa7478d7f3f4ac31084ea44fae2e03762eee4b78",
@@ -6795,7 +7159,8 @@
     "smartPctEqual": 0.602046,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6259992688166014
+    "smartPctHeldConfidence": 0.6259992688166014,
+    "smartPctOpenAsOfConfidence": 0.6232379847292472
   },
   {
     "conditionId": "0xf11bfaa30d9da174b2d93d1958ada157da7617db9b68f67f713357bb6ac877ee",
@@ -6813,7 +7178,8 @@
     "smartPctEqual": 0.3385698,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.358178
+    "smartPctHeldConfidence": 0.358178,
+    "smartPctOpenAsOfConfidence": 0.345589146326244
   },
   {
     "conditionId": "0x55fa57ffeb147d2b74df3ae48fad43f246a48aded571e398a3f18640aa41d9d4",
@@ -6831,7 +7197,8 @@
     "smartPctEqual": 0.2976437777777778,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.38
+    "smartPctHeldConfidence": 0.38,
+    "smartPctOpenAsOfConfidence": 0.3503648981183715
   },
   {
     "conditionId": "0x12d0a116a05ae3c5464fc5c9e72ff7756a8dc7c70b07397728d3cda7970565cf",
@@ -6849,7 +7216,8 @@
     "smartPctEqual": 0.2519326,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.091
+    "smartPctHeldConfidence": 0.091,
+    "smartPctOpenAsOfConfidence": 0.091
   },
   {
     "conditionId": "0x763cb705f626c9eb8886a412df31e035e5d4c85b8f2f66717f4ed783795d4a8a",
@@ -6867,7 +7235,8 @@
     "smartPctEqual": 0.2695773333333333,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.633
+    "smartPctHeldConfidence": 0.633,
+    "smartPctOpenAsOfConfidence": 0.633
   },
   {
     "conditionId": "0x5ec638191dfc672211a03dda500672f53c867fbe8cc4f31c9be67b6d33ed8079",
@@ -6885,7 +7254,8 @@
     "smartPctEqual": 0.5864166666666667,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.3590728286446058
+    "smartPctHeldConfidence": 0.3590728286446058,
+    "smartPctOpenAsOfConfidence": 0.3590728286446058
   },
   {
     "conditionId": "0x9a01f6522bb53657564b8934bd946e7cfcef0c4188f2f7311d8a00f3d042ab9f",
@@ -6903,7 +7273,8 @@
     "smartPctEqual": 0.16701116666666668,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.032
+    "smartPctHeldConfidence": 0.032,
+    "smartPctOpenAsOfConfidence": 0.032
   },
   {
     "conditionId": "0xb611b3a7173f69e412b55561ed265d849e36693c248ff620d0e981c5b3f2e325",
@@ -6921,7 +7292,8 @@
     "smartPctEqual": 0.18562416666666662,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.29035729028614893
+    "smartPctHeldConfidence": 0.29035729028614893,
+    "smartPctOpenAsOfConfidence": 0.16478484503013605
   },
   {
     "conditionId": "0xed4fa0c7a11d55f2c3bcb5e13d94d10b0dced33d7f195748990be092b70952c3",
@@ -6939,7 +7311,8 @@
     "smartPctEqual": 0.23150385714285715,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.21000000000000002
+    "smartPctHeldConfidence": 0.21000000000000002,
+    "smartPctOpenAsOfConfidence": 0.2600537200733661
   },
   {
     "conditionId": "0x83831604f88a889311dc484abc0d327d96f494bba9d41084bf1b84d8a991e97b",
@@ -6957,7 +7330,8 @@
     "smartPctEqual": 0.1285832,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.14642015238953746
+    "smartPctHeldConfidence": 0.14642015238953746,
+    "smartPctOpenAsOfConfidence": 0.13034132532153095
   },
   {
     "conditionId": "0x60c6fe27d5b273f54fe30b4003c3b2553acd5f76220d9ea289343d536d6dd9ad",
@@ -6975,7 +7349,8 @@
     "smartPctEqual": 0.11375500000000001,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.08126500000000003
+    "smartPctHeldConfidence": 0.08126500000000003,
+    "smartPctOpenAsOfConfidence": 0.08126500000000003
   },
   {
     "conditionId": "0xe72a5b90662bce568a2610aaecb5b1d4e6a8ec1286ef34850affc7d731f5b0b2",
@@ -6993,7 +7368,8 @@
     "smartPctEqual": 0.37833414285714284,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.7700009999999999
+    "smartPctHeldConfidence": 0.7700009999999999,
+    "smartPctOpenAsOfConfidence": 0.6318684032190115
   },
   {
     "conditionId": "0x9da323e862ca9e583ae67a5130c8c79960cf173e7d76165cefd4ecd7f9333b90",
@@ -7011,7 +7387,8 @@
     "smartPctEqual": 0.32123999999999997,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.5
+    "smartPctHeldConfidence": 0.5,
+    "smartPctOpenAsOfConfidence": 0.24372099999999997
   },
   {
     "conditionId": "0xd1f296e1f58f9e7f6b0eb8a4f25c4e6759528c44e30c714debc311a4b5407afb",
@@ -7029,7 +7406,8 @@
     "smartPctEqual": 0.21018700000000004,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.31153637811873364
+    "smartPctHeldConfidence": 0.31153637811873364,
+    "smartPctOpenAsOfConfidence": 0.3002129147410162
   },
   {
     "conditionId": "0xa09439b1308074b31cb2481ead54a1d369536db5d36880f7e384dee2e76f21ad",
@@ -7047,7 +7425,8 @@
     "smartPctEqual": 0.703551,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.940148
+    "smartPctHeldConfidence": 0.940148,
+    "smartPctOpenAsOfConfidence": 0.685202533584658
   },
   {
     "conditionId": "0x090297e9749a22d41c5c6d2572cc7a15b283fdce882d62b7172a1456ed68200c",
@@ -7065,7 +7444,8 @@
     "smartPctEqual": 0.5928416000000001,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.7132065301348235
+    "smartPctHeldConfidence": 0.7132065301348235,
+    "smartPctOpenAsOfConfidence": 0.6073012654322524
   },
   {
     "conditionId": "0x34a4d29cc8e7227543fd3bbe7b6b2313fac9cc3b2ae9bcace5f88bd17c990b67",
@@ -7083,7 +7463,8 @@
     "smartPctEqual": 0.5760906666666666,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.5
+    "smartPctHeldConfidence": 0.5,
+    "smartPctOpenAsOfConfidence": 0.578275
   },
   {
     "conditionId": "0x37a617cc479bc7b8a3f36e3509ae998bc4bb1e1d7e83b7b540d02e3d4c69a6a1",
@@ -7101,7 +7482,8 @@
     "smartPctEqual": 0.42138240000000005,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.42059214435358216
+    "smartPctHeldConfidence": 0.42059214435358216,
+    "smartPctOpenAsOfConfidence": 0.4202464111545161
   },
   {
     "conditionId": "0xeeef938e0a9f5a90cba923daddb79e66d353e87371b2e895964c3ca37431bf15",
@@ -7119,7 +7501,8 @@
     "smartPctEqual": 0.13762333333333335,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.1767259455155262
+    "smartPctHeldConfidence": 0.1767259455155262,
+    "smartPctOpenAsOfConfidence": 0.1767259455155262
   },
   {
     "conditionId": "0x350b4923d63cfab3b3a3cdfd8711886992431232191020aa7984def370d53497",
@@ -7137,7 +7520,8 @@
     "smartPctEqual": 0.236127625,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.239507
+    "smartPctHeldConfidence": 0.239507,
+    "smartPctOpenAsOfConfidence": 0.2486138467930131
   },
   {
     "conditionId": "0x6883cbd51b944a8dad5939e5b8a37c27bfcae3bd90701e7ebca1eb54c6d510ec",
@@ -7155,7 +7539,8 @@
     "smartPctEqual": 0.1807428,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.20913236871187552
+    "smartPctHeldConfidence": 0.20913236871187552,
+    "smartPctOpenAsOfConfidence": 0.20913236871187552
   },
   {
     "conditionId": "0xfc6260666d020a912a87d9000eff5116d2adfb8c30aba543427a4c1f1411f1a0",
@@ -7173,7 +7558,8 @@
     "smartPctEqual": 0.3712465714285714,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.286943
+    "smartPctHeldConfidence": 0.286943,
+    "smartPctOpenAsOfConfidence": 0.286943
   },
   {
     "conditionId": "0xb7dfd4e3da4055435f1db97db441391729df4a9e4b41b5f6d0212fc490eb5445",
@@ -7191,7 +7577,8 @@
     "smartPctEqual": 0.32415380000000005,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.11567336867071006
+    "smartPctHeldConfidence": 0.11567336867071006,
+    "smartPctOpenAsOfConfidence": 0.84
   },
   {
     "conditionId": "0xcb4e97d74c37863f09461162bc78c78cc274e82152e208bda3e97bc4c5aefcce",
@@ -7209,7 +7596,8 @@
     "smartPctEqual": 0.37275925000000004,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.46747510755503946
+    "smartPctHeldConfidence": 0.46747510755503946,
+    "smartPctOpenAsOfConfidence": 0.46747510755503946
   },
   {
     "conditionId": "0x976dc747774438c03e437d8f357433097eae1b932672983ba6f2a9aea79fe560",
@@ -7227,7 +7615,8 @@
     "smartPctEqual": 0.4596723333333333,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.4337264146361206
+    "smartPctHeldConfidence": 0.4337264146361206,
+    "smartPctOpenAsOfConfidence": 0.465007263858837
   },
   {
     "conditionId": "0xb20ab327dc64a405ec80a0775c5947b594581abc61d814316abc355064e16e5a",
@@ -7245,7 +7634,8 @@
     "smartPctEqual": 0.4811514,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.6999999999999998
+    "smartPctHeldConfidence": 0.6999999999999998,
+    "smartPctOpenAsOfConfidence": 0.4308246788130166
   },
   {
     "conditionId": "0xfdd4ebe45cbb144bf0ab23edc02699a091ef916e2483f67a928f78021bde09f5",
@@ -7263,7 +7653,8 @@
     "smartPctEqual": 0.39249975000000004,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.39345165395955156
+    "smartPctHeldConfidence": 0.39345165395955156,
+    "smartPctOpenAsOfConfidence": 0.3881339530271535
   },
   {
     "conditionId": "0xe86d3da939f0d5613fff5e4ff5332c93558849e238812d2a615d81c48386a790",
@@ -7281,7 +7672,8 @@
     "smartPctEqual": 0.6080004,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.6178884623419176
+    "smartPctHeldConfidence": 0.6178884623419176,
+    "smartPctOpenAsOfConfidence": 0.575647142616264
   },
   {
     "conditionId": "0x68f69b5563c4adb083c573c0876bb13f605fc9dfc2e6cfe5b1fa72f6b907cdf1",
@@ -7299,7 +7691,8 @@
     "smartPctEqual": 0.7701316,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.986343
+    "smartPctHeldConfidence": 0.986343,
+    "smartPctOpenAsOfConfidence": 0.9371367927791616
   },
   {
     "conditionId": "0x39104f7f48f4f379de4162f0cf64c24bf1ccb1f786fd7fafb3fbfb879fffedcc",
@@ -7317,7 +7710,8 @@
     "smartPctEqual": 0.07977399999999997,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.0010019999999999474
+    "smartPctHeldConfidence": 0.0010019999999999474,
+    "smartPctOpenAsOfConfidence": 0.013741356063084617
   },
   {
     "conditionId": "0x9be7bd1d7739c1924e4d2701b525d73bfa82cfecf04d2f68b762078ecb419000",
@@ -7335,7 +7729,8 @@
     "smartPctEqual": 0.49002349999999995,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.2559689682682694
+    "smartPctHeldConfidence": 0.2559689682682694,
+    "smartPctOpenAsOfConfidence": 0.4668520404355891
   },
   {
     "conditionId": "0x9395aaf4ddcdebb5b09d58d115a1dd9a3aa1fc655872727912096f93ac6095bc",
@@ -7353,7 +7748,8 @@
     "smartPctEqual": 0.5944224444444444,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.653525
+    "smartPctHeldConfidence": 0.653525,
+    "smartPctOpenAsOfConfidence": 0.64633121287728
   },
   {
     "conditionId": "0x54df2e7ec11670cc3586dbdfd7418e3f21ab0a69a154db12eec1c9a2ac95c7c0",
@@ -7371,7 +7767,8 @@
     "smartPctEqual": 0.3825826,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.43089200000000005
+    "smartPctHeldConfidence": 0.43089200000000005,
+    "smartPctOpenAsOfConfidence": 0.4199697808433589
   },
   {
     "conditionId": "0x5df1e62c95102940e53d5e10a1c82d1d95e2566ad6738444f39987ddc487b443",
@@ -7389,7 +7786,8 @@
     "smartPctEqual": 0.3773648,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.471171
+    "smartPctHeldConfidence": 0.471171,
+    "smartPctOpenAsOfConfidence": 0.46955465936774665
   },
   {
     "conditionId": "0x301a96f26fe716feb3c66d8997455bacbec5f6eadfc8c10906a4f091e28f72b5",
@@ -7407,7 +7805,8 @@
     "smartPctEqual": 0.6645417777777778,
     "participantCount": 4,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5029254907682852
+    "smartPctHeldConfidence": 0.5029254907682852,
+    "smartPctOpenAsOfConfidence": 0.5164795483351304
   },
   {
     "conditionId": "0x3ed92a5a51371e8ba5882ae743ccf90460c8860fdd862a9389e249d0a2b9f055",
@@ -7425,7 +7824,8 @@
     "smartPctEqual": 0.19476766666666667,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.038001
+    "smartPctHeldConfidence": 0.038001,
+    "smartPctOpenAsOfConfidence": 0.038001
   },
   {
     "conditionId": "0x9a134104b159462c2797a86260732eb541395daf1d4d76ff1d54a88123ea56e1",
@@ -7443,7 +7843,8 @@
     "smartPctEqual": 0.9587862000000001,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.9433922278516347
+    "smartPctHeldConfidence": 0.9433922278516347,
+    "smartPctOpenAsOfConfidence": 0.974334
   },
   {
     "conditionId": "0x92f5fa7a45fd635632fcf60b1606c4a3b2aad2a89b0538dceac1ff4b05ec6278",
@@ -7461,7 +7862,8 @@
     "smartPctEqual": 0.62,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.7355856466110811
+    "smartPctHeldConfidence": 0.7355856466110811,
+    "smartPctOpenAsOfConfidence": 0.7355856466110811
   },
   {
     "conditionId": "0xa75053ffa630e41fdc08a0885fe0614716ecb13061ac460914bfe498038d5364",
@@ -7479,7 +7881,8 @@
     "smartPctEqual": 0.5799996000000001,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.5800000000000001
+    "smartPctHeldConfidence": 0.5800000000000001,
+    "smartPctOpenAsOfConfidence": 0.5800000000000001
   },
   {
     "conditionId": "0xb8d9b5dcd93400871e765b3e72b1c500e793686345a2ea4f138e41b9cb6b12c0",
@@ -7497,7 +7900,8 @@
     "smartPctEqual": 0.17766666666666664,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.13
+    "smartPctHeldConfidence": 0.13,
+    "smartPctOpenAsOfConfidence": 0.20922490523232323
   },
   {
     "conditionId": "0x9de11706e7f6d31eddc745b50cb521c1536ae59d123419dd87e11421e3f5d208",
@@ -7515,7 +7919,8 @@
     "smartPctEqual": 0.40300024999999995,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.33799999999999997
+    "smartPctHeldConfidence": 0.33799999999999997,
+    "smartPctOpenAsOfConfidence": 0.406043889524068
   },
   {
     "conditionId": "0x46e99bb62eda23f2d65b8d789910e54e205c14b16b59939d51b01a55f63e7c38",
@@ -7533,7 +7938,8 @@
     "smartPctEqual": 0.2987026666666667,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.2818396760563197
+    "smartPctHeldConfidence": 0.2818396760563197,
+    "smartPctOpenAsOfConfidence": 0.2945650316583073
   },
   {
     "conditionId": "0x91843992ae831666114ea66ff8cc850eb669ca10e098315453a4667a236f6fb0",
@@ -7551,7 +7957,8 @@
     "smartPctEqual": 0.2736564,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.373704714495487
+    "smartPctHeldConfidence": 0.373704714495487,
+    "smartPctOpenAsOfConfidence": 0.4153678626204084
   },
   {
     "conditionId": "0x688954ad8e279cc5febef6739d4f87acd3e42ca768ac6a8b621386a8578532ed",
@@ -7569,7 +7976,8 @@
     "smartPctEqual": 0.46799940000000007,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.47999899999999995
+    "smartPctHeldConfidence": 0.47999899999999995,
+    "smartPctOpenAsOfConfidence": 0.47999899999999995
   },
   {
     "conditionId": "0xf224cac9c315d3693bbcbd8406460b8052ecc40df364f7e2bc6079c072cfe219",
@@ -7587,7 +7995,8 @@
     "smartPctEqual": 0.6974992499999999,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.64
+    "smartPctHeldConfidence": 0.64,
+    "smartPctOpenAsOfConfidence": 0.6796362946340209
   },
   {
     "conditionId": "0x9814196ae917e1c962ce23612be50554586828a996b06c800d502a137001bc25",
@@ -7605,7 +8014,8 @@
     "smartPctEqual": 0.6031747999999999,
     "participantCount": 3,
     "isUnanimous": true,
-    "smartPctHeldConfidence": 0.4126270536512105
+    "smartPctHeldConfidence": 0.4126270536512105,
+    "smartPctOpenAsOfConfidence": 0.4126270536512105
   },
   {
     "conditionId": "0x4c88e7dabe1f1f37661d7b92151276f033a29fa520b007c8099df47e1a4729d5",
@@ -7623,7 +8033,8 @@
     "smartPctEqual": 0.5959986,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.749994
+    "smartPctHeldConfidence": 0.749994,
+    "smartPctOpenAsOfConfidence": 0.749994
   },
   {
     "conditionId": "0x5ccfe1b69a582d2985db08a8481a0d74c314b1fce9b4711ae2efb2c6467fe6aa",
@@ -7641,6 +8052,7 @@
     "smartPctEqual": 0.013603400000000015,
     "participantCount": 3,
     "isUnanimous": false,
-    "smartPctHeldConfidence": 0.011309434902181715
+    "smartPctHeldConfidence": 0.011309434902181715,
+    "smartPctOpenAsOfConfidence": 0.011359616278510997
   }
 ]

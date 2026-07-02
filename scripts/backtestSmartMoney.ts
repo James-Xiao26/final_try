@@ -141,6 +141,21 @@
 // v7's confidence multiplier on top of an already-resolution-filtered subset adds size-driven noise
 // rather than signal. Not shipped (and v8 itself remains unshipped per the v9 finding that its effect
 // is retrospective-only).
+//
+// v13: EXPERIMENTAL, the correction to v12 — v8 is retrospective-only (see the v9 header note: it
+// requires knowing the position was never sold across the ENTIRE unknown future between the bet and
+// resolution, information no live system has), so a v7+v8 combination inherits that same hindsight
+// leak and its Brier score isn't trustworthy as a preview of anything shippable. v13 combines v7's
+// confidence multiplier with v9's filter instead — v9 only requires a single already-defined-checkpoint
+// snapshot fact (was the position open, not yet closed, at resolutionMs - OPEN_AS_OF_LEAD_DAYS), which
+// a live system genuinely could observe by looking at currently-open positions on any given day. Same
+// structure as v12: reported against locked v1, v7 alone, and v9 alone, all on the same entries.
+// RESULT: negative, and decisively so. n=217 same-entries comparison: locked v1 0.1178, v7 alone
+// 0.1151, v9 alone 0.1306 (already worse than v1 on its own, consistent with v9's original finding),
+// v13 combined 0.1367 — worse than everything, including v9 alone. Confirms v12's headline number was
+// an artifact of v8's hindsight leak: once the honest, live-plausible filter is substituted in, the
+// entire "held/open-as-of x confidence" line of weighting is a dead end, not just an unproven one. Not
+// shipped.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -213,6 +228,7 @@ interface HistoryEntry {
   participantCount?: number; // EXPERIMENTAL (v10b) — not locked, may be absent on older entries
   isUnanimous?: boolean; // EXPERIMENTAL (v11) — not locked, may be absent on older entries
   smartPctHeldConfidence?: number; // EXPERIMENTAL (v12) — not locked, may be absent on older entries
+  smartPctOpenAsOfConfidence?: number; // EXPERIMENTAL (v13) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -444,6 +460,7 @@ async function main(): Promise<void> {
     participantCount: number; // EXPERIMENTAL (v10b) — distinct positioned wallets; markets can be as few as MIN_PARTICIPANTS_LOOSE now
     isUnanimous: boolean; // EXPERIMENTAL (v11) — every non-dust position in the market is on the same outcome_index
     smartPctHeldConfidence: number; // EXPERIMENTAL (v12) — v8's held-to-resolution filter + v7's confidence multiplier, combined
+    smartPctOpenAsOfConfidence: number; // EXPERIMENTAL (v13) — v9's open-as-of filter + v7's confidence multiplier, combined
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -513,6 +530,8 @@ async function main(): Promise<void> {
     let heldConfidenceWeighted = 0;
     let openAsOfWeight = 0;
     let openAsOfWeighted = 0;
+    let openAsOfConfidenceWeight = 0;
+    let openAsOfConfidenceWeighted = 0;
     let equalWeight = 0;
     let equalWeighted = 0;
     let dateWeight = 0;
@@ -552,6 +571,10 @@ async function main(): Promise<void> {
       if (Number.isFinite(openAsOfReferenceMs) && isOpenAsOf(row, openAsOfReferenceMs)) {
         openAsOfWeight += w;
         openAsOfWeighted += w * yesEq;
+        // EXPERIMENTAL (v13): v9's live-plausible open-as-of filter + v7's confidence multiplier,
+        // combined — the honest counterpart to v12 (v8 is retrospective-only, see header note).
+        openAsOfConfidenceWeight += wConfidence;
+        openAsOfConfidenceWeighted += wConfidence * yesEq;
       }
       // EXPERIMENTAL (v10a): no skill lookup — every wallet is worth 1, bumped to
       // EQUAL_WEIGHT_BOOST only when this bet is bigger than that wallet's own dust-floored average.
@@ -587,6 +610,7 @@ async function main(): Promise<void> {
       participantCount: distinctWallets.size,
       isUnanimous,
       smartPctHeldConfidence: heldConfidenceWeight > 0 ? heldConfidenceWeighted / heldConfidenceWeight : smartWeighted / smartWeight,
+      smartPctOpenAsOfConfidence: openAsOfConfidenceWeight > 0 ? openAsOfConfidenceWeighted / openAsOfConfidenceWeight : smartWeighted / smartWeight,
       actual,
       daysEarly,
       refEntryMs
@@ -746,13 +770,14 @@ async function main(): Promise<void> {
       smartPctEqual: s.smartPctEqual,
       participantCount: s.participantCount,
       isUnanimous: s.isUnanimous,
-      smartPctHeldConfidence: s.smartPctHeldConfidence
+      smartPctHeldConfidence: s.smartPctHeldConfidence,
+      smartPctOpenAsOfConfidence: s.smartPctOpenAsOfConfidence
     });
   }
   saveHistory(history);
   console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
 
-  // EXPERIMENTAL (v6-v12) backfill: existing entries never got these fields (they didn't exist
+  // EXPERIMENTAL (v6-v13) backfill: existing entries never got these fields (they didn't exist
   // yet). None touch any locked field, so it's safe to add retroactively for any entry whose
   // underlying market is still represented in this run's samples (older ones may have aged out of
   // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
@@ -793,6 +818,10 @@ async function main(): Promise<void> {
     }
     if (entry.smartPctHeldConfidence === undefined) {
       entry.smartPctHeldConfidence = sample.smartPctHeldConfidence;
+      changed = true;
+    }
+    if (entry.smartPctOpenAsOfConfidence === undefined) {
+      entry.smartPctOpenAsOfConfidence = sample.smartPctOpenAsOfConfidence;
       changed = true;
     }
     if (changed) backfilled += 1;
@@ -1151,6 +1180,50 @@ async function main(): Promise<void> {
     for (const minGap of GAP_THRESHOLDS) {
       const trades = withHeldConfidence
         .map((s) => ({ ...s, gapCombined: s.smartPctHeldConfidence! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapCombined) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapCombined >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  // ── EXPERIMENTAL (v13): v7 + v9 combined — the live-plausible counterpart to v12, since v9 (unlike
+  // v8) only relies on a snapshot fact a real system could observe (open-as-of a fixed pre-resolution
+  // checkpoint), not full-future hindsight. Compared against locked v1, v7 alone, and v9 alone. ──
+  const withOpenAsOfConfidence = currentVersionAll.filter(
+    (s) => s.smartPctOpenAsOfConfidence !== undefined && s.smartPctConfidence !== undefined && s.smartPctOpenAsOf !== undefined
+  );
+  console.log(`\nEXPERIMENTAL: v7+v9 combined (live-plausible open-as-of filter, confidence-multiplied weight), n=${withOpenAsOfConfidence.length}:`);
+  if (withOpenAsOfConfidence.length === 0) {
+    console.log("  No entries have smartPctOpenAsOfConfidence yet.");
+  } else {
+    const v1BrierSub = mean(withOpenAsOfConfidence.map((s) => brier(s.smartPct, s.actual)));
+    const v7BrierSub = mean(withOpenAsOfConfidence.map((s) => brier(s.smartPctConfidence!, s.actual)));
+    const v9BrierSub = mean(withOpenAsOfConfidence.map((s) => brier(s.smartPctOpenAsOf!, s.actual)));
+    const combinedBrier = mean(withOpenAsOfConfidence.map((s) => brier(s.smartPctOpenAsOfConfidence!, s.actual)));
+    console.log(`  locked v1 Brier (same ${withOpenAsOfConfidence.length} entries): ${v1BrierSub.toFixed(4)}`);
+    console.log(`  v7 alone (confidence-weighted):        ${v7BrierSub.toFixed(4)}`);
+    console.log(`  v9 alone (open-as-of, live-plausible):  ${v9BrierSub.toFixed(4)}`);
+    console.log(`  v13 combined (v7+v9):                   ${combinedBrier.toFixed(4)}`);
+    console.log(
+      combinedBrier < Math.min(v1BrierSub, v7BrierSub, v9BrierSub)
+        ? "  -> v13 beats locked v1, v7 alone, AND v9 alone — this is the one worth taking seriously."
+        : combinedBrier < v1BrierSub
+          ? "  -> v13 beats locked v1 but not every individual component — mixed result."
+          : "  -> v13 does NOT beat locked v1 — not worth shipping."
+    );
+
+    console.log("\n  Simulated return per $1 staked using the combined tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withOpenAsOfConfidence
+        .map((s) => ({ ...s, gapCombined: s.smartPctOpenAsOfConfidence! - s.livePriceAtEntry }))
         .filter((s) => Math.abs(s.gapCombined) >= minGap);
       if (trades.length === 0) {
         console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
