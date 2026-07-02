@@ -57,6 +57,17 @@
 // base formula dampens raw cost (one outlier bet shouldn't run away with the number). Their average
 // is computed from their own dust-floored closed positions across the whole dataset, not just this
 // market.
+//
+// v8: EXPERIMENTAL, isolated from v6/v7. The locked v1 formula weights every non-dust position the
+// same regardless of whether the wallet held it to resolution or sold out early — it only uses
+// held-vs-sold to figure out what actually happened (the outcome vote), never to decide who should
+// count toward the signal. That means a wallet who bought in, then changed their mind and exited,
+// still has their original (abandoned) belief counted at full weight. v8 restricts the weighted
+// average to positions the wallet actually held to a confirmed resolution (same >=97%/<=3% exitValue
+// test the outcome vote already uses) — the closed-position analogue of what the live panel already
+// does implicitly, since wallet_positions only ever contains currently-open positions. The 5-
+// participant qualifying gate is left untouched (same 225-market population as v1/v6/v7, for a fair
+// comparison) — only which positions feed the weighted average changes.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -110,6 +121,7 @@ interface HistoryEntry {
   methodologyVersion: string;
   smartPctSpecialty?: number; // EXPERIMENTAL (v6) — not locked, may be absent on older entries
   smartPctConfidence?: number; // EXPERIMENTAL (v7) — not locked, may be absent on older entries
+  smartPctHeld?: number; // EXPERIMENTAL (v8) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -181,6 +193,13 @@ async function fetchSpecialtyByAddress(): Promise<Map<string, string>> {
 function exitValue(row: ClosedRow): number | null {
   if (row.size === null || row.size <= 0 || row.realized_pnl === null || row.avg_price === null) return null;
   return row.avg_price + row.realized_pnl / row.size;
+}
+
+// EXPERIMENTAL (v8): did this specific position get held all the way to a confirmed resolution,
+// rather than sold early? Same >=97%/<=3% test the outcome vote already uses.
+function isHeldToResolution(row: ClosedRow): boolean {
+  const ev = exitValue(row);
+  return ev !== null && (ev >= 1 - RESOLVE_EPSILON || ev <= RESOLVE_EPSILON);
 }
 
 function cost(row: ClosedRow): number {
@@ -318,6 +337,7 @@ async function main(): Promise<void> {
     dollarPct: number;
     smartPctSpecialty: number; // EXPERIMENTAL (v6) — equals smartPct when no positioned wallet has a specialty match
     smartPctConfidence: number; // EXPERIMENTAL (v7) — equals smartPct when no bet exceeds its wallet's own average
+    smartPctHeld: number; // EXPERIMENTAL (v8) — only positions held to confirmed resolution, excludes early sells
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -371,6 +391,8 @@ async function main(): Promise<void> {
     let specialtyWeighted = 0;
     let confidenceWeight = 0;
     let confidenceWeighted = 0;
+    let heldWeight = 0;
+    let heldWeighted = 0;
     let dateWeight = 0;
     let dateWeighted = 0; // sum(weight * entry epoch ms) -> weighted-average entry date
     for (const row of positioned) {
@@ -393,6 +415,12 @@ async function main(): Promise<void> {
       const wConfidence = w * confidenceMultiplier;
       confidenceWeight += wConfidence;
       confidenceWeighted += wConfidence * yesEq;
+      // EXPERIMENTAL (v8): only positions actually held to a confirmed resolution count — a wallet
+      // who bought in and later sold out doesn't get their (possibly-abandoned) entry counted.
+      if (isHeldToResolution(row)) {
+        heldWeight += w;
+        heldWeighted += w * yesEq;
+      }
       const entryMs = row.first_traded_at ? Date.parse(row.first_traded_at) : NaN;
       if (Number.isFinite(entryMs)) {
         dateWeight += w;
@@ -416,6 +444,7 @@ async function main(): Promise<void> {
       dollarPct: dollarWeighted / dollarWeight,
       smartPctSpecialty: specialtyWeight > 0 ? specialtyWeighted / specialtyWeight : smartWeighted / smartWeight,
       smartPctConfidence: confidenceWeight > 0 ? confidenceWeighted / confidenceWeight : smartWeighted / smartWeight,
+      smartPctHeld: heldWeight > 0 ? heldWeighted / heldWeight : smartWeighted / smartWeight,
       actual,
       daysEarly,
       refEntryMs
@@ -562,15 +591,16 @@ async function main(): Promise<void> {
       recordedAt: now,
       methodologyVersion: METHODOLOGY_VERSION,
       smartPctSpecialty: s.smartPctSpecialty,
-      smartPctConfidence: s.smartPctConfidence
+      smartPctConfidence: s.smartPctConfidence,
+      smartPctHeld: s.smartPctHeld
     });
   }
   saveHistory(history);
   console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
 
-  // EXPERIMENTAL (v6/v7) backfill: existing entries never got these fields (they didn't exist yet).
-  // Neither touches any locked field, so it's safe to add retroactively for any entry whose underlying
-  // market is still represented in this run's samples (older ones may have aged out of
+  // EXPERIMENTAL (v6/v7/v8) backfill: existing entries never got these fields (they didn't exist
+  // yet). None touch any locked field, so it's safe to add retroactively for any entry whose
+  // underlying market is still represented in this run's samples (older ones may have aged out of
   // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
   // simply excluded from the experimental comparisons below until/unless re-derivable).
   const samplesByCondition = new Map(samples.map((s) => [s.conditionId, s]));
@@ -585,6 +615,10 @@ async function main(): Promise<void> {
     }
     if (entry.smartPctConfidence === undefined) {
       entry.smartPctConfidence = sample.smartPctConfidence;
+      changed = true;
+    }
+    if (entry.smartPctHeld === undefined) {
+      entry.smartPctHeld = sample.smartPctHeld;
       changed = true;
     }
     if (changed) backfilled += 1;
@@ -706,6 +740,41 @@ async function main(): Promise<void> {
         continue;
       }
       const profits = trades.map((s) => (s.gapConfidence >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  // ── EXPERIMENTAL (v8): held-to-resolution-only weighted (excludes early sells from the weighted
+  // average, not just from the outcome vote), compared head-to-head against locked v1. ──
+  const withHeld = currentVersionAll.filter((s) => s.smartPctHeld !== undefined);
+  console.log(`\nEXPERIMENTAL: held-to-resolution-only weighted (early sells excluded from the average), n=${withHeld.length}:`);
+  if (withHeld.length === 0) {
+    console.log("  No entries have smartPctHeld yet.");
+  } else {
+    const v1BrierSub = mean(withHeld.map((s) => brier(s.smartPct, s.actual)));
+    const heldBrier = mean(withHeld.map((s) => brier(s.smartPctHeld!, s.actual)));
+    console.log(`  locked v1 Brier (same ${withHeld.length} entries): ${v1BrierSub.toFixed(4)}`);
+    console.log(`  held-only Brier:                            ${heldBrier.toFixed(4)}`);
+    console.log(
+      heldBrier < v1BrierSub
+        ? "  -> excluding early sells improves on locked v1 on this sample."
+        : "  -> excluding early sells does NOT improve on locked v1 on this sample — not worth shipping as-is."
+    );
+
+    console.log("\n  Simulated return per $1 staked using the held-only tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withHeld
+        .map((s) => ({ ...s, gapHeld: s.smartPctHeld! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapHeld) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapHeld >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
       const avgProfit = mean(profits);
       const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
       console.log(
