@@ -198,6 +198,45 @@
 // EITHER weighting (agreement among more traders is real signal, regardless of how you weight within a
 // market). Skill-weighting may be adding noise relative to simply following dollar volume — worth a
 // closer look before touching production, but not acted on yet.
+// Follow-up diagnostic (not a numbered version, no code artifact): is v1 losing to dollarPct because a
+// few noisy high-skill wallets dominate individual markets? Recomputed the 5+ population's weight
+// concentration ad hoc — the opposite is true. Skill-weighting is CLOSEST to dollar-weighting (gap
+// ~0) when one wallet dominates a market's weight, and WORST (gap ~0.02) when weight is spread across
+// many wallets — i.e. skill-weighting underperforms exactly where it gets to do its job (differentiate
+// several disagreeing wallets by quality), not because of whale distortion. One wallet
+// (0x3c593aeb73ebdadbc9ce76d4264a6a2af4011766, skill 7.57) stood out with a 0.057 Brier gap across its
+// 10 dominated markets — flagged for a future look, not investigated further here.
+//
+// v16: EXPERIMENTAL, isolated — same locked v1 formula (skill*sqrt(cost)), but with DUST_FLOOR_USD
+// (10) removed entirely: every position counts, no matter how small, both toward who qualifies as a
+// "participant" and toward the weighted average itself. sqrt(cost) already heavily dampens a tiny
+// position's WEIGHT once included, so the main effect this tests is on the qualifying-market gate — a
+// market with several genuine bettors plus a handful of sub-$10 dust positions previously either
+// wasn't reached (if dust-only wallets pushed it to 5+ raw participants but <5 real ones) or had those
+// dust wallets silently excluded from both the count and the average. Reports a genuinely separate
+// population (participantCountNoDust >= MIN_PARTICIPANTS) side by side with locked v1's population,
+// since the two aren't guaranteed identical. Scoping note: the outer per-condition walk floor
+// (MIN_PARTICIPANTS_FLOOR) is still defined on the DUST-FLOORED participant count, so a market with
+// zero non-dust positions at all is never visited in the first place — deliberate, since walking every
+// market with even one cent of activity would balloon the live-price-fetch backlog far past v15's
+// already-large 1+ tier for markets that are unlikely to carry real signal anyway.
+// RESULT: negative. Locked v1 ($10 floor, n=226) Brier 0.1168 vs. no-dust-floor (n=223) Brier 0.1300 —
+// worse. The $10 floor is filtering real noise, not discarding real signal; confirms it's doing useful
+// work as configured. Not shipped (no change needed — this is the status quo staying correct).
+//
+// v17: EXPERIMENTAL, isolated — same locked v1 population (5+, $10 dust floor), but weight = skill*cost
+// (linear) instead of skill*sqrt(cost). Tests whether the sqrt dampening is earning its place or just
+// throwing away real conviction signal. Reported three-way against locked v1 (sqrt) and dollarPct (no
+// skill, also linear in cost) on the exact same entries — brackets the whole size-scaling design space:
+// no size scaling (equal-weight, v10a, already tested), sqrt (locked v1), and linear (v17) alongside
+// dollar-only linear-with-no-skill (dollarPct).
+// RESULT: negative, and forms a clean monotonic pattern with dollarPct and locked v1 on the same n=217
+// entries: dollarPct (no skill) 0.1128 < locked v1 (sqrt) 0.1178 < v17 (linear) 0.1244. The MORE
+// influence skill_score is given over the weighting, the WORSE the prediction gets — not just "dollar
+// happens to edge out v1," but a graded effect across the whole size-scaling spectrum. The sqrt
+// dampening is actively protective, not an arbitrary knob costing real signal; going further toward
+// dollar-only keeps helping. Not shipped, but this materially sharpens the v15 finding — worth
+// prioritizing over other open threads if this line of investigation continues.
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -289,6 +328,9 @@ interface HistoryEntry {
   smartPctOpenAsOfConfidence?: number; // EXPERIMENTAL (v13) — not locked, may be absent on older entries
   smartPctConviction?: number; // EXPERIMENTAL (v14) — not locked, may be absent on older entries
   dollarPct?: number; // EXPERIMENTAL (v15a) — not locked, may be absent on older entries
+  smartPctNoDust?: number; // EXPERIMENTAL (v16) — not locked, may be absent on older entries
+  participantCountNoDust?: number; // EXPERIMENTAL (v16) — not locked, may be absent on older entries
+  smartPctLinear?: number; // EXPERIMENTAL (v17) — not locked, may be absent on older entries
 }
 
 function loadHistory(): Map<string, HistoryEntry> {
@@ -579,6 +621,9 @@ async function main(): Promise<void> {
     smartPctHeldConfidence: number; // EXPERIMENTAL (v12) — v8's held-to-resolution filter + v7's confidence multiplier, combined
     smartPctOpenAsOfConfidence: number; // EXPERIMENTAL (v13) — v9's open-as-of filter + v7's confidence multiplier, combined
     smartPctConviction: number; // EXPERIMENTAL (v14) — v1 base weight x wavering-conviction multiplier
+    smartPctNoDust: number; // EXPERIMENTAL (v16) — locked v1 formula with DUST_FLOOR_USD removed entirely
+    participantCountNoDust: number; // EXPERIMENTAL (v16) — distinct wallets with ANY nonzero position, no dust floor
+    smartPctLinear: number; // EXPERIMENTAL (v17) — skill*cost (no sqrt dampening), same population as locked v1
     actual: number; // 1 = YES won, 0 = NO won
     daysEarly: number | null; // resolution date minus smart money's weighted entry date
     refEntryMs: number | null; // smart money's weighted entry date, as epoch ms (for the price-history lookup)
@@ -622,6 +667,12 @@ async function main(): Promise<void> {
     const distinctWallets = new Set(positioned.map((r) => r.address));
     if (distinctWallets.size < MIN_PARTICIPANTS_FLOOR) continue;
 
+    // EXPERIMENTAL (v16): every position with a nonzero cost, no $10 floor at all — the loop below
+    // iterates this instead of `positioned` and re-applies the dust floor per-row for every OTHER
+    // (locked + experimental) formula, so v16 is the only one that sees the dust-floor-excluded rows.
+    const allPositioned = rows.filter((r) => cost(r) > 0);
+    const allDistinctWallets = new Set(allPositioned.map((r) => r.address));
+
     // EXPERIMENTAL (v11): every non-dust position (across every wallet) on the same outcome_index —
     // no leaderboard money at all took the other side.
     const isUnanimous = new Set(positioned.map((r) => r.outcome_index)).size === 1;
@@ -655,17 +706,32 @@ async function main(): Promise<void> {
     let equalWeighted = 0;
     let convictionWeight = 0;
     let convictionWeighted = 0;
+    let noDustWeight = 0;
+    let noDustWeighted = 0;
+    let linearWeight = 0;
+    let linearWeighted = 0;
     let dateWeight = 0;
     let dateWeighted = 0; // sum(weight * entry epoch ms) -> weighted-average entry date
-    for (const row of positioned) {
+    for (const row of allPositioned) {
       const c = cost(row);
       const yesEq = yesEquivalentEntry(row);
       const skill = Math.max(0, skillByAddress.get(row.address) ?? 0);
       const w = skill * Math.sqrt(c);
+
+      // EXPERIMENTAL (v16): unconditional — sees every nonzero position, dust or not.
+      noDustWeight += w;
+      noDustWeighted += w * yesEq;
+
+      if (c < DUST_FLOOR_USD) continue; // dust floor gate for every formula below (identical to the old `positioned`-only loop)
+
       smartWeight += w;
       smartWeighted += w * yesEq;
       dollarWeight += c;
       dollarWeighted += c * yesEq;
+      // EXPERIMENTAL (v17): linear in cost, no sqrt dampening — same dust-floored population as locked v1.
+      const wLinear = skill * c;
+      linearWeight += wLinear;
+      linearWeighted += wLinear * yesEq;
       const isSpecialtyMatch = marketCategory !== null && specialtyByAddress.get(row.address) === marketCategory;
       const wSpecialty = isSpecialtyMatch ? w * SPECIALTY_BOOST : w;
       specialtyWeight += wSpecialty;
@@ -741,6 +807,9 @@ async function main(): Promise<void> {
       smartPctHeldConfidence: heldConfidenceWeight > 0 ? heldConfidenceWeighted / heldConfidenceWeight : smartWeighted / smartWeight,
       smartPctOpenAsOfConfidence: openAsOfConfidenceWeight > 0 ? openAsOfConfidenceWeighted / openAsOfConfidenceWeight : smartWeighted / smartWeight,
       smartPctConviction: convictionWeight > 0 ? convictionWeighted / convictionWeight : smartWeighted / smartWeight,
+      smartPctNoDust: noDustWeight > 0 ? noDustWeighted / noDustWeight : smartWeighted / smartWeight,
+      participantCountNoDust: allDistinctWallets.size,
+      smartPctLinear: linearWeight > 0 ? linearWeighted / linearWeight : smartWeighted / smartWeight,
       actual,
       daysEarly,
       refEntryMs
@@ -878,7 +947,10 @@ async function main(): Promise<void> {
       smartPctHeldConfidence: s.smartPctHeldConfidence,
       smartPctOpenAsOfConfidence: s.smartPctOpenAsOfConfidence,
       smartPctConviction: s.smartPctConviction,
-      dollarPct: s.dollarPct
+      dollarPct: s.dollarPct,
+      smartPctNoDust: s.smartPctNoDust,
+      participantCountNoDust: s.participantCountNoDust,
+      smartPctLinear: s.smartPctLinear
     });
   }
   for (const s of matched) recordMatch(s);
@@ -915,7 +987,7 @@ async function main(): Promise<void> {
   saveHistory(history);
   console.log(`${history.size - before} new markets added to ${HISTORY_FILE} (${history.size} total recorded)`);
 
-  // EXPERIMENTAL (v6-v15) backfill: existing entries never got these fields (they didn't exist
+  // EXPERIMENTAL (v6-v17) backfill: existing entries never got these fields (they didn't exist
   // yet). None touch any locked field, so it's safe to add retroactively for any entry whose
   // underlying market is still represented in this run's samples (older ones may have aged out of
   // wallet_closed_positions' rolling window and just won't get backfilled — that's fine, they're
@@ -970,6 +1042,18 @@ async function main(): Promise<void> {
       entry.dollarPct = sample.dollarPct;
       changed = true;
     }
+    if (entry.smartPctNoDust === undefined) {
+      entry.smartPctNoDust = sample.smartPctNoDust;
+      changed = true;
+    }
+    if (entry.participantCountNoDust === undefined) {
+      entry.participantCountNoDust = sample.participantCountNoDust;
+      changed = true;
+    }
+    if (entry.smartPctLinear === undefined) {
+      entry.smartPctLinear = sample.smartPctLinear;
+      changed = true;
+    }
     if (changed) backfilled += 1;
   }
   if (backfilled > 0) {
@@ -1012,6 +1096,15 @@ async function main(): Promise<void> {
   // EXPERIMENTAL (v15b): the most permissive 1+ population — a strict superset of currentVersionAllLoose.
   const currentVersionAllFloor = all.filter(
     (s) => s.methodologyVersion === METHODOLOGY_VERSION && (s.participantCount ?? MIN_PARTICIPANTS) >= MIN_PARTICIPANTS_FLOOR
+  );
+  // EXPERIMENTAL (v16): population gated on the NO-DUST participant count instead of the dust-floored
+  // one — not necessarily identical to currentVersionAll, since a market can clear one gate without
+  // clearing the other. Older entries (participantCountNoDust undefined) fall back to participantCount
+  // (a reasonable floor since the no-dust count can only be >= the dust-floored one).
+  const currentVersionAllNoDust = all.filter(
+    (s) =>
+      s.methodologyVersion === METHODOLOGY_VERSION &&
+      (s.participantCountNoDust ?? s.participantCount ?? MIN_PARTICIPANTS) >= MIN_PARTICIPANTS
   );
 
   const smartBrierM = mean(currentVersionAll.map((s) => brier(s.smartPct, s.actual)));
@@ -1459,6 +1552,80 @@ async function main(): Promise<void> {
         continue;
       }
       const profits = trades.map((s) => (s.gapDollar >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  // ── EXPERIMENTAL (v16): DUST_FLOOR_USD removed entirely — compares locked v1 (on its own dust-
+  // floored 5+ population) against smartPctNoDust (on the separately-gated no-dust 5+ population),
+  // since the two populations aren't guaranteed to be identical. ──
+  console.log(`\nEXPERIMENTAL: dust floor removed entirely, n=${currentVersionAllNoDust.length} (vs. locked v1's n=${currentVersionAll.length}, dust floor $${DUST_FLOOR_USD}):`);
+  const withNoDust = currentVersionAllNoDust.filter((s) => s.smartPctNoDust !== undefined);
+  if (withNoDust.length === 0) {
+    console.log("  No entries have smartPctNoDust yet.");
+  } else {
+    const noDustBrier = mean(withNoDust.map((s) => brier(s.smartPctNoDust!, s.actual)));
+    console.log(`  locked v1 Brier ($10 dust floor, n=${currentVersionAll.length}): ${smartBrierM.toFixed(4)}`);
+    console.log(`  no-dust-floor Brier (n=${withNoDust.length}):                    ${noDustBrier.toFixed(4)}`);
+    console.log(
+      noDustBrier < smartBrierM
+        ? "  -> removing the dust floor improves on locked v1."
+        : "  -> removing the dust floor does NOT improve on locked v1 — the $10 floor is filtering real noise, not real signal."
+    );
+
+    console.log("\n  Simulated return per $1 staked using the no-dust-floor tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withNoDust
+        .map((s) => ({ ...s, gapNoDust: s.smartPctNoDust! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapNoDust) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapNoDust >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
+      const avgProfit = mean(profits);
+      const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+      console.log(
+        `    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avgProfit >= 0 ? "+" : ""}${avgProfit.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  // ── EXPERIMENTAL (v17): linear-in-cost (skill*cost, no sqrt) — three-way against locked v1 (sqrt)
+  // and dollarPct (linear, no skill), all on the exact same entries. Brackets the size-scaling design
+  // space: equal-weight (v10a, no size scaling), sqrt (locked v1), linear (v17), dollar-only linear-
+  // with-no-skill (dollarPct). ──
+  const withLinear = currentVersionAll.filter((s) => s.smartPctLinear !== undefined && s.dollarPct !== undefined);
+  console.log(`\nEXPERIMENTAL: linear-in-cost weighted (skill*cost, no sqrt dampening), n=${withLinear.length}:`);
+  if (withLinear.length === 0) {
+    console.log("  No entries have smartPctLinear yet.");
+  } else {
+    const sqrtBrier = mean(withLinear.map((s) => brier(s.smartPct, s.actual)));
+    const linearBrier = mean(withLinear.map((s) => brier(s.smartPctLinear!, s.actual)));
+    const dollarBrierSub = mean(withLinear.map((s) => brier(s.dollarPct!, s.actual)));
+    console.log(`  locked v1 (sqrt(cost)):     ${sqrtBrier.toFixed(4)}`);
+    console.log(`  v17 (linear cost, w/skill): ${linearBrier.toFixed(4)}`);
+    console.log(`  dollarPct (linear, no skill): ${dollarBrierSub.toFixed(4)}`);
+    console.log(
+      linearBrier < sqrtBrier
+        ? "  -> dropping the sqrt dampening improves on locked v1 — sqrt may be throwing away real conviction signal."
+        : "  -> dropping the sqrt dampening does NOT improve on locked v1 — the dampening is earning its place."
+    );
+
+    console.log("\n  Simulated return per $1 staked using the linear-cost tilt (min gap):");
+    for (const minGap of GAP_THRESHOLDS) {
+      const trades = withLinear
+        .map((s) => ({ ...s, gapLinear: s.smartPctLinear! - s.livePriceAtEntry }))
+        .filter((s) => Math.abs(s.gapLinear) >= minGap);
+      if (trades.length === 0) {
+        console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
+        continue;
+      }
+      const profits = trades.map((s) => (s.gapLinear >= 0 ? s.actual - s.livePriceAtEntry : s.livePriceAtEntry - s.actual));
       const avgProfit = mean(profits);
       const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
       console.log(
