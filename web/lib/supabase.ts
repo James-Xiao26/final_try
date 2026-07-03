@@ -550,14 +550,24 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
     { data: ranks, error: ranksError },
     { data: positionsData, error: positionsError },
     { data: tradesData, error: tradesError },
-    { data: closedData }
+    closedPaged
   ] = await Promise.all([
     supabase.from("wallet_stats").select("*").eq("address", normalized).in("horizon_days", [...HORIZONS]).order("horizon_days"),
     supabase.from("equity_curve").select("horizon_days, ts, cumulative_pnl").eq("address", normalized).in("horizon_days", [...HORIZONS]).order("ts"),
     supabase.from("leaderboard_cache").select("rank, horizon_days").eq("address", normalized).order("horizon_days"),
     supabase.from("wallet_positions").select("condition_id, asset, market, outcome_index, size, avg_price, cur_price, initial_value, current_value, cash_pnl, end_date").eq("address", normalized),
     supabase.from("wallet_trades").select("condition_id, market, outcome_index, outcome_label, event_slug, side, price, size, usdc_size, traded_at, transaction_hash").eq("address", normalized).order("traded_at", { ascending: false }),
-    supabase.from("wallet_closed_positions").select("condition_id, outcome_index, market, outcome_label, event_slug, avg_price, size, realized_pnl, close_time").eq("address", normalized)
+    // A single unpaginated read is silently capped at 1000 rows by PostgREST, so a hyperactive wallet
+    // with >1000 closed positions in-window lost its oldest settlements (blanked trade-history basis
+    // and dive-hover detail before the cutoff date). Page through and order newest-first.
+    fetchAllPaged((from, to) =>
+      supabase
+        .from("wallet_closed_positions")
+        .select("condition_id, outcome_index, market, outcome_label, event_slug, avg_price, size, realized_pnl, close_time")
+        .eq("address", normalized)
+        .order("close_time", { ascending: false })
+        .range(from, to)
+    )
   ]);
 
   if (statsError) {
@@ -607,7 +617,7 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
   // Trade history is grouped from the last ~200 fills, so a position bought before that window shows
   // blank avg entry / 0 bought shares. wallet_closed_positions carries the truth (cost basis, size,
   // realized P/L), so backfill by conditionId:outcomeIndex (shared with the live fallback).
-  const closedBasis = ((closedData ?? []) as unknown as ClosedPositionRowDb[]).map((row) => ({
+  const closedBasis = (closedPaged.rows as unknown as ClosedPositionRowDb[]).map((row) => ({
     conditionId: row.condition_id,
     outcomeIndex: row.outcome_index,
     market: row.market,
