@@ -8,6 +8,8 @@
     "ingest:feed": "tsx ingest.ts --feed-only",
     "ingest:markets": "tsx ingest.ts --markets-only",
     "ingest:rescore": "tsx ingest.ts --rescore-top",
+    "forward:record": "tsx forwardAlpha.ts --record",
+    "forward:score": "tsx forwardAlpha.ts --score",
     "webhook": "tsx server.ts",
     "probe": "tsx probeClosedPositions.ts",
     "typecheck": "tsc --noEmit",
