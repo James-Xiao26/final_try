@@ -3,7 +3,7 @@ import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { botSignal, detectArbitrageConditions, type BotSignal } from "./botDetection.js";
 import { CONFIG } from "./config.js";
-import { computeMetrics, excludeArbitrage, type IneligibilityReason, type WalletMetrics } from "./metrics.js";
+import { computeMetrics, excludeArbitrage, isLongshotChurner, type IneligibilityReason, type WalletMetrics } from "./metrics.js";
 import { apiStats, discoverTopWallets, discoverCandidateAddresses, scanChipBoards, openUnrealizedPnl, PolymarketClient, resolvedToClosed, type DiscoveredWallet, type EventSummary } from "./polymarket.js";
 import { recentTradesFromActivity, type RecentTrade } from "./recentTrades.js";
 import { walletSpecialty } from "./specialty.js";
@@ -815,12 +815,28 @@ export async function processWallet(
   const tooNew =
     firstTradeMs !== null &&
     Date.now() - firstTradeMs < CONFIG.MIN_ACCOUNT_AGE_DAYS * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
-  const metrics = CONFIG.HORIZONS.map((horizon) => {
-    const metric = computeMetrics(positions, horizon, CONFIG, unrealizedPnlUsd);
-    // ineligibleReason override (not just skillScore): the age gate is horizon-independent and comes
-    // from /activity, which computeMetrics never sees — same reasoning as the skillScore override.
-    // The tiered recheck cooldown (walletRecheck.ts) reads this to compute an exact re-eligibility date.
-    return tooNew ? { ...metric, skillScore: null, ineligibleReason: "too_new" as const } : metric;
+  const rawMetrics = CONFIG.HORIZONS.map((horizon) => computeMetrics(positions, horizon, CONFIG, unrealizedPnlUsd));
+  // Longshot-churner is a wallet-level judgment detected on the widest horizon (most complete churn
+  // sample — a shorter window under-counts it), then applied to every horizon, so a churner can't sit
+  // on the shorter-window board where its churn hasn't accumulated yet. Same wallet-wide override shape
+  // as the age gate below.
+  const widestHorizon = Math.max(...CONFIG.HORIZONS);
+  const isChurner = isLongshotChurner(
+    rawMetrics.find((m) => m.horizonDays === widestHorizon) ?? rawMetrics[0]!,
+    CONFIG
+  );
+  const metrics = rawMetrics.map((metric) => {
+    // ineligibleReason override (not just skillScore): these gates are horizon-independent and come
+    // from signals computeMetrics never sees (age from /activity; churn judged wallet-wide). The tiered
+    // recheck cooldown (walletRecheck.ts) reads this to compute an exact re-eligibility date. Age takes
+    // precedence — it resolves on a known calendar date, so it shouldn't be masked by the churn flag.
+    if (tooNew) {
+      return { ...metric, skillScore: null, ineligibleReason: "too_new" as const };
+    }
+    if (isChurner) {
+      return { ...metric, skillScore: null, ineligibleReason: "longshot_churn" as const };
+    }
+    return metric;
   });
 
   await Promise.all(metrics.map((metric) => upsertMetrics(supabase, normalized, metric)));
@@ -2481,7 +2497,7 @@ async function main(): Promise<void> {
   // ingest time. Bulk-loaded once for the whole discovered set, then filtered before the worker pool
   // starts so a skipped wallet never pays for /activity + /closed-positions + /positions at all.
   let walletsToProcess = wallets;
-  const skipBreakdown = { bot: 0, thin: 0, longshot: 0, too_new: 0 };
+  const skipBreakdown = { bot: 0, thin: 0, longshot: 0, churn: 0, too_new: 0 };
   try {
     const recheckStates = await loadWalletRecheckStates(supabase, wallets.map((w) => w.address.toLowerCase()));
     walletsToProcess = wallets.filter((wallet) => {
@@ -2497,6 +2513,8 @@ async function main(): Promise<void> {
           skipBreakdown.too_new += 1;
         } else if (widest.ineligibleReason === "longshot_entry") {
           skipBreakdown.longshot += 1;
+        } else if (widest.ineligibleReason === "longshot_churn") {
+          skipBreakdown.churn += 1;
         } else {
           skipBreakdown.thin += 1;
         }
@@ -2525,7 +2543,7 @@ async function main(): Promise<void> {
 
   console.log(
     `Discovered ${discoveredWallets.length} wallets + ${newTracked.length} tracked candidates = ${wallets.length} total; ` +
-      `skipped ${skippedCount} on cooldown (bot=${skipBreakdown.bot}, thin=${skipBreakdown.thin}, longshot=${skipBreakdown.longshot}, too_new=${skipBreakdown.too_new}); ` +
+      `skipped ${skippedCount} on cooldown (bot=${skipBreakdown.bot}, thin=${skipBreakdown.thin}, longshot=${skipBreakdown.longshot}, churn=${skipBreakdown.churn}, too_new=${skipBreakdown.too_new}); ` +
       `processing ${walletsToProcess.length}`
   );
 

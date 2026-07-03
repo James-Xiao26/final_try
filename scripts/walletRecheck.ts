@@ -59,6 +59,8 @@ export function shouldSkipWallet(state: WalletRecheckState | null, config: typeo
       return daysSince(widest.computedAt, now) < config.WALLET_RECHECK.THIN_SAMPLE_DAYS;
     case "longshot_entry":
       return daysSince(widest.computedAt, now) < config.WALLET_RECHECK.LONGSHOT_DAYS;
+    case "longshot_churn":
+      return daysSince(widest.computedAt, now) < config.WALLET_RECHECK.CHURN_DAYS;
     case null:
     default:
       return false;

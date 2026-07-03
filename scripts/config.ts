@@ -16,6 +16,18 @@ export const CONFIG = {
   // this gate excludes them. Volume-weighted (not median) so a few small dust bets among normal
   // positions don't trip it — only wallets whose *capital* sits in cheap shares are caught.
   MIN_AVG_ENTRY_PRICE: 0.04,
+  // Longshot-churner exclusion (a wallet-level gate applied in processWallet on the widest horizon —
+  // see metrics.ts isLongshotChurner). A wallet that resolves more than LONGSHOT_CHURN_MIN_RESOLVED
+  // positions while averaging under LONGSHOT_CHURN_MAX_AVG_BET_USD of cost basis per bet is farming
+  // micro-longshots, not showing copyable forecasting edge (its thin edge is spread across thousands
+  // of tiny bets it mostly sells before resolution). BOTH signals are required — high churn alone is a
+  // legit high-volume whale, small average bets alone is a cautious trader; only the combination is the
+  // non-copyable pattern. Thresholds from the live 90d board (2026-07): resolved-position p95 ≈ 340,
+  // p99 ≈ 856, so >500 is genuinely anomalous; legit high-volume traders average $680+/bet while the
+  // one churner caught here averages ~$160. Recorded as ineligible_reason "longshot_churn" (auditable —
+  // query wallet_stats to see exactly who this excludes, rather than a silent drop).
+  LONGSHOT_CHURN_MIN_RESOLVED: 500,
+  LONGSHOT_CHURN_MAX_AVG_BET_USD: 400,
   // Skill Score = pure statistical forecasting edge, on a 0-SCORE_MAX scale. Each resolved
   // position is a Bernoulli trial whose entry price is the market's implied probability; per-share
   // edge is (outcome - price). The score is the Bayesian-shrunk mean edge, remapped so that any
@@ -105,7 +117,10 @@ export const CONFIG = {
     // an emerging skilled wallet for a full month is a real cost.
     THIN_SAMPLE_DAYS: 7,
     // Medium — a structural trading-style flag (longshot entries), not urgent but not permanent.
-    LONGSHOT_DAYS: 21
+    LONGSHOT_DAYS: 21,
+    // Longest of the style flags — a longshot-churner's pattern is very stable, and re-fetching one is
+    // the most expensive case (thousands of closed positions to page), so skip it the longest.
+    CHURN_DAYS: 30
     // "too_new" (age gate) isn't a fixed window at all — computed exactly from
     // wallets.earliest_trade_at + MIN_ACCOUNT_AGE_DAYS, since it resolves on a known calendar date.
   },

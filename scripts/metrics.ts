@@ -32,7 +32,26 @@ export interface WalletMetrics {
   equityCurve: EquityPoint[];
 }
 
-export type IneligibilityReason = "insufficient_trades" | "insufficient_volume" | "longshot_entry" | "too_new";
+export type IneligibilityReason =
+  | "insufficient_trades"
+  | "insufficient_volume"
+  | "longshot_entry"
+  | "longshot_churn"
+  | "too_new";
+
+// Longshot-churner: resolves an unusually high number of positions while averaging a tiny per-bet cost
+// basis — micro-longshot farming, not copyable forecasting edge. Needs BOTH signals (high churn alone
+// is a legit high-volume trader; small average bets alone is a cautious one). Detected on the widest
+// horizon (the most complete sample — a shorter window under-counts the churn) and applied wallet-wide
+// in processWallet like the age gate, because it's a property of the trader, not one horizon. Kept out
+// of computeSkillScore/ineligibilityReason so their exact-constant tests stay untouched.
+export function isLongshotChurner(metrics: WalletMetrics, config: typeof CONFIG): boolean {
+  if (metrics.nResolved <= config.LONGSHOT_CHURN_MIN_RESOLVED) {
+    return false;
+  }
+  const avgBetUsd = metrics.nTrades > 0 ? metrics.totalVolumeUsd / metrics.nTrades : 0;
+  return avgBetUsd > 0 && avgBetUsd < config.LONGSHOT_CHURN_MAX_AVG_BET_USD;
+}
 
 // Same three gates computeSkillScore checks (age gate excluded — see the field comment above),
 // broken out into a reason code instead of a bare null. Kept separate from computeSkillScore itself

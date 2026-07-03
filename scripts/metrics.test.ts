@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CONFIG } from "./config.js";
-import { computeMetrics, computeSkillScore, excludeArbitrage, ineligibilityReason, isScorableMarket, type WalletMetrics } from "./metrics.js";
+import { computeMetrics, computeSkillScore, excludeArbitrage, ineligibilityReason, isLongshotChurner, isScorableMarket, type WalletMetrics } from "./metrics.js";
 import type { ClosedPosition } from "./polymarket.js";
 
 const recentIso = (daysAgo: number): string =>
@@ -246,6 +246,26 @@ test("ineligibilityReason flags insufficient_volume", () => {
 
 test("ineligibilityReason flags longshot_entry", () => {
   assert.equal(ineligibilityReason(metrics({ avgEntryPrice: 0.005 }), CONFIG), "longshot_entry");
+});
+
+// --- isLongshotChurner: wallet-level exclusion, needs BOTH high churn AND tiny bets --------------
+
+test("isLongshotChurner flags high churn with tiny average bets", () => {
+  // ~2000 resolved positions averaging ~$160/bet (the rocky42025 profile).
+  const churner = metrics({ nResolved: 1914, nTrades: 1959, totalVolumeUsd: 318_000 });
+  assert.equal(isLongshotChurner(churner, CONFIG), true);
+});
+
+test("isLongshotChurner spares a legit high-volume trader (big average bets)", () => {
+  // High churn but real size per bet — a whale, not a longshot farmer.
+  const whale = metrics({ nResolved: 856, nTrades: 857, totalVolumeUsd: 4_799_000 });
+  assert.equal(isLongshotChurner(whale, CONFIG), false);
+});
+
+test("isLongshotChurner spares a low-churn small-stakes trader", () => {
+  // Tiny bets but few positions — below the churn floor, so not the pattern.
+  const cautious = metrics({ nResolved: 145, nTrades: 159, totalVolumeUsd: 25_000 });
+  assert.equal(isLongshotChurner(cautious, CONFIG), false);
 });
 
 // --- computeSkillScore: Bayesian-shrunk edge (0, then 4–10) -----------------
