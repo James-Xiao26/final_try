@@ -36,25 +36,42 @@ const COMMAND: Record<JobMode, string> = {
 
 // Single global guard: only ONE job runs at a time, regardless of mode. The jobs share this dyno's
 // 512MB, so letting feed + markets + rescore run concurrently (as a per-mode guard would) stacks
-// their memory and triggers R14. A request that arrives while any job runs gets 409 and is skipped;
-// the external cron will retry on its next tick.
+// their memory and triggers R14.
+//
+// A request that arrives while another job runs is QUEUED, not dropped: markets and rescore are both
+// scheduled at the top of the hour, so a straight reject 409'd rescore every hour (its cron marked it
+// failed). Queued modes are coalesced in a Set (a second feed request while feed waits runs once, not
+// twice) and drained one at a time when the current job finishes — the lock still serializes, so
+// memory never stacks; the collision just costs a ~30s delay instead of a lost run.
 let busy: JobMode | null = null;
+const pending = new Set<JobMode>();
 
 function runJob(mode: JobMode): boolean {
-  if (busy) return false;
+  if (busy) {
+    pending.add(mode);
+    return false;
+  }
   busy = mode;
   const child = spawn("pnpm", [COMMAND[mode]], {
     cwd: ROOT,
     stdio: "inherit",
     env: { ...process.env, WALLET_CONCURRENCY: PARTIAL_WALLET_CONCURRENCY },
   });
-  child.on("close", (code) => {
+  const done = (): void => {
     busy = null;
+    const next = pending.values().next().value; // FIFO drain of the coalesced queue
+    if (next !== undefined) {
+      pending.delete(next);
+      runJob(next);
+    }
+  };
+  child.on("close", (code) => {
     console.log(`[${mode}] finished (exit ${code ?? "?"})`);
+    done();
   });
   child.on("error", (err) => {
-    busy = null;
     console.error(`[${mode}] spawn error:`, err);
+    done();
   });
   return true;
 }
@@ -85,7 +102,9 @@ const server = createServer((req, res) => {
 
   const blockedBy = busy;
   const started = runJob(mode);
-  res.writeHead(started ? 202 : 409).end(started ? "Accepted" : `Busy: ${blockedBy} job running`);
+  // Queued still returns 202 so the external cron sees success — the job will run, just after the
+  // current one finishes. Only a same-mode request already queued is a true no-op.
+  res.writeHead(202).end(started ? "Accepted" : `Queued behind ${blockedBy} job`);
 });
 
 server.listen(PORT, () => {
