@@ -126,6 +126,7 @@ async function record(): Promise<void> {
     smart_v1: number;
     smart_dollar: number;
     smart_sqrt: number;
+    smart_payout: number;
     entry_dispersion: number;
     end_date: string | null;
   }
@@ -149,7 +150,9 @@ async function record(): Promise<void> {
     const v1 = weightedYes(positioned, (r) => skillOf(r) * Math.sqrt(cost(r)));
     const dollar = weightedYes(positioned, cost);
     const sqrt = weightedYes(positioned, (r) => Math.sqrt(cost(r)));
-    if (v1 === null || dollar === null || sqrt === null) continue;
+    // Payout-if-it-wins weight = shares * $1 = size; drops entry price from the weight (see migration 030).
+    const payout = weightedYes(positioned, (r) => r.size ?? 0);
+    if (v1 === null || dollar === null || sqrt === null || payout === null) continue;
 
     const endDate = positioned.map((r) => r.end_date).filter((d): d is string => d !== null).sort().at(-1) ?? null;
     inserts.push({
@@ -160,6 +163,7 @@ async function record(): Promise<void> {
       smart_v1: v1,
       smart_dollar: dollar,
       smart_sqrt: sqrt,
+      smart_payout: payout,
       entry_dispersion: dispersion(positioned),
       end_date: endDate
     });
@@ -221,7 +225,7 @@ async function score(): Promise<void> {
 
   const { data: resolvedData, error: resolvedErr } = await supabase
     .from("forward_alpha_predictions")
-    .select("market_price, smart_v1, smart_dollar, smart_sqrt, entry_dispersion, resolved_outcome")
+    .select("market_price, smart_v1, smart_dollar, smart_sqrt, smart_payout, entry_dispersion, resolved_outcome")
     .not("resolved_outcome", "is", null);
   if (resolvedErr) throw resolvedErr;
   const resolved = (resolvedData ?? []) as {
@@ -229,6 +233,7 @@ async function score(): Promise<void> {
     smart_v1: number;
     smart_dollar: number;
     smart_sqrt: number;
+    smart_payout: number | null;
     entry_dispersion: number | null;
     resolved_outcome: number;
   }[];
@@ -246,23 +251,33 @@ async function score(): Promise<void> {
 
   // The alpha question: does the smart-money signal beat the MARKET's own price? Market price is the
   // benchmark row — a formula only has edge if its Brier is below the market's.
-  const cols: [string, (r: (typeof resolved)[number]) => number][] = [
+  // smart_payout is nullable (rows predating migration 030), so a column's getter may return null and
+  // each row is scored only on the formulas it has — hence the per-column non-null filter below.
+  const cols: [string, (r: (typeof resolved)[number]) => number | null][] = [
     ["market price (benchmark)", (r) => r.market_price],
     ["smart v1 (skill*sqrt)", (r) => r.smart_v1],
     ["smart dollar", (r) => r.smart_dollar],
-    ["smart sqrt(cost)", (r) => r.smart_sqrt]
+    ["smart sqrt(cost)", (r) => r.smart_sqrt],
+    ["smart payout (size)", (r) => r.smart_payout]
   ];
   console.log("\nBrier vs. outcome (lower = better) + directional accuracy:");
   for (const [label, get] of cols) {
-    const preds = resolved.map(get);
-    console.log(`  ${label.padEnd(26)} Brier ${mean(preds.map((p, i) => brier(p, actuals[i]!))).toFixed(4)}   accuracy ${(acc(preds, actuals) * 100).toFixed(1)}%`);
+    const rowsF = resolved.filter((r) => get(r) !== null);
+    const preds = rowsF.map((r) => get(r)!);
+    const acts = rowsF.map((r) => r.resolved_outcome);
+    console.log(
+      `  ${label.padEnd(26)} Brier ${mean(preds.map((p, i) => brier(p, acts[i]!))).toFixed(4)}   accuracy ${(acc(preds, acts) * 100).toFixed(1)}%   n=${rowsF.length}`
+    );
   }
 
   console.log("\nSimulated return per $1 — buy the side each formula diverges from the market on, at the market price:");
   for (const [label, get] of cols.slice(1)) {
     console.log(`\n  [${label}]`);
     for (const minGap of GAP_THRESHOLDS) {
-      const trades = resolved.map((r) => ({ r, gap: get(r) - r.market_price })).filter((t) => Math.abs(t.gap) >= minGap);
+      const trades = resolved
+        .filter((r) => get(r) !== null)
+        .map((r) => ({ r, gap: get(r)! - r.market_price }))
+        .filter((t) => Math.abs(t.gap) >= minGap);
       if (trades.length === 0) {
         console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=0`);
         continue;
@@ -284,9 +299,9 @@ async function score(): Promise<void> {
     for (const [label, get] of cols.slice(1)) {
       console.log(`\n  [${label}]`);
       for (const [tag, keep] of [["tight", true], ["loose", false]] as const) {
-        const half = withDisp.filter((r) => (r.entry_dispersion! <= medianDisp) === keep);
+        const half = withDisp.filter((r) => (r.entry_dispersion! <= medianDisp) === keep && get(r) !== null);
         const profits = half.map((r) => {
-          const gap = get(r) - r.market_price;
+          const gap = get(r)! - r.market_price;
           return gap >= 0 ? r.resolved_outcome - r.market_price : r.market_price - r.resolved_outcome;
         });
         if (profits.length === 0) {
@@ -311,6 +326,13 @@ function selfCheck(): void {
   ];
   assert.ok(Math.abs(weightedYes(rows, () => 1)! - 0.65) < 1e-9); // (0.6 + 0.7) / 2
   assert.ok(Math.abs(weightedYes(rows, cost)! - (60 * 0.6 + 30 * 0.7) / 90) < 1e-9);
+  // payout(size) weight drops entry price: two equal-share YES entries at 0.8 and 0.2 -> dollar 0.68, payout 0.50.
+  const favLong: PositionRow[] = [
+    { address: "a", condition_id: "c", market: null, outcome_index: 0, size: 100, avg_price: 0.8, cur_price: null, end_date: null },
+    { address: "b", condition_id: "c", market: null, outcome_index: 0, size: 100, avg_price: 0.2, cur_price: null, end_date: null }
+  ];
+  assert.ok(Math.abs(weightedYes(favLong, cost)! - 0.68) < 1e-9);
+  assert.ok(Math.abs(weightedYes(favLong, (r) => r.size ?? 0)! - 0.5) < 1e-9);
   assert.ok(Math.abs(yesEqCur(rows[1]!) - 0.55) < 1e-9); // NO holder cur 0.45 -> YES-equiv 0.55
   assert.ok(Math.abs(dispersion(rows) - 0.05) < 1e-9); // yes-equiv entries {0.6, 0.7}, stdev = 0.05
 }

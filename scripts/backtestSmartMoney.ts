@@ -229,6 +229,10 @@ function savePriceCache(cache: Map<string, PricePoint>): void {
 type Formula = { name: string; weightOf?: (r: ClosedRow, skill: (r: ClosedRow) => number) => number; special?: (rows: ClosedRow[]) => number };
 const FORMULAS: Formula[] = [
   { name: "dollar size (no skill)", weightOf: (r) => cost(r) },
+  // Weight by PAYOUT if the bet wins = shares * $1 = size. Removes price from the weight, so a wallet
+  // holding N shares of an 80c favorite and one holding N shares of a 20c longshot count equally
+  // (same payout / same conviction), instead of dollar-weighting handing the favorite 4x the say.
+  { name: "payout (size, no skill)", weightOf: (r) => r.size ?? 0 },
   { name: "sqrt(cost) (no skill)", weightOf: (r) => Math.sqrt(cost(r)) },
   { name: "v1 skill*sqrt(cost)", weightOf: (r, s) => s(r) * Math.sqrt(cost(r)) },
   { name: "skill*cost", weightOf: (r, s) => s(r) * cost(r) },
@@ -243,7 +247,7 @@ const FORMULAS: Formula[] = [
   }
 ];
 // Formulas to run the profit/alpha simulation on (the front-runners + the incumbent for reference).
-const PROFIT_FORMULAS = ["dollar size (no skill)", "sqrt(cost) (no skill)", "v1 skill*sqrt(cost)"];
+const PROFIT_FORMULAS = ["dollar size (no skill)", "payout (size, no skill)", "sqrt(cost) (no skill)", "v1 skill*sqrt(cost)"];
 
 const brier = (pred: number, actual: number): number => (pred - actual) ** 2;
 const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -259,6 +263,14 @@ function selfCheck(): void {
   assert.ok(Math.abs(weightedYes(rows, () => 1)! - 0.65) < 1e-9);
   // dollar-weighted: costs 60 and 30 -> (60*0.6 + 30*0.7) / 90 = 0.6333...
   assert.ok(Math.abs(weightedYes(rows, cost)! - (60 * 0.6 + 30 * 0.7) / 90) < 1e-9);
+  // payout(size)-weighting drops price from the weight, so it diverges from dollar-weighting whenever
+  // prices differ: a 0.8-entry and a 0.2-entry with equal shares -> dollar leans to 0.68, payout to 0.50.
+  const favLong: ClosedRow[] = [
+    { address: "a", condition_id: "c", outcome_index: 0, avg_price: 0.8, realized_pnl: 0, size: 100, first_traded_at: null, close_time: null },
+    { address: "b", condition_id: "c", outcome_index: 0, avg_price: 0.2, realized_pnl: 0, size: 100, first_traded_at: null, close_time: null }
+  ];
+  assert.ok(Math.abs(weightedYes(favLong, cost)! - 0.68) < 1e-9);
+  assert.ok(Math.abs(weightedYes(favLong, (r) => r.size ?? 0)! - 0.5) < 1e-9);
   assert.ok(Math.abs(brier(0.7, 1) - 0.09) < 1e-9);
   assert.equal(accuracy([0.7, 0.3], [1, 0]), 1);
 }
@@ -284,6 +296,7 @@ async function main(): Promise<void> {
     actual: number;
     refEntryMs: number | null; // dollar-weighted entry date, the common "when did smart money enter" clock
     preds: Map<string, number>; // formula name -> predicted YES price
+    whaleSoldEarly: boolean; // biggest bettor closed at a mid-range price (didn't ride to $1/$0)
   }
   const samples: Sample[] = [];
 
@@ -330,7 +343,16 @@ async function main(): Promise<void> {
         dateWeighted += w * entryMs;
       }
     }
-    samples.push({ conditionId, actual, refEntryMs: dateWeight > 0 ? dateWeighted / dateWeight : null, preds });
+    // Did the biggest bettor RIDE to resolution or SELL OUT mid-market? A closed position exiting at a
+    // mid-range price (not ~$1 win / ~$0 loss) = they bailed before settlement. This is the "whale sold
+    // mid-market" case: a hold-to-resolution copier ignores the exit and holds anyway, so the question
+    // is whether that whale's ENTRY still pointed at the correct final outcome.
+    let whale = positioned[0]!;
+    for (const r of positioned) if (cost(r) > cost(whale)) whale = r;
+    const whaleExit = exitValue(whale);
+    const whaleSoldEarly = whaleExit !== null && whaleExit > RESOLVE_EPSILON && whaleExit < 1 - RESOLVE_EPSILON;
+
+    samples.push({ conditionId, actual, refEntryMs: dateWeight > 0 ? dateWeighted / dateWeight : null, preds, whaleSoldEarly });
   }
 
   console.log(`${samples.length} resolved markets clear the ${MIN_PARTICIPANTS}-participant / $${DUST_FLOOR_USD} floor\n`);
@@ -360,6 +382,32 @@ async function main(): Promise<void> {
   console.log(`\nPaired v1 vs dollar-weighted, n=${samples.length}:`);
   console.log(`  mean Brier(v1) - Brier(dollar) = ${dMean >= 0 ? "+" : ""}${dMean.toFixed(5)}  (positive => v1 worse)`);
   console.log(`  t = ${(dMean / dSe).toFixed(2)}  (|t|>2 ~ significant at 95%);  dollar strictly better on ${dollarWins}/${samples.length} (${((100 * dollarWins) / samples.length).toFixed(0)}%)`);
+
+  // ── Hold-to-resolution robustness: does the ENTRY signal survive the biggest bettor selling out
+  // mid-market? Split the same markets by whether the whale rode to resolution or bailed early, and
+  // score each half's entry signal against the FINAL outcome (i.e. you held anyway). For a
+  // hold-to-resolution copier this is the whole ballgame: if the "whale sold early" half still has a
+  // good Brier / win rate, a whale's exit is just noise you can ignore; if it collapses, a whale
+  // bailing is a real warning you'd be eating by holding through. (Win rate = directional accuracy =
+  // fraction where the side the signal leaned actually resolved, which for a hold-to-$1/$0 bet IS the
+  // win rate.) Caveat: outcome still comes from OTHER wallets who held, so markets where EVERYONE
+  // bailed are absent — this measures the whale-bailed-but-crowd-held case specifically. ────────────
+  console.log(`\nHold-to-resolution robustness — biggest bettor RODE vs SOLD OUT early (entry signal scored vs final outcome):`);
+  const rode = samples.filter((s) => !s.whaleSoldEarly);
+  const bailed = samples.filter((s) => s.whaleSoldEarly);
+  for (const [tag, set] of [["whale RODE to resolution", rode], ["whale SOLD OUT early ", bailed]] as const) {
+    if (set.length === 0) {
+      console.log(`  ${tag}: n=0`);
+      continue;
+    }
+    const acts = set.map((s) => s.actual);
+    for (const name of ["payout (size, no skill)", "dollar size (no skill)"]) {
+      const preds = set.map((s) => s.preds.get(name)!);
+      const b = mean(preds.map((p, i) => brier(p, acts[i]!)));
+      const short = (name.split(" ")[0] ?? name).padEnd(6);
+      console.log(`  ${tag}  [${short}]  n=${String(set.length).padStart(3)}  Brier ${b.toFixed(4)}  win rate ${(accuracy(preds, acts) * 100).toFixed(1)}%`);
+    }
+  }
 
   // ── Price matching for the profit/alpha sim: market_price_history cache, then the immutable price
   // cache, then a live Gamma+CLOB fetch for anything still missing. ───────────────────────────────
@@ -430,6 +478,25 @@ async function main(): Promise<void> {
     console.log("No markets matched a price — nothing to simulate.");
     return;
   }
+
+  // ── Favorite / market baseline: the alpha question is whether smart money beats the MARKET'S OWN
+  // price, not whether it beats a coin. Two baselines on the identical price-matched set: (a) the
+  // market's live price used directly as the forecast (a well-calibrated market's Brier is the bar to
+  // clear), and (b) "always bet the favorite" = pick whichever side is priced >50c at entry. If a
+  // smart-money formula can't beat the market-price Brier, its earlier low Brier was just echoing the
+  // market (high directional accuracy is mostly favorites winning), and any profit lives ONLY in the
+  // divergence subset below. ───────────────────────────────────────────────────────────────────────
+  const mActuals = matched.map((m) => m.actual);
+  const favoriteAcc = mean(matched.map((m) => ((m.livePriceAtEntry > 0.5 ? 1 : 0) === m.actual ? 1 : 0)));
+  const marketBrier = mean(matched.map((m) => brier(m.livePriceAtEntry, m.actual)));
+  console.log(`Baseline on the ${matched.length} price-matched markets — can smart money beat the market itself?`);
+  console.log(`  ${"market price (the favorite)".padEnd(28)} Brier ${marketBrier.toFixed(4)}   dir.acc ${(favoriteAcc * 100).toFixed(1)}%   <- the bar to beat`);
+  for (const name of PROFIT_FORMULAS) {
+    const preds = matched.map((m) => m.preds.get(name)!);
+    const b = mean(preds.map((p, i) => brier(p, mActuals[i]!)));
+    console.log(`  ${name.padEnd(28)} Brier ${b.toFixed(4)}   dir.acc ${(accuracy(preds, mActuals) * 100).toFixed(1)}%`);
+  }
+  console.log(`  (a formula only has forecasting alpha over the market if its Brier is BELOW ${marketBrier.toFixed(4)})\n`);
 
   // ── Profit/alpha simulation: for each profiled formula, buy the side it diverges from the market
   // on, AT the market's own price at that time. This is the real bankroll question — being
