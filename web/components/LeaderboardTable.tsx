@@ -3,18 +3,14 @@
 import { Copy } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import HorizonToggle from "@/components/HorizonToggle";
 import WalletSearch from "@/components/WalletSearch";
 import { formatEdge, formatNumber, formatPercent, shortenAddress, parseChip } from "@/lib/format";
-import { HORIZONS } from "@/lib/types";
-import type { HorizonDays, LeaderboardRow } from "@/lib/types";
+import type { LeaderboardRow } from "@/lib/types";
 
-const LEADERBOARD_HORIZONS: readonly HorizonDays[] = HORIZONS;
 const POLL_INTERVAL_MS = 60_000;
 
 interface LeaderboardTableProps {
   initialRows: LeaderboardRow[];
-  initialHorizon: HorizonDays;
 }
 
 // Whale class by signal strength (skill score). Pure presentation — derived, not stored.
@@ -55,11 +51,9 @@ function LeaderboardChips({ chips }: { chips: string[] }) {
   );
 }
 
-export default function LeaderboardTable({ initialRows, initialHorizon }: LeaderboardTableProps) {
-  const [horizon, setHorizon] = useState<HorizonDays>(initialHorizon);
+export default function LeaderboardTable({ initialRows }: LeaderboardTableProps) {
   const [rows, setRows] = useState(initialRows);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [locked, setLocked] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
@@ -69,38 +63,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (horizon === initialHorizon) {
-      setRows(initialRows);
-      return;
-    }
-
-    let active = true;
-    setLoading(true);
-    fetch(`/api/leaderboard?horizon=${horizon}`)
-      .then((response) => response.ok ? response.json() as Promise<LeaderboardRow[]> : Promise.reject(new Error("Leaderboard request failed")))
-      .then((nextRows) => {
-        if (active) {
-          setRows(nextRows);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setRows([]);
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [horizon, initialHorizon, initialRows]);
-
-  // Live refresh: re-pull the current horizon on an interval (and when the tab regains focus) so an
+  // Live refresh: re-pull the leaderboard on an interval (and when the tab regains focus) so an
   // open tab tracks the scheduled ingest without a manual reload. Mirrors the Activity feed's poll.
   useEffect(() => {
     let active = true;
@@ -108,7 +71,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
       if (document.hidden) {
         return;
       }
-      fetch(`/api/leaderboard?horizon=${horizon}`)
+      fetch(`/api/leaderboard?horizon=90`)
         .then((response) => response.ok ? response.json() as Promise<LeaderboardRow[]> : Promise.reject(new Error("Leaderboard request failed")))
         .then((nextRows) => {
           if (active) {
@@ -130,7 +93,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
       clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [horizon]);
+  }, []);
 
   const apex = useMemo(() => rows.find((row) => row.rank === 1) ?? rows[0], [rows]);
 
@@ -158,7 +121,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
     update();
     log.addEventListener("scroll", update);
     return () => log.removeEventListener("scroll", update);
-  }, [contactRows, loading]);
+  }, [contactRows]);
 
   // Top-3 sonar blips, positioned by signal (stronger = nearer the core), like the console scope.
   const blips = rows.slice(0, 3).map((row, i) => {
@@ -177,10 +140,6 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
   return (
     <>
       <div className="lb-controls">
-        <div className="lb-range">
-          <span className="lb-range-lbl">Scan Range</span>
-          <HorizonToggle value={horizon} onChange={setHorizon} horizons={LEADERBOARD_HORIZONS} />
-        </div>
         <WalletSearch value={query} onChange={setQuery} />
       </div>
 
@@ -189,7 +148,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
         <div className="panel lb-scope-panel">
           <div className="lb-scope-head">
             <span className="t">Sonar Scope</span>
-            <span className="d">RANGE · {horizon}D</span>
+            <span className="d">RANGE · 90D</span>
           </div>
           <div className="lb-scope">
             <svg viewBox="0 0 200 200" aria-hidden>
@@ -242,7 +201,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
                     {whaleClass(apex.skillScore)}
                     {apex.specialty ? <span className="lb-spec" title={`Strongest forecasting edge in ${apex.specialty} markets`}>{apex.specialty}</span> : null}
                     <LeaderboardChips chips={apex.leaderboardChips} />
-                    <Link href={`/wallet/${apex.address}?horizon=${horizon}`} className="full">View dossier →</Link>
+                    <Link href={`/wallet/${apex.address}`} className="full">View dossier →</Link>
                   </div>
                 </div>
                 <div className="lb-gauge">
@@ -305,15 +264,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i}>
-                    {Array.from({ length: 7 }).map((__, c) => (
-                      <td key={c}><div className="skeleton" style={{ height: 16, width: c === 1 ? 150 : 64 }} /></td>
-                    ))}
-                  </tr>
-                ))
-              ) : contactRows.length === 0 ? (
+              {contactRows.length === 0 ? (
                 <tr><td colSpan={7} className="muted" style={{ padding: 36, textAlign: "center" }}>No contact matches that designation on this scan.</td></tr>
               ) : (
                 contactRows.map((row) => {
@@ -324,7 +275,7 @@ export default function LeaderboardTable({ initialRows, initialHorizon }: Leader
                     <tr key={row.address}>
                       <td className={`lb-cid${apexRow ? " apex" : ""}`}><span className="hex">#{row.rank}</span></td>
                       <td className="lb-desig">
-                        <Link href={`/wallet/${row.address}?horizon=${horizon}`} className="name">
+                        <Link href={`/wallet/${row.address}`} className="name">
                           {row.handle ? <><span className="at">@</span>{row.handle}</> : shortenAddress(row.address)}
                         </Link>
                         {row.specialty ? <span className="lb-spec" title={`Strongest forecasting edge in ${row.specialty} markets`}>{row.specialty}</span> : null}

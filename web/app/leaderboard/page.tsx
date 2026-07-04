@@ -10,7 +10,7 @@ export default async function LeaderboardPage() {
 
   return (
     <main className="page">
-      <LeaderboardTable initialRows={initialRows} initialHorizon={90} />
+      <LeaderboardTable initialRows={initialRows} />
 
       <footer className="ww-ops">
         <div className="ww-ops-rule"><span>Operations Manual</span><span className="line" /><span className="orn">✦</span></div>

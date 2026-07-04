@@ -1,17 +1,14 @@
 "use client";
 
 import { useEffect, useState, type MouseEvent } from "react";
-import HorizonToggle from "@/components/HorizonToggle";
 import { windowedCurve } from "@/lib/equityCurve";
 import { formatCompactPercent, formatCompactUsd, formatEdge, formatNumber, formatPercent, formatPrice, formatUsd } from "@/lib/format";
-import { HORIZONS } from "@/lib/types";
 import type { ClosedTrade, EquityPoint, HorizonDays, WalletMetrics } from "@/lib/types";
 
 interface WalletTelemetryProps {
   metrics: WalletMetrics[];
   equityCurves: Record<HorizonDays, EquityPoint[]>;
   closedTrades: ClosedTrade[];
-  initialHorizon: HorizonDays;
 }
 
 // Outcome side label for a step trade — Polymarket's real label, else binary Yes/No from the index.
@@ -319,9 +316,12 @@ function DiveProfile({
   );
 }
 
-export default function WalletTelemetry({ metrics, equityCurves, closedTrades, initialHorizon }: WalletTelemetryProps) {
-  const [horizon, setHorizon] = useState<HorizonDays>(initialHorizon);
+export default function WalletTelemetry({ metrics, equityCurves, closedTrades }: WalletTelemetryProps) {
+  // Single 90-day window (the leaderboard consolidated to one horizon). Kept as a const so the chart
+  // window + labels below read from one place; the pipeline still computes 30-day data, just unshown.
+  const horizon: HorizonDays = 90;
   const points = equityCurves[horizon] ?? [];
+  const m90 = metrics.find((metric) => metric.horizonDays === 90);
   // Group closed positions by UTC close-day so the chart can look up a step's trades by its date.
   // Horizon-independent (the day key is the same across windows), so build it once for the wallet.
   const tradesByDay = new Map<string, ClosedTrade[]>();
@@ -337,39 +337,29 @@ export default function WalletTelemetry({ metrics, equityCurves, closedTrades, i
 
   return (
     <>
-      <div className="wl-tele-bar">
-        <div className="lbl">Telemetry Window</div>
-        <HorizonToggle value={horizon} onChange={setHorizon} />
-      </div>
-
       <div className="wl-metrics">
-        {HORIZONS.map((h) => {
-          const m = metrics.find((metric) => metric.horizonDays === h);
-          return (
-            <div key={h} className="panel wl-mcard">
-              <div className="mh">
-                <span className="hz">{h}-Day Window</span>
-                <span className="sk">{m && m.skillScore !== null ? m.skillScore.toFixed(1) : "N/A"} <small>SIG</small></span>
-              </div>
-              {m ? (
-                <dl>
-                  <dt>Edge / share</dt>
-                  <dd className={m.avgEdgePerShare >= 0 ? "pos" : "neg"}>{formatEdge(m.avgEdgePerShare)} <span className="sub">· {formatNumber(m.nResolved)} resolved</span></dd>
-                  <dt>Hit rate</dt>
-                  <dd>{formatPercent(m.winRate)}</dd>
-                  <dt>Net P/L · Vol</dt>
-                  <dd>{formatCompactUsd(m.totalPnlUsd)} <span className="sub">/ {formatCompactUsd(m.totalVolumeUsd)}</span></dd>
-                  <dt>% return</dt>
-                  <dd className={m.pctReturn >= 0 ? "pos" : "neg"}>{formatPercent(m.pctReturn, true)}</dd>
-                  <dt>Observations</dt>
-                  <dd>{formatNumber(m.nTrades)}</dd>
-                </dl>
-              ) : (
-                <p className="muted" style={{ margin: "22px 0 0", fontSize: 13 }}>No telemetry for this window.</p>
-              )}
-            </div>
-          );
-        })}
+        <div className="panel wl-mcard">
+          <div className="mh">
+            <span className="hz">90-Day Window</span>
+            <span className="sk">{m90 && m90.skillScore !== null ? m90.skillScore.toFixed(1) : "N/A"} <small>SIG</small></span>
+          </div>
+          {m90 ? (
+            <dl>
+              <dt>Edge / share</dt>
+              <dd className={m90.avgEdgePerShare >= 0 ? "pos" : "neg"}>{formatEdge(m90.avgEdgePerShare)} <span className="sub">· {formatNumber(m90.nResolved)} resolved</span></dd>
+              <dt>Hit rate</dt>
+              <dd>{formatPercent(m90.winRate)}</dd>
+              <dt>Net P/L · Vol</dt>
+              <dd>{formatCompactUsd(m90.totalPnlUsd)} <span className="sub">/ {formatCompactUsd(m90.totalVolumeUsd)}</span></dd>
+              <dt>% return</dt>
+              <dd className={m90.pctReturn >= 0 ? "pos" : "neg"}>{formatPercent(m90.pctReturn, true)}</dd>
+              <dt>Observations</dt>
+              <dd>{formatNumber(m90.nTrades)}</dd>
+            </dl>
+          ) : (
+            <p className="muted" style={{ margin: "22px 0 0", fontSize: 13 }}>No telemetry for this window.</p>
+          )}
+        </div>
       </div>
 
       <section className="panel wl-dive">

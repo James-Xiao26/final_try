@@ -681,10 +681,12 @@ export async function getWalletProfile(address: string): Promise<WalletProfile |
     metrics: ((stats ?? []) as unknown as WalletStatsRow[]).map(mapMetric),
     equityCurve: equityCurves[90],
     equityCurves,
-    badges: ((ranks ?? []) as unknown as RankSelectRow[]).map((rank) => ({
-      label: `Top ${rank.rank} - ${rank.horizon_days}D`,
-      horizonDays: rank.horizon_days
-    })),
+    badges: ((ranks ?? []) as unknown as RankSelectRow[])
+      .filter((rank) => rank.horizon_days === 90)
+      .map((rank) => ({
+        label: `Top ${rank.rank}`,
+        horizonDays: rank.horizon_days
+      })),
     positions,
     tradeGroups,
     closedTrades

@@ -104,7 +104,7 @@ export default function WorldCupBoard({ rows }: { rows: WorldCupRow[] }) {
           {podium.length > 0 ? (
             <section className="wc-podium">
               {podium.map((row) => (
-                <Link key={row.address} href={`/wallet/${row.address}?horizon=90`} className={`panel wc-pod wc-pod-${row.rank}`}>
+                <Link key={row.address} href={`/wallet/${row.address}`} className={`panel wc-pod wc-pod-${row.rank}`}>
                   <div className="wc-pod-rank">
                     <span className="medal" aria-hidden>{row.rank === 1 ? "🥇" : row.rank === 2 ? "🥈" : "🥉"}</span>
                     <span className="pos">#{row.rank}</span>
@@ -156,7 +156,7 @@ export default function WorldCupBoard({ rows }: { rows: WorldCupRow[] }) {
                         <tr key={row.address}>
                           <td className="wc-pos"><span>#{row.rank}</span></td>
                           <td className="wc-trader">
-                            <Link href={`/wallet/${row.address}?horizon=90`} className="name">
+                            <Link href={`/wallet/${row.address}`} className="name">
                               {row.handle ? <><span className="at">@</span>{row.handle}</> : shortenAddress(row.address)}
                             </Link>
                             <div className="meta">

@@ -4,8 +4,6 @@ import WalletActivity from "@/components/WalletActivity";
 import WalletDossier from "@/components/WalletDossier";
 import WalletTelemetry from "@/components/WalletTelemetry";
 import { getWalletProfile, withTimeout } from "@/lib/supabase";
-import { HORIZONS } from "@/lib/types";
-import type { HorizonDays } from "@/lib/types";
 
 export const revalidate = 300;
 
@@ -13,19 +11,10 @@ interface WalletPageProps {
   params: {
     address: string;
   };
-  searchParams: {
-    horizon?: string;
-  };
 }
 
-function parseHorizon(value: string | undefined): HorizonDays {
-  const parsed = Number(value);
-  return HORIZONS.includes(parsed as HorizonDays) ? (parsed as HorizonDays) : 90;
-}
-
-export default async function WalletPage({ params, searchParams }: WalletPageProps) {
+export default async function WalletPage({ params }: WalletPageProps) {
   const address = params.address.toLowerCase();
-  const initialHorizon = parseHorizon(searchParams.horizon);
 
   if (!address.startsWith("0x") || address.length !== 42) {
     notFound();
@@ -85,7 +74,6 @@ export default async function WalletPage({ params, searchParams }: WalletPagePro
         metrics={profile.metrics}
         equityCurves={profile.equityCurves}
         closedTrades={profile.closedTrades}
-        initialHorizon={initialHorizon}
       />
 
       <WalletActivity positions={profile.positions} tradeGroups={profile.tradeGroups} />

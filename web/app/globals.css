@@ -711,7 +711,7 @@ input:focus { border-color: var(--green) !important; }
 .wl-tele-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; flex-wrap: wrap; }
 .wl-tele-bar .lbl { font-family: var(--font-display); font-weight: 600; font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 
-.wl-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
+.wl-metrics { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 18px; }
 .wl-mcard { padding: 22px 24px; }
 .wl-mcard .mh { display: flex; justify-content: space-between; align-items: center; }
 .wl-mcard .mh .hz { font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; }
