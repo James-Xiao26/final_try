@@ -70,7 +70,7 @@ A wallet with a non-null score on *any* horizon is **never** skipped, regardless
 - `--feed-only` — re-pull `/activity` + `/positions` for leaderboard wallets; refresh feed **and** `wallet_positions` (no scoring/closed-positions), so Current Positions stays as fresh as Trade History.
 - `--markets-only` — just step 10.
 - `--rescore-top` (`rescoreTopWallets`) — re-score just the standings (below).
-- `--candidates-only` — **only** step 7, nothing else. Manual one-off to drain a large unscored backlog, paired with a high override: `CANDIDATE_BATCH_PER_RUN=15000 pnpm ingest --candidates-only` (on Heroku wrap in `heroku run:detached "…" -a edgeboard-ingest`). Safe to re-run; already-scored stay skipped for `CANDIDATE_RESCORE_DAYS`.
+- `--candidates-only` — candidate **discovery + scoring**, standalone (no leaderboard/markets/feed work). First registers new addresses (the leaderboard-permutation + `/trades` discovery, plus `/holders` top-holders of the cached crowded markets — read back from `crowded_markets_cache`, so it needs a prior full ingest to be non-empty), then drains the unscored/stale backlog through step 7. Newly-registered candidates are never-scored so they're scored first. Manual one-off, paired with a high override: `CANDIDATE_BATCH_PER_RUN=15000 pnpm ingest --candidates-only` (on Heroku wrap in `heroku run:detached "…" -a edgeboard-ingest`). Safe to re-run/interrupt; already-scored stay skipped for `CANDIDATE_RESCORE_DAYS`, discovered addresses dedupe via `ignoreDuplicates`.
 
 The first three skip the candidate pipeline entirely.
 

@@ -773,6 +773,30 @@ export async function processWallet(
     return { address: normalized, bot: true, botReason, insufficient: false, summary: `skipped (bot: ${botReason})`, recentTrades: [], openPositions: [], fills: [], closedPositions: [], assets: [], worldCup: null };
   }
 
+  // Age-gate short-circuit. The too-new test needs only /activity (already fetched) — earliest fill vs
+  // MIN_ACCOUNT_AGE_DAYS — so a wallet younger than the gate can never score and there's no point paying
+  // for the expensive /closed-positions + /positions fetch. Same shape as the bot short-circuit above:
+  // persist the wallet row plus a null-score wallet_stats row (reason too_new, empty metrics via an
+  // empty computeMetrics) so the tiered recheck cooldown and leaderboard exclusion behave exactly as
+  // through the full path — minus the wasted fetch. (A too-new wallet is dropped from the World Cup
+  // board too; a <14-day account shouldn't be featured anywhere, same as the main board.)
+  const tooNew =
+    firstTradeMs !== null &&
+    Date.now() - firstTradeMs < CONFIG.MIN_ACCOUNT_AGE_DAYS * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
+  if (tooNew) {
+    const { error: newWalletError } = await supabase.from("wallets").upsert(walletRow, { onConflict: "address" });
+    if (newWalletError) {
+      throw newWalletError;
+    }
+    const tooNewMetrics = CONFIG.HORIZONS.map((horizon) => ({
+      ...computeMetrics([], horizon, CONFIG, 0),
+      skillScore: null,
+      ineligibleReason: "too_new" as const
+    }));
+    await Promise.all(tooNewMetrics.map((metric) => upsertMetrics(supabase, normalized, metric)));
+    return { address: normalized, bot: false, botReason: null, insufficient: true, summary: "skipped (too new)", recentTrades: [], openPositions: [], fills: [], closedPositions: [], assets: [], worldCup: null };
+  }
+
   // Merge actually-closed positions with resolved-but-unredeemed ones. /closed-positions holds only
   // positions the trader sold/redeemed (winner-biased, since $0 losers get abandoned, not redeemed);
   // the resolved-unredeemed set restores those losses so the score reflects real edge. The two
@@ -812,9 +836,6 @@ export async function processWallet(
   // MIN_ACCOUNT_AGE_DAYS, so a brand-new account can't rank on a few days of bets. Done here (not in
   // computeSkillScore) because the age signal comes from /activity, which the pure metric functions
   // don't receive; a null skill score keeps the wallet out of leaderboard_cache (see rebuildLeaderboardCache).
-  const tooNew =
-    firstTradeMs !== null &&
-    Date.now() - firstTradeMs < CONFIG.MIN_ACCOUNT_AGE_DAYS * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
   const rawMetrics = CONFIG.HORIZONS.map((horizon) => computeMetrics(positions, horizon, CONFIG, unrealizedPnlUsd));
   // Longshot-churner is a wallet-level judgment detected on the widest horizon (most complete churn
   // sample — a shorter window under-counts it), then applied to every horizon, so a churner can't sit
@@ -826,13 +847,10 @@ export async function processWallet(
     CONFIG
   );
   const metrics = rawMetrics.map((metric) => {
-    // ineligibleReason override (not just skillScore): these gates are horizon-independent and come
-    // from signals computeMetrics never sees (age from /activity; churn judged wallet-wide). The tiered
-    // recheck cooldown (walletRecheck.ts) reads this to compute an exact re-eligibility date. Age takes
-    // precedence — it resolves on a known calendar date, so it shouldn't be masked by the churn flag.
-    if (tooNew) {
-      return { ...metric, skillScore: null, ineligibleReason: "too_new" as const };
-    }
+    // ineligibleReason override (not just skillScore): longshot-churn is horizon-independent and judged
+    // wallet-wide (a signal computeMetrics never sees per-horizon). The tiered recheck cooldown
+    // (walletRecheck.ts) reads this to compute an exact re-eligibility date. (The age gate is handled
+    // earlier as a short-circuit, so a wallet reaching here is never too_new.)
     if (isChurner) {
       return { ...metric, skillScore: null, ineligibleReason: "longshot_churn" as const };
     }
@@ -2166,7 +2184,12 @@ async function scoreCandidateBatch(
   // feeds/positions (they're not on the board yet; the leaderboard rebuild will include
   // them if they get promoted and rank in the top N).
   const scoreByAddress = new Map<string, number | null>();
+  const total = batch.length;
+  console.log(`Grading ${total} candidates (never-scored first)...`);
   let cursor = 0;
+  let completed = 0;
+  let promising = 0; // running count of candidates scoring at/above the promotion bar — the "new good traders" signal
+  const LOG_EVERY = 25; // progress cadence; workers share the event loop so the counters need no locking
   const worker = async (): Promise<void> => {
     while (cursor < batch.length) {
       const candidate = batch[cursor];
@@ -2187,10 +2210,18 @@ async function scoreCandidateBatch(
           .select("skill_score")
           .eq("address", candidate.address);
         const scores = (statsRows ?? []).map((r) => r.skill_score);
-        scoreByAddress.set(candidate.address, bestSkillScore(scores));
+        const best = bestSkillScore(scores);
+        scoreByAddress.set(candidate.address, best);
+        if (best !== null && best >= CONFIG.CANDIDATE_PROMOTION_THRESHOLD) {
+          promising += 1;
+        }
       } catch (reason) {
         console.warn(`Candidate scoring ${candidate.address}: ${describeError(reason)}`);
         scoreByAddress.set(candidate.address, null); // treat as ineligible
+      }
+      completed += 1;
+      if (completed % LOG_EVERY === 0 || completed === total) {
+        console.log(`  graded ${completed}/${total} — ${promising} clearing the promotion bar (>= ${CONFIG.CANDIDATE_PROMOTION_THRESHOLD}) so far`);
       }
     }
   };
@@ -2423,8 +2454,35 @@ async function main(): Promise<void> {
   // picks promoted wallets into the leaderboard. Already-scored candidates stay skipped for
   // CANDIDATE_RESCORE_DAYS, so re-running is safe and never double-scores.
   if (process.argv.includes("--candidates-only")) {
+    const client = new PolymarketClient();
+    // Discover + register NEW addresses first, so a standalone candidates-only run finds fresh traders
+    // rather than only scoring the existing backlog. Two sources: (1) the leaderboard-permutation +
+    // /trades discovery, and (2) top holders of the already-cached crowded markets (/holders) — the
+    // crowd cache is populated by prior full ingests, so we read it back here rather than recomputing.
+    // Newly-registered candidates are never-scored, so scoreCandidateBatch prioritizes them. Non-fatal:
+    // a discovery failure still scores whatever backlog exists.
+    try {
+      const discovery = await discoverAndRegisterCandidates(supabase, new Set());
+      console.log(`Candidate discovery: found ${discovery.discovered}, registered ${discovery.registered} new`);
+      const { data: crowdRows } = await supabase
+        .from("crowded_markets_cache")
+        .select("condition_id")
+        .order("rank", { ascending: true })
+        .limit(CONFIG.HOLDER_DISCOVERY_MARKETS);
+      const conditionIds = (crowdRows ?? [])
+        .map((row) => row.condition_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+      if (conditionIds.length > 0) {
+        const holders = await client.getTopHolders(conditionIds);
+        await registerCandidates(supabase, holders.map((address) => ({ address, discoverySource: "top-holders" })));
+        console.log(`Top-holders discovery: probed ${conditionIds.length} markets, upserted ${holders.length} holder addresses`);
+      }
+    } catch (reason) {
+      console.warn(`Candidate discovery (candidates-only) failed (non-fatal): ${describeError(reason)}`);
+    }
+
     const recentTradeCutoffMs = Date.now() - CONFIG.RECENT_TRADE_WINDOW_HOURS * 60 * 60 * CONFIG.MS_PER_SECOND;
-    const result = await scoreCandidateBatch(supabase, new PolymarketClient(), recentTradeCutoffMs);
+    const result = await scoreCandidateBatch(supabase, client, recentTradeCutoffMs);
     console.log(
       `Candidate-only batch: scored=${result.scored}, promoted=${result.promoted}; ` +
         `elapsed=${((Date.now() - startedAt) / CONFIG.MS_PER_SECOND).toFixed(1)}s`
