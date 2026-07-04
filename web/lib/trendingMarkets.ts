@@ -15,6 +15,9 @@ export const TRENDING_MIN_PARTICIPANTS = 5;
 // convergence — it's a single whale/specialist. Mirror of CONFIG.MAX_WHALE_COST_SHARE (scripts side).
 export const MAX_WHALE_COST_SHARE = 0.6;
 export const NEAR_ENTRY_CENTS = 0.05; // near-entry score decays to 0 by a 5¢ gap
+// Above this bid/ask spread Polymarket's displayed price flips from the midpoint to the (stale) last
+// trade, so the price-vs-smart-money gap is noise. Skip the near-entry term on markets wider than this.
+export const NEAR_ENTRY_MAX_SPREAD = 0.1;
 export const RESOLVE_SOON_HALFLIFE_DAYS = 1; // score ~0.5 at 1 day out
 export const START_SOON_HALFLIFE_DAYS = 1;
 
@@ -141,8 +144,12 @@ export function scoreTrendingMarket(
     if (Number.isFinite(days) && days > 0) score += proximityScore(days, RESOLVE_SOON_HALFLIFE_DAYS);
   }
 
+  // Only trust the currentPrice-vs-implied gap when the book is tight. Above NEAR_ENTRY_MAX_SPREAD the
+  // displayed price is a stale last-trade, not the midpoint, so the gap is noise. Unknown spread (null)
+  // is treated as tight — consistent with the "each term only ever adds" design.
   const impliedPrice = smartMoneyImpliedPrice(rows, lookups);
-  if (impliedPrice !== null && market.currentPrice !== null) {
+  const tightBook = market.spread === null || market.spread <= NEAR_ENTRY_MAX_SPREAD;
+  if (tightBook && impliedPrice !== null && market.currentPrice !== null) {
     const gap = Math.abs(market.currentPrice - impliedPrice);
     score += Math.max(0, 1 - gap / NEAR_ENTRY_CENTS);
   }

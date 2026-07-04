@@ -293,6 +293,15 @@ export const CONFIG = {
   // Aligns with the 30-day scoring horizon: edge can meaningfully shift month to month.
   CANDIDATE_RESCORE_DAYS: 30,
 
+  // Top-holders candidate discovery: after the crowded-markets list is built, probe the top
+  // HOLDER_DISCOVERY_MARKETS markets' top holders via the Data API /holders endpoint and register any
+  // new wallets as candidates. Surfaces high-conviction traders who never appear on a volume-sorted
+  // leaderboard (the documented discovery gap). Also backfills candidate_wallets rows for board wallets
+  // that never had one. HOLDER_MARKET_CHUNK markets per /holders request (comma-separated; 66-char
+  // condition ids, kept well under the URL-length limit). /holders returns 20 holders/token (API cap).
+  HOLDER_DISCOVERY_MARKETS: 50,
+  HOLDER_MARKET_CHUNK: 25,
+
   // ── Hourly leaderboard rescore ─────────────────────────────────────────────────────────
   //
   // The full ingest runs daily (expensive: 5k+ wallets, closed-positions pagination, price

@@ -381,6 +381,22 @@ export function mapActivity(record: JsonRecord): TradeActivity {
   };
 }
 
+// Flatten a Data API /holders response — an array of { token, holders: [{ proxyWallet, ... }] } — into
+// a deduped, lowercased list of holder addresses. Defensive against the field-name drift the other
+// mappers guard for. Exported for unit testing (the response shape is the only non-trivial bit).
+export function parseHoldersResponse(response: unknown): string[] {
+  const out = new Set<string>();
+  for (const meta of asArray(response)) {
+    const holders = Array.isArray(meta.holders) ? meta.holders : [];
+    for (const holder of holders) {
+      if (!isRecord(holder)) continue;
+      const address = readString(holder, ["proxyWallet", "user", "wallet", "address"]).toLowerCase();
+      if (address) out.add(address);
+    }
+  }
+  return [...out];
+}
+
 export function mapLeaderboard(record: JsonRecord): LeaderboardEntry {
   return {
     rank: readString(record, ["rank"]),
@@ -675,7 +691,30 @@ export class PolymarketClient {
       type: "TRADE",
       sortDirection: "DESC"
     });
-    return asArray(await fetchJson("/activity", params)).map(mapActivity);
+    // Drop combo (multi-market) legs: a combo row's conditionId/price describe one leg of a
+    // combinatorial bet, not a clean single-market forecast, so counting them would inflate bot
+    // detection (trade rate / simultaneous markets) and show misleading single-market rows in the feed.
+    // The Skill Score is unaffected — it reads /closed-positions, which carries no combos.
+    // ponytail: flag-filter at the fetch choke point, not a combo-aware feature.
+    return asArray(await fetchJson("/activity", params))
+      .filter((record) => record.isCombo !== true)
+      .map(mapActivity);
+  }
+
+  // Top holders (by token balance) of the given markets, from the public Data API /holders endpoint.
+  // Discovers high-conviction wallets that never surface on a volume-sorted leaderboard. Markets are
+  // batched comma-separated per request (chunked by count to stay under the URL-length limit); returns
+  // a deduped, lowercased address set across all requested markets. General lane, no auth.
+  async getTopHolders(conditionIds: string[]): Promise<string[]> {
+    const found = new Set<string>();
+    for (let i = 0; i < conditionIds.length; i += CONFIG.HOLDER_MARKET_CHUNK) {
+      const slice = conditionIds.slice(i, i + CONFIG.HOLDER_MARKET_CHUNK);
+      const params = new URLSearchParams({ market: slice.join(","), limit: "20" });
+      for (const addr of parseHoldersResponse(await fetchJson("/holders", params))) {
+        found.add(addr);
+      }
+    }
+    return [...found];
   }
 
   async getTotalValue(address: string): Promise<number> {

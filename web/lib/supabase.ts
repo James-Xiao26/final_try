@@ -63,6 +63,7 @@ type MarketSelectRow = Pick<
   | "last_trade_price"
   | "top_outcome"
   | "one_day_price_change"
+  | "spread"
   | "end_date"
   | "game_start_time"
   | "image"
@@ -428,7 +429,7 @@ const MARKET_SORT_COLUMNS: Record<MarketSort, keyof MarketSelectRow> = {
 };
 
 const MARKET_COLUMNS =
-  "id, condition_id, question, slug, category, liquidity_usd, volume_usd, volume_24hr_usd, volume_1wk_usd, last_trade_price, top_outcome, one_day_price_change, end_date, game_start_time, image";
+  "id, condition_id, question, slug, category, liquidity_usd, volume_usd, volume_24hr_usd, volume_1wk_usd, last_trade_price, top_outcome, one_day_price_change, spread, end_date, game_start_time, image";
 
 function mapMarketRow(row: MarketSelectRow): MarketRow {
   return {
@@ -444,6 +445,7 @@ function mapMarketRow(row: MarketSelectRow): MarketRow {
     currentPrice: row.last_trade_price,
     topOutcome: row.top_outcome,
     oneDayPriceChange: row.one_day_price_change,
+    spread: row.spread,
     endDate: row.end_date,
     gameStartTime: row.game_start_time,
     image: row.image

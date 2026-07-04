@@ -6,6 +6,7 @@ import {
   mapLeaderboard,
   mapPosition,
   openUnrealizedPnl,
+  parseHoldersResponse,
   type Position
 } from "./polymarket.js";
 
@@ -247,4 +248,20 @@ test("openUnrealizedPnl excludes resolved-but-unredeemed (redeemable) positions"
 
 test("openUnrealizedPnl returns 0 for an empty set", () => {
   assert.equal(openUnrealizedPnl([]), 0);
+});
+
+// --- parseHoldersResponse ---------------------------------------------------
+
+test("parseHoldersResponse flattens holders across markets, lowercases and dedupes", () => {
+  const response = [
+    { token: "t1", holders: [{ proxyWallet: "0xABC" }, { proxyWallet: "0xDef" }] },
+    { token: "t2", holders: [{ proxyWallet: "0xabc" }, { wallet: "0xGHI" }] } // dup 0xabc + fallback key
+  ];
+  assert.deepEqual(parseHoldersResponse(response), ["0xabc", "0xdef", "0xghi"]);
+});
+
+test("parseHoldersResponse tolerates malformed shapes", () => {
+  assert.deepEqual(parseHoldersResponse(null), []);
+  assert.deepEqual(parseHoldersResponse([{ token: "t1" }]), []); // no holders array
+  assert.deepEqual(parseHoldersResponse([{ token: "t1", holders: [{}, "junk", 5] }]), []); // no address
 });

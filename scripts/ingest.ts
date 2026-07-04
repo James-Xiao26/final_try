@@ -1418,7 +1418,9 @@ async function cacheWorldCup(supabase: SupabaseClient, entries: WorldCupEntry[])
   return rows.length;
 }
 
-async function cacheCrowdedMarkets(supabase: SupabaseClient): Promise<number> {
+// Returns the ranked condition ids it cached (most-crowded first), consumed by the top-holders
+// candidate-discovery step. Empty array on no-op / no crowded markets.
+async function cacheCrowdedMarkets(supabase: SupabaseClient): Promise<string[]> {
   // Best (lowest-number) leaderboard rank per address, for the participant rank overlay.
   const { data: cacheData, error: cacheError } = await supabase.from("leaderboard_cache").select("address, rank");
   if (cacheError) {
@@ -1494,7 +1496,7 @@ async function cacheCrowdedMarkets(supabase: SupabaseClient): Promise<number> {
     throw deleteError;
   }
   if (summaries.length === 0) {
-    return 0;
+    return [];
   }
 
   const cachedAt = new Date().toISOString();
@@ -1518,7 +1520,7 @@ async function cacheCrowdedMarkets(supabase: SupabaseClient): Promise<number> {
   if (insertError) {
     throw insertError;
   }
-  return rows.length;
+  return rows.map((row) => row.condition_id).filter((id): id is string => typeof id === "string" && id.length > 0);
 }
 
 // Signal #2 — precompute the "Fresh Entries" (flow) ranked list into fresh_entries_cache. Mirrors
@@ -2662,11 +2664,27 @@ async function main(): Promise<void> {
   // instead of scanning the whole position table per request (Fix C). Must run after the position
   // caches above and the leaderboard rebuild — it reads both back. Non-fatal: a failure here just
   // leaves the previous cache in place rather than aborting the run.
-  let crowdedMarketCount = 0;
+  let crowdedConditionIds: string[] = [];
   try {
-    crowdedMarketCount = await cacheCrowdedMarkets(supabase);
+    crowdedConditionIds = await cacheCrowdedMarkets(supabase);
   } catch (reason) {
     console.warn(`Crowded-markets cache failed (non-fatal): ${describeError(reason)}`);
+  }
+  const crowdedMarketCount = crowdedConditionIds.length;
+
+  // Top-holders candidate discovery: probe the most-crowded markets' top holders and register any as
+  // candidates. Surfaces high-conviction wallets the volume-sorted main discovery misses, and backfills
+  // candidate_wallets rows for board wallets that never had one (ignoreDuplicates keeps existing rows).
+  // Non-fatal — a failure just skips this run's holder discovery.
+  try {
+    const probeMarkets = crowdedConditionIds.slice(0, CONFIG.HOLDER_DISCOVERY_MARKETS);
+    if (probeMarkets.length > 0) {
+      const holders = await polymarket.getTopHolders(probeMarkets);
+      await registerCandidates(supabase, holders.map((address) => ({ address, discoverySource: "top-holders" })));
+      console.log(`Top-holders discovery: probed ${probeMarkets.length} markets, upserted ${holders.length} holder addresses as candidates`);
+    }
+  } catch (reason) {
+    console.warn(`Top-holders discovery failed (non-fatal): ${describeError(reason)}`);
   }
 
   // Limited-time World Cup board. Non-fatal: a failure leaves the previous board in place. Uses the

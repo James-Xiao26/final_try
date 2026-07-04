@@ -143,6 +143,10 @@ export interface MarketRow {
   currentPrice: number | null;
   topOutcome: string | null;
   oneDayPriceChange: number | null;
+  // Leading market's bid/ask spread. Above ~$0.10 Polymarket's displayed price is the (stale) last
+  // trade, not the midpoint, so a wide spread means currentPrice is unreliable — used by Trending to
+  // gate its price-vs-smart-money term. null = not derivable.
+  spread: number | null;
   endDate: string | null;
   // Scheduled real-world start time — sports/esports only, null everywhere else (Polymarket has no
   // equivalent for other categories). Powers the Trending panel's "starts soon" signal.

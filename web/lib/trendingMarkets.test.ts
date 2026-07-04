@@ -23,6 +23,7 @@ function market(p: Partial<MarketRow>): MarketRow {
     currentPrice: 0.5,
     topOutcome: "Yes",
     oneDayPriceChange: null,
+    spread: null,
     endDate: null,
     gameStartTime: null,
     image: null,
@@ -113,6 +114,16 @@ test("near-entry score decays to 0 by a 5c gap", () => {
   const bigGap = scoreTrendingMarket(market({ currentPrice: 0.9 }), rows, lookups);
   assert.equal(zeroGap, 1);
   assert.equal(bigGap, 0);
+});
+
+test("near-entry term is skipped on a wide-spread market (stale last-trade price), but null spread still counts", () => {
+  const rows = fiveWallets({ outcomeIndex: 0, avgPrice: 0.5 }); // implied 0.5, price at 0.5 == full credit
+  const tight = scoreTrendingMarket(market({ currentPrice: 0.5, spread: 0.02 }), rows, lookups);
+  const wide = scoreTrendingMarket(market({ currentPrice: 0.5, spread: 0.2 }), rows, lookups);
+  const unknown = scoreTrendingMarket(market({ currentPrice: 0.5, spread: null }), rows, lookups);
+  assert.equal(tight, 1); // tight book -> near-entry term applies
+  assert.equal(wide, 0); // wide book -> term skipped, no other signal
+  assert.equal(unknown, 1); // unknown spread treated as tight
 });
 
 test("resolve-soon score is high for an imminent endDate, ~0 for a far one, 0 for none", () => {
