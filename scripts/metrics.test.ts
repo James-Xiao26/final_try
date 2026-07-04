@@ -309,21 +309,35 @@ test("computeSkillScore is 0 with no resolved positions", () => {
 
 // --- forecasting edge -------------------------------------------------------
 
-test("computeMetrics derives per-position mean edge (avgEdgePerShare) from outcomes", () => {
-  // Per-share edges: (1-0.5)=+0.5, (1-0.4)=+0.6, (0-0.6)=-0.6. Per-position mean = 0.5/3 = 0.1667.
-  // Sizes differ, so this is distinct from the share-weighted pctEdge below. The still-trading
-  // position (outcome null) is excluded, not counted as a miss.
+test("computeMetrics derives per-family mean edge (avgEdgePerShare) from outcomes", () => {
+  // Per-share edges: (1-0.5)=+0.5, (1-0.4)=+0.6, (0-0.6)=-0.6. Distinct market families, so each is one
+  // observation: family mean = 0.5/3 = 0.1667. Sizes differ, so this is distinct from share-weighted
+  // pctEdge below. The still-trading position (outcome null) is excluded, not counted as a miss.
   const positions = [
-    position({ size: 100, avgPrice: 0.5, outcome: 1 }),
-    position({ size: 900, avgPrice: 0.4, outcome: 1 }),
-    position({ size: 100, avgPrice: 0.6, outcome: 0 }),
-    position({ size: 1000, avgPrice: 0.9, outcome: null })
+    position({ market: "Alpha market", size: 100, avgPrice: 0.5, outcome: 1 }),
+    position({ market: "Beta market", size: 900, avgPrice: 0.4, outcome: 1 }),
+    position({ market: "Gamma market", size: 100, avgPrice: 0.6, outcome: 0 }),
+    position({ market: "Delta market", size: 1000, avgPrice: 0.9, outcome: null })
   ];
   const m = computeMetrics(positions, 30, CONFIG);
   assert.equal(m.nResolved, 3);
-  assert.equal(m.avgEdgePerShare, 0.1667); // per-position mean: 0.5 / 3
+  assert.equal(m.avgEdgePerShare, 0.1667); // per-family mean: 0.5 / 3
   // pctEdge is share-weighted: edge $ = 50 + 540 - 60 = 530 over capital 50 + 360 + 60 = 470.
   assert.equal(m.pctEdge, 1.1277); // 530 / 470
+});
+
+test("computeMetrics collapses recurring-series variants into ONE resolved prediction", () => {
+  // A wallet grinding many date/number variants of one series shouldn't get N predictions' worth of
+  // Skill Score credit. Three "Elon posts N-M tweets from <date>" buckets = one family = one edge obs.
+  const grind = [
+    position({ market: "Will Elon Musk post 40-64 tweets from June 13 to June 15, 2026?", size: 100, avgPrice: 0.5, outcome: 1 }),
+    position({ market: "Will Elon Musk post 200-219 tweets from May 12 to May 19, 2026?", size: 100, avgPrice: 0.5, outcome: 1 }),
+    position({ market: "Will Elon Musk post 65-89 tweets from July 1 to July 3, 2026?", size: 100, avgPrice: 0.5, outcome: 1 })
+  ];
+  const m = computeMetrics(grind, 30, CONFIG);
+  assert.equal(m.nResolved, 1); // collapsed to one family, not 3
+  assert.equal(m.nTrades, 3); // eligibility/volume still count every position — only the edge sample collapses
+  assert.equal(m.avgEdgePerShare, 0.5); // family mean of the three +0.5 edges
 });
 
 test("computeMetrics reports zero edge when no position has resolved", () => {

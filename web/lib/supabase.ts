@@ -10,7 +10,7 @@ import { buildCrowdMarketDetail, type CrowdClosedPosition, type CrowdLookups, ty
 import type { MarketAnalytics, MarketMeta, PriceLine, PricePoint, WhaleFillInput } from "./marketAnalytics";
 import { fetchEventCandidates, fetchLiveMarket, fetchLivePriceSeries, fetchLiveWalletDetail, type LiveMarket } from "./polymarketLive";
 import { summarizeResolvedMarkets } from "./resolvedMarkets";
-import { buildTrendingMarkets, qualifyingConditionIds, TRENDING_MIN_PARTICIPANTS } from "./trendingMarkets";
+import { buildTrendingMarkets, MAX_WHALE_COST_SHARE, qualifyingConditionIds, TRENDING_MIN_PARTICIPANTS } from "./trendingMarkets";
 
 type WalletRow = Database["public"]["Tables"]["wallets"]["Row"];
 type WalletStatsRow = Database["public"]["Tables"]["wallet_stats"]["Row"];
@@ -1262,7 +1262,7 @@ export async function getTrendingMarkets(limit = 12): Promise<TrendingMarket[]> 
   if (missing) return [];
   const positions = (posRows as unknown as OpenPositionRowDb[]).map(toOpenPosition);
 
-  const qualifying = [...qualifyingConditionIds(positions, TRENDING_MIN_PARTICIPANTS)];
+  const qualifying = [...qualifyingConditionIds(positions, TRENDING_MIN_PARTICIPANTS, MAX_WHALE_COST_SHARE)];
   if (qualifying.length === 0) return [];
 
   // Chunk the condition_id list (same CONDITION_ID_CHUNK pattern as getRecentLeaderboardTrades) —

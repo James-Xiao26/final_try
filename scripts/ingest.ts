@@ -1486,7 +1486,7 @@ async function cacheCrowdedMarkets(supabase: SupabaseClient): Promise<number> {
     closeTime: row.close_time
   }));
 
-  const summaries = summarizeCrowdedMarkets(positions, closed, rankByAddress);
+  const summaries = summarizeCrowdedMarkets(positions, closed, rankByAddress, 5, CONFIG.MAX_WHALE_COST_SHARE);
 
   // Wipe-and-replace: stores all markets with ≥5 leaderboard participants.
   const { error: deleteError } = await supabase.from("crowded_markets_cache").delete().gte("rank", 0);

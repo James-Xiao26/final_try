@@ -92,6 +92,25 @@ export function isScorableMarket(title: string): boolean {
   return !RECURRING_WINDOW_MARKET.test(title);
 }
 
+const FAMILY_MONTHS = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/gi;
+
+// Normalize a market title to its recurring-SERIES family key: strip numbers, ranges, dates, and month
+// names so that date/number variants of one template collapse together — e.g. "Elon posts 40-64 tweets
+// from Jun 13 to Jun 15" and "...200-219 tweets from May 12 to May 19", or "US–Iran peace deal by May
+// 31" and "...by June 30". Used only to keep correlated variants of one series from each counting as a
+// separate independent prediction in the Skill Score (see collapseFamilyEdges below).
+// ponytail: keyword-ish normalizer; upgrade path = a condition_id→event map from Gamma tags at ingest.
+export function marketFamilyKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\b\d[\d,.:-]*\b/g, "#")
+    .replace(FAMILY_MONTHS, "")
+    .replace(/\b(st|nd|rd|th)\b/g, "")
+    .replace(/[?,.'"]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // Strips positions in a conditionId where the wallet held both outcome legs concurrently (detected
 // from /activity by scripts/botDetection.ts detectArbitrageConditions) — locking in a YES+NO<$1
 // mispricing or hedging isn't a directional forecast, so it shouldn't count toward Skill Score or a
@@ -173,21 +192,33 @@ export function computeMetrics(
   //     equal-weight prediction. This is the point estimate the Skill Score shrinks (see
   //     computeSkillScore).
   //   pctEdge — share-weighted edge as a return on the capital in those positions (display stat).
-  let perShareEdgeSum = 0;
+  // FAMILY-COLLAPSE the per-position edge: date/number variants of one recurring series (a wallet
+  // grinding hundreds of "Elon posts N-M tweets" buckets, or a dozen "US–Iran peace by <date>" markets)
+  // are correlated forecasts, not independent ones. Counting each as its own resolved prediction
+  // inflates the shrinkage sample (nResolved) and lets one single-theme grind pin a high Skill Score.
+  // So each market FAMILY contributes ONE equal-weight observation (its mean per-share edge), and
+  // nResolved is the count of distinct resolved families. pctEdge (share-weighted display stat) stays
+  // raw over all positions. Diversified wallets (all-distinct families) are unaffected — this is a
+  // no-op unless a wallet holds multiple variants of the same series. See ALPHA_RESEARCH_LOG.md §5/§8.
+  const familyEdge = new Map<string, { sum: number; n: number }>();
   let edgeDollars = 0;
   let edgeCapital = 0;
-  let nResolved = 0;
   for (const position of positions) {
     if (position.outcome === null) {
       continue;
     }
-    perShareEdgeSum += position.outcome - position.avgPrice;
     edgeDollars += position.size * (position.outcome - position.avgPrice);
     edgeCapital += position.size * position.avgPrice;
-    nResolved += 1;
+    const key = marketFamilyKey(position.market);
+    const fam = familyEdge.get(key) ?? { sum: 0, n: 0 };
+    fam.sum += position.outcome - position.avgPrice;
+    fam.n += 1;
+    familyEdge.set(key, fam);
   }
+  const familyMeanEdges = [...familyEdge.values()].map((f) => f.sum / f.n);
+  const nResolved = familyMeanEdges.length;
   const pctEdge = edgeCapital > 0 ? edgeDollars / edgeCapital : 0;
-  const avgEdgePerShare = nResolved > 0 ? perShareEdgeSum / nResolved : 0;
+  const avgEdgePerShare = nResolved > 0 ? familyMeanEdges.reduce((a, b) => a + b, 0) / nResolved : 0;
 
   const metricsWithoutScore: WalletMetrics = {
     horizonDays,

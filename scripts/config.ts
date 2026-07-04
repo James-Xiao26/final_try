@@ -153,6 +153,11 @@ export const CONFIG = {
   // the read layer re-orders it by volume/24h/volatility, so no per-sort fetch is needed.
   MARKETS_TOP_N: 300,
   MARKETS_PAGE_SIZE: 100,
+  // Convergence whale-concentration cap: a "crowded" market whose committed capital is more than this
+  // fraction in a SINGLE wallet isn't multi-wallet convergence — it's one whale (often a single
+  // specialist grinding a recurring bucket series). Drop it from the crowded/trending signal. See
+  // ALPHA_RESEARCH_LOG.md §4g/§8. Web keeps its own copy of this value (web/lib/trendingMarkets.ts).
+  MAX_WHALE_COST_SHARE: 0.6,
   // Per-event cap on mapEventCandidates (top-N by liquidity within one event) — without it, one large
   // multi-candidate election/tournament can claim dozens of the MARKETS_TOP_N slots and crowd out
   // unrelated events on the Markets page.

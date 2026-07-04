@@ -32,6 +32,22 @@ const ranks = new Map<string, number>([["0xa", 1], ["0xb", 5]]);
 // minTraders=1 lets unit tests use small fixtures without hitting the ≥5 production threshold.
 const MIN1 = 1;
 
+test("summarizeCrowdedMarkets drops whale-dominated markets when a maxWhaleShare cap is set", () => {
+  // Two wallets, but 0xa holds $900 of $1000 committed (90%) — one whale, not convergence.
+  const positions = [
+    open({ address: "0xa", size: 3000, avgPrice: 0.3 }), // $900
+    open({ address: "0xb", size: 250, avgPrice: 0.4 }) //   $100
+  ];
+  const uncapped = summarizeCrowdedMarkets(positions, [], ranks, MIN1);
+  assert.equal(uncapped.length, 1);
+  assert.ok(Math.abs(uncapped[0]!.whaleCostShare - 0.9) < 1e-9);
+  // With a 60% cap, the 90%-whale market is filtered out.
+  assert.equal(summarizeCrowdedMarkets(positions, [], ranks, MIN1, 0.6).length, 0);
+  // A balanced market (50/50) survives the same cap.
+  const balanced = [open({ address: "0xa", size: 250, avgPrice: 0.4 }), open({ address: "0xb", size: 250, avgPrice: 0.4 })];
+  assert.equal(summarizeCrowdedMarkets(balanced, [], ranks, MIN1, 0.6).length, 1);
+});
+
 test("summarizeCrowdedMarkets counts distinct wallets, YES/NO split, committed capital, and best rank", () => {
   const positions = [open({ address: "0xa", outcomeIndex: 0 }), open({ address: "0xb", outcomeIndex: 1, curPrice: 0.55 })];
   const closedRows = [closed({ address: "0xa", outcomeIndex: 0, closeTime: "2026-01-03T00:00:00.000Z" })];

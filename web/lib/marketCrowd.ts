@@ -176,10 +176,16 @@ export function summarizeCrowdedMarkets(
   positions: CrowdOpenPosition[],
   closed: CrowdClosedPosition[],
   lookups: Pick<CrowdLookups, "rankByAddress">,
-  minTraders = 5
+  minTraders = 5,
+  maxWhaleShare = 1 // default off (production passes MAX_WHALE_COST_SHARE); off keeps the single-wallet
+  // unit fixtures from being filtered — mirrors the minTraders override pattern. (Keep in sync with scripts.)
 ): CrowdedMarketSummary[] {
   const buckets = bucketize(positions, closed);
   const summaries: CrowdedMarketSummary[] = [];
+  // Fraction of a market's committed capital held by its single biggest wallet, by conditionId. A
+  // market above maxWhaleShare is one whale, not multi-wallet convergence. Kept local (not on the
+  // shared CrowdedMarketSummary type, which the DB read path also builds) to avoid schema churn.
+  const whaleShareByCondition = new Map<string, number>();
 
   for (const b of buckets.values()) {
     let yesTraders = 0;
@@ -187,6 +193,7 @@ export function summarizeCrowdedMarkets(
     let openCount = 0;
     let closedCount = 0;
     let topRank: number | null = null;
+    let maxAddrCost = 0;
     for (const [address, s] of b.byAddress) {
       // Dominant side: the outcome the wallet has more cost basis in. Ties / fill-only wallets with
       // no position cost fall through to neither side but still count as a participant.
@@ -196,7 +203,11 @@ export function summarizeCrowdedMarkets(
       else closedCount += 1;
       const rank = lookups.rankByAddress.get(address);
       if (rank !== undefined && (topRank === null || rank < topRank)) topRank = rank;
+      const addrCost = s.yesCost + s.noCost;
+      if (addrCost > maxAddrCost) maxAddrCost = addrCost;
     }
+    const committedUsd = b.yesCost + b.noCost;
+    whaleShareByCondition.set(b.conditionId, committedUsd > 0 ? maxAddrCost / committedUsd : 1);
     summaries.push({
       conditionId: b.conditionId,
       market: b.market,
@@ -205,7 +216,7 @@ export function summarizeCrowdedMarkets(
       noTraders,
       openCount,
       closedCount,
-      committedUsd: b.yesCost + b.noCost,
+      committedUsd,
       netExposureUsd: b.yesCost - b.noCost,
       topRank,
       curPrice: b.curPrice,
@@ -216,8 +227,9 @@ export function summarizeCrowdedMarkets(
   return summaries
     // Convergence = markets leaderboard wallets are converging on *now*. Drop markets no one currently
     // holds (openCount 0) — resolved or fully-exited — so a settled market (every position closed)
-    // can't sit at the top forever on historical participation alone. (Keep in sync with scripts copy.)
-    .filter((s) => s.openCount > 0 && s.traderCount >= minTraders)
+    // can't sit at the top forever on historical participation alone. Also drop whale-dominated markets
+    // (one wallet > maxWhaleShare of the capital). (Keep in sync with scripts copy.)
+    .filter((s) => s.openCount > 0 && s.traderCount >= minTraders && (whaleShareByCondition.get(s.conditionId) ?? 1) <= maxWhaleShare)
     .sort((a, c) => c.traderCount - a.traderCount || c.committedUsd - a.committedUsd);
 }
 

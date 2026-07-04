@@ -67,6 +67,15 @@ const lookups: CrowdLookups = {
 // minTraders=1 lets unit tests use small fixtures without hitting the ≥5 production threshold.
 const MIN1 = 1;
 
+test("summarizeCrowdedMarkets drops whale-dominated markets when a maxWhaleShare cap is set", () => {
+  // 0xa holds $900 of $1000 committed (90%) — one whale, not multi-wallet convergence.
+  const positions = [open({ address: "0xa", size: 3000, avgPrice: 0.3 }), open({ address: "0xb", size: 250, avgPrice: 0.4 })];
+  assert.equal(summarizeCrowdedMarkets(positions, [], lookups, MIN1).length, 1); // uncapped: survives
+  assert.equal(summarizeCrowdedMarkets(positions, [], lookups, MIN1, 0.6).length, 0); // 60% cap: filtered
+  const balanced = [open({ address: "0xa", size: 250, avgPrice: 0.4 }), open({ address: "0xb", size: 250, avgPrice: 0.4 })];
+  assert.equal(summarizeCrowdedMarkets(balanced, [], lookups, MIN1, 0.6).length, 1); // 50/50 survives
+});
+
 test("summarizeCrowdedMarkets counts distinct wallets, YES/NO split, committed capital, and best rank", () => {
   const positions = [open({ address: "0xa", outcomeIndex: 0 }), open({ address: "0xb", outcomeIndex: 1, curPrice: 0.55 })];
   const closedRows = [closed({ address: "0xa", outcomeIndex: 0, closeTime: "2026-01-03T00:00:00.000Z" })];

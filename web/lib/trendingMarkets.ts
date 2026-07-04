@@ -11,6 +11,9 @@ import type { MarketRow, TrendingConsensus, TrendingMarket } from "./types";
 
 export const TRENDING_DUST_FLOOR_USD = 10;
 export const TRENDING_MIN_PARTICIPANTS = 5;
+// A market whose committed capital is more than this fraction in ONE wallet isn't multi-wallet
+// convergence — it's a single whale/specialist. Mirror of CONFIG.MAX_WHALE_COST_SHARE (scripts side).
+export const MAX_WHALE_COST_SHARE = 0.6;
 export const NEAR_ENTRY_CENTS = 0.05; // near-entry score decays to 0 by a 5¢ gap
 export const RESOLVE_SOON_HALFLIFE_DAYS = 1; // score ~0.5 at 1 day out
 export const START_SOON_HALFLIFE_DAYS = 1;
@@ -61,12 +64,26 @@ function groupByCondition(positions: CrowdOpenPosition[]): Map<string, CrowdOpen
 // are weighted once a market qualifies).
 export function qualifyingConditionIds(
   positions: CrowdOpenPosition[],
-  minParticipants = TRENDING_MIN_PARTICIPANTS
+  minParticipants = TRENDING_MIN_PARTICIPANTS,
+  maxWhaleShare = 1 // default off (production passes MAX_WHALE_COST_SHARE); off keeps unit fixtures unfiltered.
 ): Set<string> {
   const qualifying = new Set<string>();
   for (const [conditionId, rows] of groupByCondition(positions)) {
-    const addresses = new Set(rows.filter(isDustFloored).map((p) => p.address));
-    if (addresses.size >= minParticipants) qualifying.add(conditionId);
+    const dust = rows.filter(isDustFloored);
+    const addresses = new Set(dust.map((p) => p.address));
+    if (addresses.size < minParticipants) continue;
+    // Whale-concentration cap: if one wallet holds more than maxWhaleShare of the committed capital,
+    // this isn't a crowd — it's a single specialist (often grinding a recurring bucket series).
+    const costByAddress = new Map<string, number>();
+    let total = 0;
+    for (const p of dust) {
+      const c = cost(p);
+      costByAddress.set(p.address, (costByAddress.get(p.address) ?? 0) + c);
+      total += c;
+    }
+    const whaleShare = total > 0 ? Math.max(...costByAddress.values()) / total : 1;
+    if (whaleShare > maxWhaleShare) continue;
+    qualifying.add(conditionId);
   }
   return qualifying;
 }

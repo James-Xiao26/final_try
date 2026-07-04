@@ -71,6 +71,14 @@ test("qualifyingConditionIds: 4 distinct wallets does not qualify, 5 does", () =
   assert.deepEqual([...qualifyingConditionIds(five)], ["c1"]);
 });
 
+test("qualifyingConditionIds: whale-concentration cap drops markets one wallet dominates", () => {
+  // 5 balanced wallets ($50 each) + one whale ($10k) = 6 participants but ~98% one wallet.
+  const withWhale = [...fiveWallets(), open({ address: "0xwhale", size: 20000, avgPrice: 0.5 })];
+  assert.deepEqual([...qualifyingConditionIds(withWhale)], ["c1"]); // uncapped: qualifies on headcount
+  assert.equal(qualifyingConditionIds(withWhale, 5, 0.6).size, 0); // 60% cap: filtered as a single whale
+  assert.deepEqual([...qualifyingConditionIds(fiveWallets(), 5, 0.6)], ["c1"]); // balanced 20%-each survives
+});
+
 test("qualifyingConditionIds: dust positions don't count toward the participant floor", () => {
   const positions = [
     ...fiveWallets(),
