@@ -1,0 +1,12 @@
+-- Forward alpha: record the CONSENSUS TIGHTNESS of the qualifying wallets, not just their mean.
+--
+-- The signal in 028 stores only the (weighted) mean YES-equivalent entry. But 5 wallets clustered at
+-- 0.68-0.72 and 5 wallets scattered 0.35-0.95 both average ~0.70 — one is conviction, the other is
+-- noise. entry_dispersion is the (unweighted) standard deviation of the wallets' YES-equivalent
+-- entries at record time: a second, orthogonal signal. The hypothesis is that tight consensus means a
+-- higher win rate AND lower variance (more reliably profitable, not just higher EV).
+--
+-- Must be captured point-in-time like every other column here — it can't be backfilled without
+-- reintroducing survivorship bias. Nullable so old rows (recorded before this column existed) don't
+-- block scoring; the scorecard just skips them from the dispersion slice.
+ALTER TABLE forward_alpha_predictions ADD COLUMN entry_dispersion NUMERIC;

@@ -22,7 +22,17 @@ const ROOT = resolve(fileURLToPath(import.meta.url), "../../");
 // to keep in-flight /activity payloads from exhausting memory (R14). Override per-deploy via env.
 const PARTIAL_WALLET_CONCURRENCY = process.env.PARTIAL_WALLET_CONCURRENCY ?? "8";
 
-type JobMode = "feed" | "markets" | "rescore";
+type JobMode = "feed" | "markets" | "rescore" | "forward:record" | "forward:score";
+
+// mode -> the root package.json script it runs. Most are ingest:<mode>; the forward-alpha jobs are
+// their own scripts, so the mapping is explicit rather than a string-concatenated "ingest:" prefix.
+const COMMAND: Record<JobMode, string> = {
+  feed: "ingest:feed",
+  markets: "ingest:markets",
+  rescore: "ingest:rescore",
+  "forward:record": "forward:record",
+  "forward:score": "forward:score",
+};
 
 // Single global guard: only ONE job runs at a time, regardless of mode. The jobs share this dyno's
 // 512MB, so letting feed + markets + rescore run concurrently (as a per-mode guard would) stacks
@@ -33,7 +43,7 @@ let busy: JobMode | null = null;
 function runJob(mode: JobMode): boolean {
   if (busy) return false;
   busy = mode;
-  const child = spawn("pnpm", [`ingest:${mode}`], {
+  const child = spawn("pnpm", [COMMAND[mode]], {
     cwd: ROOT,
     stdio: "inherit",
     env: { ...process.env, WALLET_CONCURRENCY: PARTIAL_WALLET_CONCURRENCY },
@@ -53,6 +63,8 @@ const ROUTES: Record<string, JobMode> = {
   "/refresh/feed": "feed",
   "/refresh/markets": "markets",
   "/refresh/rescore": "rescore",
+  "/refresh/forward-record": "forward:record",
+  "/refresh/forward-score": "forward:score",
 };
 
 const server = createServer((req, res) => {

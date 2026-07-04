@@ -6964,5 +6964,77 @@
     "livePriceAtEntry": 0.215,
     "actual": 0,
     "recordedAt": "2026-07-02T23:51:24.660Z"
+  },
+  {
+    "conditionId": "0x1595b4818eeb1ea1e0bec5de6f057218e557feee9b405a0e930d290384fa1d16",
+    "livePriceAtEntry": 0.0515,
+    "actual": 0,
+    "recordedAt": "2026-07-04T01:45:39.793Z"
+  },
+  {
+    "conditionId": "0x7e5228c4aa228752fb75ec1ffcb315a5f2fef812d746ceb6601cee285366d1a8",
+    "livePriceAtEntry": 0.406,
+    "actual": 1,
+    "recordedAt": "2026-07-04T01:45:39.793Z"
+  },
+  {
+    "conditionId": "0x182390641d3b1b47cc64274b9da290efd04221c586651ba190880713da6347d9",
+    "livePriceAtEntry": 0.66,
+    "actual": 1,
+    "recordedAt": "2026-07-04T01:45:39.793Z"
+  },
+  {
+    "conditionId": "0x4023fae82e2914ce29c6abc62d4353a7ea1eeaca5dd73b27faeead9abbee790f",
+    "livePriceAtEntry": 0.595,
+    "actual": 0,
+    "recordedAt": "2026-07-04T01:45:39.793Z"
+  },
+  {
+    "conditionId": "0x9a87a0011494682e4d17a9073059cbbd32ebea4bbc7284219afb5e9a6b4ca8f6",
+    "livePriceAtEntry": 0.375,
+    "actual": 0,
+    "recordedAt": "2026-07-04T01:45:39.793Z"
+  },
+  {
+    "conditionId": "0x43bde2aa4a2067139451beb84649e5acaff989a3a0817fb1c592046c993d4168",
+    "livePriceAtEntry": 0.545,
+    "actual": 1,
+    "recordedAt": "2026-07-04T01:45:39.793Z"
+  },
+  {
+    "conditionId": "0x5bdcf0fd010eba1a55a0f3de9be6612fc72038279a734e994ce2e34664a3cfe4",
+    "livePriceAtEntry": 0.645,
+    "actual": 1,
+    "recordedAt": "2026-07-04T01:45:39.793Z"
+  },
+  {
+    "conditionId": "0x6f05c7bc5ad978f8f9916f05d30a7f752e02b81508c56d82ed7c9245bca163b0",
+    "livePriceAtEntry": 0.475,
+    "actual": 1,
+    "recordedAt": "2026-07-04T01:45:39.793Z"
+  },
+  {
+    "conditionId": "0xc45a4c5c01082f8c727add1be91ab92d6c4fb782dddc6ec0e92b7b992fa62202",
+    "livePriceAtEntry": 0.59,
+    "actual": 1,
+    "recordedAt": "2026-07-04T01:45:39.793Z"
+  },
+  {
+    "conditionId": "0x1be62d973dc8fb45de714eb2113118b6ac3e47694f8b0801c0c41d992d0b7c9f",
+    "livePriceAtEntry": 0.0835,
+    "actual": 0,
+    "recordedAt": "2026-07-04T01:45:39.793Z"
+  },
+  {
+    "conditionId": "0xed76e3c271f4e24a3db2436cdf2c314cda43909fbc94c2bc34631a01cd67d3ae",
+    "livePriceAtEntry": 0.745,
+    "actual": 1,
+    "recordedAt": "2026-07-04T01:45:39.793Z"
+  },
+  {
+    "conditionId": "0x9ad06dd68a4075ba2ac99fc138f7c1506f236851233b0ec79a130a348af19a82",
+    "livePriceAtEntry": 0.435,
+    "actual": 0,
+    "recordedAt": "2026-07-04T01:45:39.793Z"
   }
 ]

@@ -67,6 +67,13 @@ function weightedYes(rows: PositionRow[], weightOf: (r: PositionRow) => number):
   return weight > 0 ? weighted / weight : null;
 }
 
+// Consensus tightness: unweighted stdev of the wallets' YES-equivalent entries. Low = they agree.
+function dispersion(rows: PositionRow[]): number {
+  const xs = rows.map(yesEqEntry);
+  const m = xs.reduce((a, x) => a + x, 0) / xs.length;
+  return Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / xs.length);
+}
+
 async function fetchPositions(): Promise<PositionRow[]> {
   const rows: PositionRow[] = [];
   const PAGE = 1000;
@@ -119,6 +126,7 @@ async function record(): Promise<void> {
     smart_v1: number;
     smart_dollar: number;
     smart_sqrt: number;
+    entry_dispersion: number;
     end_date: string | null;
   }
   const inserts: Insert[] = [];
@@ -152,6 +160,7 @@ async function record(): Promise<void> {
       smart_v1: v1,
       smart_dollar: dollar,
       smart_sqrt: sqrt,
+      entry_dispersion: dispersion(positioned),
       end_date: endDate
     });
   }
@@ -212,7 +221,7 @@ async function score(): Promise<void> {
 
   const { data: resolvedData, error: resolvedErr } = await supabase
     .from("forward_alpha_predictions")
-    .select("market_price, smart_v1, smart_dollar, smart_sqrt, resolved_outcome")
+    .select("market_price, smart_v1, smart_dollar, smart_sqrt, entry_dispersion, resolved_outcome")
     .not("resolved_outcome", "is", null);
   if (resolvedErr) throw resolvedErr;
   const resolved = (resolvedData ?? []) as {
@@ -220,6 +229,7 @@ async function score(): Promise<void> {
     smart_v1: number;
     smart_dollar: number;
     smart_sqrt: number;
+    entry_dispersion: number | null;
     resolved_outcome: number;
   }[];
 
@@ -263,6 +273,33 @@ async function score(): Promise<void> {
       console.log(`    >=${(minGap * 100).toFixed(0)}pt gap: n=${trades.length}, avg profit/$1=${avg >= 0 ? "+" : ""}${avg.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`);
     }
   }
+  // Consensus split: does a TIGHT smart-money cluster (low entry_dispersion) beat a scattered one?
+  // Split the resolved sample at its median dispersion and score each formula's tilt within each half.
+  // Skips rows recorded before the entry_dispersion column existed (029).
+  const withDisp = resolved.filter((r) => r.entry_dispersion !== null);
+  if (withDisp.length >= 4) {
+    const sortedDisp = withDisp.map((r) => r.entry_dispersion!).sort((a, b) => a - b);
+    const medianDisp = sortedDisp[Math.floor(sortedDisp.length / 2)]!;
+    console.log(`\nConsensus split — tight vs loose smart-money agreement (median dispersion ${medianDisp.toFixed(3)}):`);
+    for (const [label, get] of cols.slice(1)) {
+      console.log(`\n  [${label}]`);
+      for (const [tag, keep] of [["tight", true], ["loose", false]] as const) {
+        const half = withDisp.filter((r) => (r.entry_dispersion! <= medianDisp) === keep);
+        const profits = half.map((r) => {
+          const gap = get(r) - r.market_price;
+          return gap >= 0 ? r.resolved_outcome - r.market_price : r.market_price - r.resolved_outcome;
+        });
+        if (profits.length === 0) {
+          console.log(`    ${tag.padEnd(5)}: n=0`);
+          continue;
+        }
+        const avg = mean(profits);
+        const winRate = mean(profits.map((p) => (p > 0 ? 1 : 0)));
+        console.log(`    ${tag.padEnd(5)}: n=${profits.length}, avg profit/$1=${avg >= 0 ? "+" : ""}${avg.toFixed(3)}, win rate=${(winRate * 100).toFixed(1)}%`);
+      }
+    }
+  }
+
   console.log("\n(No survivorship bias here — predictions were locked before resolution. Still gross of fees/slippage.)");
 }
 
@@ -275,6 +312,7 @@ function selfCheck(): void {
   assert.ok(Math.abs(weightedYes(rows, () => 1)! - 0.65) < 1e-9); // (0.6 + 0.7) / 2
   assert.ok(Math.abs(weightedYes(rows, cost)! - (60 * 0.6 + 30 * 0.7) / 90) < 1e-9);
   assert.ok(Math.abs(yesEqCur(rows[1]!) - 0.55) < 1e-9); // NO holder cur 0.45 -> YES-equiv 0.55
+  assert.ok(Math.abs(dispersion(rows) - 0.05) < 1e-9); // yes-equiv entries {0.6, 0.7}, stdev = 0.05
 }
 
 async function main(): Promise<void> {
