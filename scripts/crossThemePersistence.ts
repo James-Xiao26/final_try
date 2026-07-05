@@ -138,7 +138,17 @@ function report(label: string, xs: number[], ys: number[], sideA: string, sideB:
     console.log(`    long-running theme (e.g. the Iran cluster) resolving across both halves inflates this.`);
     console.log(`    NOT evidence of transferable skill — read the theme splits below for that.`);
   } else {
-    const verdict = r >= 0.3 ? "TRANSFERS — evidence of general, cross-theme skill" : r <= 0.15 ? "does NOT transfer — edge is theme-specific, not general skill" : "weak/ambiguous";
+    // Deliberately conservative bands. A cross-theme r is confounded by (a) survivorship — the sample
+    // is board WINNERS, and (b) wallet non-independence — convergence means board wallets hold the SAME
+    // bets, so effective n is well below the wallet count and face-value significance is overstated. And
+    // "everything else" may hide a SECOND correlated theme-cluster, so a moderate r can mean "two macro
+    // reads" not "general skill." So 0.25–0.45 is "suggestive, not conclusive" — the forward test is the
+    // arbiter, not this. (Mirrors §4f: a backtest r that looked significant died under clustering.)
+    const verdict =
+      r >= 0.45 ? "TRANSFERS (strong) — but still verify on the forward test before trusting"
+      : r >= 0.25 ? "SUGGESTIVE — positive but NOT conclusive; survivorship + wallet-herding confounds remain"
+      : r <= 0.15 ? "does NOT transfer — edge is theme-specific, not general skill"
+      : "weak/ambiguous";
     console.log(`  → ${verdict}`);
   }
 }
