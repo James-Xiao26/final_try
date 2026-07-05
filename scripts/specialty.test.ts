@@ -34,6 +34,14 @@ function many(n: number, make: () => ClosedPosition): ClosedPosition[] {
   return Array.from({ length: n }, make);
 }
 
+// Distinct non-numeric suffixes so each generated title is its own market FAMILY (marketFamilyKey
+// strips numbers, so "market 1"/"market 2" would collapse — these words don't). walletSpecialty now
+// counts distinct families, not positions, so a category needs MIN_SPECIALTY_TRADES separate families.
+const FAMILY_SUFFIXES = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet", "kilo", "lima"];
+function families(base: string, count: number, make: (market: string) => ClosedPosition): ClosedPosition[] {
+  return FAMILY_SUFFIXES.slice(0, count).map((suffix) => make(`${base} ${suffix}`));
+}
+
 test("classifyMarket buckets titles by keyword, null for unclassifiable", () => {
   assert.equal(classifyMarket("Will Trump win Pennsylvania in the election?"), "Geopolitics");
   assert.equal(classifyMarket("Bitcoin above $100k by year end?"), "Crypto");
@@ -55,29 +63,29 @@ test("Geopolitics is matched before Sports' generic 'vs'", () => {
 });
 
 test("walletSpecialty picks the strongest qualifying category", () => {
-  const positions = [...many(10, () => winning("Trump 2024 election")), ...many(10, () => losing("Lakers vs Celtics"))];
-  // Geopolitics: +edge, n=10 ≥ MIN; Sports: −edge, disqualified.
+  const positions = [...families("Trump election", 10, winning), ...families("NBA game", 10, losing)];
+  // Geopolitics: +edge, 10 families ≥ MIN; Sports: −edge, disqualified.
   assert.equal(walletSpecialty(positions, CONFIG), "Geopolitics");
 });
 
 test("walletSpecialty ranks by shrunk edge when multiple qualify", () => {
-  const geopolitics = many(10, () => position({ market: "Senate race 2024", outcome: 1, avgPrice: 0.7 })); // +0.3
-  const crypto = many(10, () => position({ market: "Bitcoin to $100k", outcome: 1, avgPrice: 0.5 })); // +0.5
+  const geopolitics = families("Senate race", 10, (m) => position({ market: m, outcome: 1, avgPrice: 0.7 })); // +0.3
+  const crypto = families("Bitcoin above", 10, (m) => position({ market: m, outcome: 1, avgPrice: 0.5 })); // +0.5
   assert.equal(walletSpecialty([...geopolitics, ...crypto], CONFIG), "Crypto");
 });
 
 test("walletSpecialty returns null below the sample floor", () => {
-  const positions = many(CONFIG.MIN_SPECIALTY_TRADES - 1, () => winning("Trump 2024 election"));
+  const positions = families("Trump election", CONFIG.MIN_SPECIALTY_TRADES - 1, winning);
   assert.equal(walletSpecialty(positions, CONFIG), null);
 });
 
 test("walletSpecialty returns null with no positive-edge category", () => {
-  assert.equal(walletSpecialty(many(12, () => losing("Trump 2024 election")), CONFIG), null);
+  assert.equal(walletSpecialty(families("Trump election", 10, losing), CONFIG), null);
 });
 
 test("walletSpecialty ignores unresolved and unclassifiable positions", () => {
-  const unresolved = many(12, () => position({ market: "Trump 2024 election", outcome: null }));
-  const other = many(12, () => winning("Will it snow in Denver this week?"));
+  const unresolved = families("Trump election", 10, (m) => position({ market: m, outcome: null }));
+  const other = families("Denver snow", 10, winning);
   assert.equal(walletSpecialty([...unresolved, ...other], CONFIG), null);
 });
 
@@ -85,4 +93,14 @@ test("walletSpecialty ignores recurring 'Up or Down' windowed positions, same ca
   const windowed = many(20, () => winning("Bitcoin Up or Down - May 31, 1:55PM-2:00PM ET"));
   // Would otherwise easily clear MIN_SPECIALTY_TRADES with a strong positive edge.
   assert.equal(walletSpecialty(windowed, CONFIG), null);
+});
+
+test("walletSpecialty no longer mints a chip from one recurring family grind (family-collapse)", () => {
+  // 40 bets, all the same market family (date/number variants collapse) — one correlated observation,
+  // not 40. Would clear the old per-position floor easily; now counts as a single family < MIN.
+  const grind = [
+    ...many(20, () => winning("Elon posts 200-219 tweets this week")),
+    ...many(20, () => winning("Elon posts 40-64 tweets this week"))
+  ];
+  assert.equal(walletSpecialty(grind, CONFIG), null);
 });

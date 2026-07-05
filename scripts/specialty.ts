@@ -1,6 +1,6 @@
 import type { CONFIG } from "./config.js";
 import type { ClosedPosition } from "./polymarket.js";
-import { isScorableMarket } from "./metrics.js";
+import { isScorableMarket, marketFamilyKey } from "./metrics.js";
 
 // A wallet's "specialty" is the market category where it has both enough resolved bets AND a proven
 // positive forecasting edge — the same edge math the Skill Score uses (Bayesian-shrunk per-share
@@ -45,26 +45,29 @@ export function classifyMarket(title: string): Specialty | null {
   return null;
 }
 
-interface CategoryEdge {
-  edgeSum: number;
-  n: number;
-}
-
 /**
  * The category a wallet is demonstrably best at, or null if it has no standout specialty.
  *
  * Over the wallet's resolved positions (outcome known), groups by classified category and computes
  * the Bayesian-shrunk per-share edge for each: edgeSum / (n + EDGE_SHRINKAGE_K) — the same shrink
  * the Skill Score uses, so a 3-bet fluke can't out-rank a 40-bet record. A category qualifies only
- * with at least MIN_SPECIALTY_TRADES resolved bets and a positive shrunk edge; the specialty is the
+ * with at least MIN_SPECIALTY_TRADES observations and a positive shrunk edge; the specialty is the
  * qualifying category with the highest shrunk edge. Unclassifiable ("Other") positions count toward
  * nothing and can never win.
+ *
+ * FAMILY-COLLAPSE (matches computeMetrics — see ALPHA_RESEARCH_LOG.md §8): each market FAMILY (date/
+ * number variants of one recurring series, via marketFamilyKey) contributes ONE equal-weight edge
+ * observation per category, not one per position, and the MIN_SPECIALTY_TRADES floor + shrinkage
+ * denominator count distinct resolved *families*. Otherwise a wallet grinding one recurring series
+ * (e.g. hundreds of "Elon posts N tweets" buckets) could mint a Culture chip off a single correlated
+ * bet repeated N times. No-op for a diversified wallet (all-distinct families).
  */
 export function walletSpecialty(
   positions: ClosedPosition[],
   config: Pick<typeof CONFIG, "MIN_SPECIALTY_TRADES" | "EDGE_SHRINKAGE_K">
 ): Specialty | null {
-  const byCategory = new Map<Specialty, CategoryEdge>();
+  // category -> familyKey -> { edge sum, position count } for that family
+  const byCategory = new Map<Specialty, Map<string, { sum: number; n: number }>>();
 
   for (const position of positions) {
     if (position.outcome === null) {
@@ -77,18 +80,24 @@ export function walletSpecialty(
     if (category === null) {
       continue; // "Other"
     }
-    const entry = byCategory.get(category) ?? { edgeSum: 0, n: 0 };
-    entry.edgeSum += position.outcome - position.avgPrice;
-    entry.n += 1;
-    byCategory.set(category, entry);
+    const families = byCategory.get(category) ?? new Map<string, { sum: number; n: number }>();
+    const key = marketFamilyKey(position.market);
+    const fam = families.get(key) ?? { sum: 0, n: 0 };
+    fam.sum += position.outcome - position.avgPrice;
+    fam.n += 1;
+    families.set(key, fam);
+    byCategory.set(category, families);
   }
 
   let best: Specialty | null = null;
   let bestShrunkEdge = 0;
-  for (const [category, { edgeSum, n }] of byCategory) {
+  for (const [category, families] of byCategory) {
+    const familyMeanEdges = [...families.values()].map((fam) => fam.sum / fam.n);
+    const n = familyMeanEdges.length; // distinct families = independent observations
     if (n < config.MIN_SPECIALTY_TRADES) {
       continue;
     }
+    const edgeSum = familyMeanEdges.reduce((sum, edge) => sum + edge, 0);
     const shrunkEdge = edgeSum / (n + config.EDGE_SHRINKAGE_K);
     if (shrunkEdge > bestShrunkEdge) {
       best = category;

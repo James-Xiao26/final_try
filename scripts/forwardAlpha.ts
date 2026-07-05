@@ -260,13 +260,26 @@ async function score(): Promise<void> {
     ["smart sqrt(cost)", (r) => r.smart_sqrt],
     ["smart payout (size)", (r) => r.smart_payout]
   ];
+  // Market benchmark, scored over the FULL resolved set — the bar every smart formula must clear.
+  const marketBrier = mean(resolved.map((r) => brier(r.market_price, r.resolved_outcome)));
+  const marketAcc = acc(resolved.map((r) => r.market_price), actuals);
+
   console.log("\nBrier vs. outcome (lower = better) + directional accuracy:");
+  console.log("(Δmkt = edge OVER the market's own price — the only column that means alpha. Raw");
+  console.log(" accuracy is mostly just 'favorites usually win' and is NOT edge on its own.)");
   for (const [label, get] of cols) {
     const rowsF = resolved.filter((r) => get(r) !== null);
     const preds = rowsF.map((r) => get(r)!);
     const acts = rowsF.map((r) => r.resolved_outcome);
+    const b = mean(preds.map((p, i) => brier(p, acts[i]!)));
+    // Marginal edge: positive ΔBrier = beats the market; positive Δacc = more directionally right than
+    // the market. Blank for the benchmark row itself. Scored on the SAME rows so it's a fair paired gap.
+    const isBenchmark = label.startsWith("market");
+    const marginal = isBenchmark
+      ? ""
+      : `   Δmkt Brier ${(marketBrier - b >= 0 ? "+" : "")}${(marketBrier - b).toFixed(4)}   Δmkt acc ${(acc(preds, acts) - marketAcc >= 0 ? "+" : "")}${((acc(preds, acts) - marketAcc) * 100).toFixed(1)}pt`;
     console.log(
-      `  ${label.padEnd(26)} Brier ${mean(preds.map((p, i) => brier(p, acts[i]!))).toFixed(4)}   accuracy ${(acc(preds, acts) * 100).toFixed(1)}%   n=${rowsF.length}`
+      `  ${label.padEnd(26)} Brier ${b.toFixed(4)}   accuracy ${(acc(preds, acts) * 100).toFixed(1)}%   n=${rowsF.length}${marginal}`
     );
   }
 

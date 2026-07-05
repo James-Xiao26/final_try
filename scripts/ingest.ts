@@ -529,6 +529,43 @@ interface Database {
         };
         Relationships: [];
       };
+      closed_positions_archive: {
+        Row: {
+          address: string;
+          condition_id: string;
+          outcome_index: number;
+          close_time: string;
+          market: string | null;
+          avg_price: number | null;
+          realized_pnl: number | null;
+          size: number | null;
+          outcome: number | null;
+          event_slug: string | null;
+          first_seen_at: string;
+        };
+        Insert: {
+          address: string;
+          condition_id: string;
+          outcome_index: number;
+          close_time: string;
+          market?: string | null;
+          avg_price?: number | null;
+          realized_pnl?: number | null;
+          size?: number | null;
+          outcome?: number | null;
+          event_slug?: string | null;
+          first_seen_at?: string;
+        };
+        Update: {
+          market?: string | null;
+          avg_price?: number | null;
+          realized_pnl?: number | null;
+          size?: number | null;
+          outcome?: number | null;
+          event_slug?: string | null;
+        };
+        Relationships: [];
+      };
       market_price_history: {
         Row: {
           asset: string;
@@ -1362,6 +1399,45 @@ async function replaceWalletClosedPositions(
     }
   }
   return scoped.length;
+}
+
+// Append-only archive of board wallets' closed positions (migration 031). Unlike the wipe-and-replace
+// cache above, this NEVER prunes and stores `outcome` (resolved 0/1) — so months of distinct market
+// themes accumulate for the cross-theme persistence analysis (crossThemePersistence.ts), which the
+// 90-day rolling cache makes impossible. Upsert with ignoreDuplicates: a resolved position is immutable,
+// so the first sighting wins and re-seeing it on later daily runs is a no-op. Only records with a
+// non-null close_time are archivable (it's part of the primary key).
+async function archiveClosedPositions(
+  supabase: SupabaseClient,
+  records: ClosedPositionRecord[],
+  boardAddresses: Set<string>
+): Promise<number> {
+  const rows = records
+    .filter((record) => boardAddresses.has(record.address) && record.closeTime)
+    .map((record) => ({
+      address: record.address,
+      condition_id: record.conditionId,
+      outcome_index: record.outcomeIndex,
+      close_time: record.closeTime,
+      market: record.market,
+      avg_price: record.avgPrice,
+      realized_pnl: record.realizedPnl,
+      size: record.size,
+      outcome: record.outcome,
+      event_slug: record.eventSlug
+    }));
+  for (let offset = 0; offset < rows.length; offset += CONFIG.RECENT_TRADES_INSERT_CHUNK) {
+    const { error } = await supabase
+      .from("closed_positions_archive")
+      .upsert(rows.slice(offset, offset + CONFIG.RECENT_TRADES_INSERT_CHUNK), {
+        onConflict: "address,condition_id,outcome_index,close_time",
+        ignoreDuplicates: true
+      });
+    if (error) {
+      throw error;
+    }
+  }
+  return rows.length;
 }
 
 // crowded_markets_cache stores all markets with ≥5 leaderboard participants (no row cap).
@@ -2717,6 +2793,15 @@ async function main(): Promise<void> {
   // Closed-position basis cache. Already board-scoped above; replaceWalletClosedPositions re-applies
   // the boardAddresses filter defensively. Sourced from the /closed-positions payload already fetched.
   const closedPositionCount = await replaceWalletClosedPositions(supabase, boardClosed, boardAddresses);
+  // Append the same closed positions to the never-pruned archive (migration 031) for cross-theme
+  // persistence research. Non-fatal: the rolling cache above is what the site reads, so an archive
+  // failure must not abort the run.
+  try {
+    const archivedCount = await archiveClosedPositions(supabase, boardClosed, boardAddresses);
+    console.log(`Archived ${archivedCount} closed-position rows (append-only, ignoreDuplicates).`);
+  } catch (reason) {
+    console.warn(`Closed-position archive failed (non-fatal): ${describeError(reason)}`);
+  }
 
   // Precompute the Convergence ("crowded markets") ranked list so the web app reads a tiny cache
   // instead of scanning the whole position table per request (Fix C). Must run after the position

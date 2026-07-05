@@ -605,11 +605,11 @@ export function mapEventCandidates(record: JsonRecord): EventSummary[] {
 }
 
 export class PolymarketClient {
-  async getClosedPositions(address: string): Promise<ClosedPosition[]> {
-    // Positions older than the largest scoring horizon are discarded downstream, so stop
-    // paginating once we cross that boundary (the API returns newest-first).
-    const maxHorizonDays = Math.max(...CONFIG.HORIZONS);
-    const cutoffMs = Date.now() - maxHorizonDays * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
+  async getClosedPositions(address: string, maxDays = Math.max(...CONFIG.HORIZONS)): Promise<ClosedPosition[]> {
+    // Positions older than maxDays are discarded downstream, so stop paginating once we cross that
+    // boundary (the API returns newest-first). Defaults to the largest scoring horizon (the daily
+    // ingest's needs); the one-off archive backfill passes a wider window for deeper history.
+    const cutoffMs = Date.now() - maxDays * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
     const positions: ClosedPosition[] = [];
     for (let pageIndex = 0; pageIndex < CONFIG.MAX_CLOSED_POSITION_PAGES; pageIndex += 1) {
       const params = new URLSearchParams({

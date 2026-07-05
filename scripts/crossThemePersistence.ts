@@ -1,0 +1,192 @@
+// Cross-theme persistence test — the question the 90-day rolling cache couldn't answer.
+//
+//   pnpm --filter edgeboard-scripts exec tsx crossThemePersistence.ts
+//
+// The core alpha doubt (ALPHA_RESEARCH_LOG.md §5.5): the leaderboard's apparent skill might be ONE
+// correct macro read (spring-2026 Iran) replicated across date-variant markets, not a repeatable
+// forecasting process. Real skill leaves a trace on OTHER themes and PERSISTS over time; a one-lucky-
+// -theme artifact does not. This reads the never-pruned closed_positions_archive (migration 031) and
+// runs two persistence checks across wallets:
+//
+//   1. TIME-split    — each wallet's first-half vs second-half resolved history (by close_time).
+//   2. THEME-split   — each wallet's Geopolitics edge vs its non-Geopolitics edge.
+//
+// For each split it computes every wallet's Bayesian-shrunk, FAMILY-COLLAPSED per-share edge on each
+// side (same math as the Skill Score: correlated date/number variants of one series count once), then
+// the Pearson correlation of side-A edge vs side-B edge across wallets. r≈0 => no persistence => the
+// edge does NOT generalize (confirms the null result). r meaningfully positive => real, transferable
+// skill. Needs the archive to have depth first — run archiveBackfill.ts once before this.
+import { config as loadEnv } from "dotenv";
+import { createClient } from "@supabase/supabase-js";
+import { strict as assert } from "node:assert";
+import { CONFIG } from "./config.js";
+import { isScorableMarket, marketFamilyKey } from "./metrics.js";
+import { classifyMarket } from "./specialty.js";
+
+loadEnv({ path: "../.env.local" });
+loadEnv();
+
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing required environment variable: ${name}`);
+  return value;
+}
+
+const supabase = createClient(requiredEnv("NEXT_PUBLIC_SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
+
+const K = CONFIG.EDGE_SHRINKAGE_K; // shrinkage prior, same as the Skill Score
+const MIN_FAMILIES_PER_SIDE = 4; // a side needs this many distinct market families to get a usable edge
+
+interface Row {
+  address: string;
+  market: string | null;
+  avg_price: number | null;
+  outcome: number | null;
+  close_time: string | null;
+}
+
+async function fetchArchive(): Promise<Row[]> {
+  const rows: Row[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("closed_positions_archive")
+      .select("address, market, avg_price, outcome, close_time")
+      .not("outcome", "is", null)
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as Row[];
+    rows.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+  return rows;
+}
+
+// Family-collapsed, Bayesian-shrunk per-share edge over a set of resolved positions, or null if the
+// set has fewer than MIN_FAMILIES_PER_SIDE distinct families (too thin to trust).
+function shrunkEdge(rows: Row[]): number | null {
+  const fam = new Map<string, { sum: number; n: number }>();
+  for (const r of rows) {
+    if (r.outcome === null || r.avg_price === null || !r.market) continue;
+    if (!isScorableMarket(r.market)) continue;
+    const key = marketFamilyKey(r.market);
+    const e = fam.get(key) ?? { sum: 0, n: 0 };
+    e.sum += r.outcome - r.avg_price;
+    e.n += 1;
+    fam.set(key, e);
+  }
+  const familyEdges = [...fam.values()].map((e) => e.sum / e.n);
+  if (familyEdges.length < MIN_FAMILIES_PER_SIDE) return null;
+  const total = familyEdges.reduce((a, b) => a + b, 0);
+  return total / (familyEdges.length + K);
+}
+
+// Pearson correlation of two equal-length series (returns null if <3 points or a side is constant).
+function pearson(xs: number[], ys: number[]): number | null {
+  const n = xs.length;
+  if (n < 3) return null;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (let i = 0; i < n; i += 1) {
+    sxy += (xs[i]! - mx) * (ys[i]! - my);
+    sxx += (xs[i]! - mx) ** 2;
+    syy += (ys[i]! - my) ** 2;
+  }
+  if (sxx === 0 || syy === 0) return null;
+  return sxy / Math.sqrt(sxx * syy);
+}
+
+// Pairs of (side-A edge, side-B edge) across wallets, for wallets where BOTH sides are usable.
+function correlate(byWallet: Map<string, Row[]>, split: (rows: Row[]) => [Row[], Row[]]): { xs: number[]; ys: number[] } {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (const rows of byWallet.values()) {
+    const [a, b] = split(rows);
+    const ea = shrunkEdge(a);
+    const eb = shrunkEdge(b);
+    if (ea === null || eb === null) continue;
+    xs.push(ea);
+    ys.push(eb);
+  }
+  return { xs, ys };
+}
+
+function report(label: string, xs: number[], ys: number[], sideA: string, sideB: string): void {
+  const r = pearson(xs, ys);
+  const mean = (v: number[]): number => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0);
+  const signAgree = xs.length ? xs.filter((x, i) => Math.sign(x) === Math.sign(ys[i]!)).length / xs.length : 0;
+  console.log(`\n── ${label} (n=${xs.length} wallets with both sides usable) ──`);
+  if (xs.length < 3) {
+    console.log("  Too few wallets have enough resolved history on BOTH sides yet. Backfill deeper / wait.");
+    return;
+  }
+  console.log(`  mean shrunk edge — ${sideA}: ${mean(xs) >= 0 ? "+" : ""}${mean(xs).toFixed(4)}   ${sideB}: ${mean(ys) >= 0 ? "+" : ""}${mean(ys).toFixed(4)}`);
+  console.log(`  edge-sign agreement across sides: ${(signAgree * 100).toFixed(0)}%`);
+  console.log(`  Pearson r(${sideA} edge, ${sideB} edge) = ${r === null ? "n/a" : r.toFixed(3)}`);
+  if (r !== null) {
+    const verdict = r >= 0.3 ? "PERSISTS — evidence of transferable skill" : r <= 0.1 ? "does NOT persist — edge is side-specific, not a general skill" : "weak/ambiguous";
+    console.log(`  → ${verdict}`);
+  }
+}
+
+function medianCloseSplit(rows: Row[]): [Row[], Row[]] {
+  const dated = rows.filter((r) => r.close_time).sort((a, b) => Date.parse(a.close_time!) - Date.parse(b.close_time!));
+  const mid = Math.floor(dated.length / 2);
+  return [dated.slice(0, mid), dated.slice(mid)];
+}
+
+function geoSplit(rows: Row[]): [Row[], Row[]] {
+  const geo: Row[] = [];
+  const other: Row[] = [];
+  for (const r of rows) {
+    if (!r.market) continue;
+    (classifyMarket(r.market) === "Geopolitics" ? geo : other).push(r);
+  }
+  return [geo, other];
+}
+
+async function main(): Promise<void> {
+  selfCheck();
+  const rows = await fetchArchive();
+  console.log(`Loaded ${rows.length} resolved archived positions.`);
+  if (rows.length === 0) {
+    console.log("Archive is empty. Apply migration 031 and run archiveBackfill.ts (or a full ingest) first.");
+    return;
+  }
+  const byWallet = new Map<string, Row[]>();
+  for (const r of rows) {
+    const g = byWallet.get(r.address);
+    if (g) g.push(r);
+    else byWallet.set(r.address, [r]);
+  }
+  console.log(`${byWallet.size} distinct wallets in the archive.`);
+
+  const time = correlate(byWallet, medianCloseSplit);
+  report("TIME-split persistence: first-half vs second-half history", time.xs, time.ys, "1st-half", "2nd-half");
+
+  const theme = correlate(byWallet, geoSplit);
+  report("THEME-split persistence: Geopolitics vs everything else", theme.xs, theme.ys, "geo", "non-geo");
+
+  console.log("\n(r near 0 on both = the leaderboard's edge does not generalize — consistent with §5.5.)");
+}
+
+// Guards the shrinkage + Pearson math (ponytail: one runnable check for the non-trivial logic).
+function selfCheck(): void {
+  // Perfectly correlated series -> r = 1; anti-correlated -> r = -1.
+  assert.ok(Math.abs(pearson([1, 2, 3, 4], [2, 4, 6, 8])! - 1) < 1e-9);
+  assert.ok(Math.abs(pearson([1, 2, 3, 4], [8, 6, 4, 2])! + 1) < 1e-9);
+  // shrunkEdge: 4 distinct families each +0.5 edge -> 2.0 / (4 + 50) = 0.037.
+  const mk = (fam: string): Row => ({ address: "a", market: `topic ${fam} thing`, avg_price: 0.5, outcome: 1, close_time: null });
+  const edge = shrunkEdge([mk("alpha"), mk("bravo"), mk("charlie"), mk("delta")]);
+  assert.ok(edge !== null && Math.abs(edge - 2 / 54) < 1e-9);
+  // Below the family floor -> null.
+  assert.equal(shrunkEdge([mk("alpha"), mk("bravo")]), null);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
