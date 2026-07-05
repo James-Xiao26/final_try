@@ -126,10 +126,10 @@ async function main(): Promise<void> {
   const candidates = buildCandidates(trades, elite, Date.now(), { freshDays: FRESH_DAYS, minPrice: MIN_PRICE, maxPrice: MAX_PRICE, minLiquidity: MIN_LIQUIDITY_USD });
 
   // Enrich with Gamma: the exact side label (outcomes[outcomeIndex] — "Over"/team/"Yes", NOT a bare
-  // YES/NO), and drop markets already resolved or past their end date (you can't bet a played game).
+  // YES/NO), the event/game grouping, and drop markets already resolved or past their end date.
   const client = new PolymarketClient();
   const now = Date.now();
-  interface Live { c: Candidate; bet: string; endDays: number }
+  interface Live { c: Candidate; bet: string; marketType: string; game: string; endDays: number }
   const live: Live[] = [];
   let dropped = 0;
   for (const c of candidates.slice(0, 80)) {
@@ -138,20 +138,45 @@ async function main(): Promise<void> {
     const endMs = brief.endDate ? Date.parse(brief.endDate) : NaN;
     if (!Number.isNaN(endMs) && endMs <= now) { dropped += 1; continue; } // already ended
     const bet = brief.outcomes[c.outcomeIndex] ?? c.side; // exact label, fall back to YES/NO
-    live.push({ c, bet, endDays: Number.isNaN(endMs) ? NaN : (endMs - now) / 86_400_000 });
+    // Game = Polymarket's event title stem (before " - "), its authoritative grouping. Falls back to
+    // the market question when a market has no event, so standalone markets stay their own group.
+    const game = (brief.eventTitle ?? c.question).split(" - ")[0]!.trim();
+    const marketType = brief.groupItemTitle ?? c.question;
+    live.push({ c, bet, marketType, game, endDays: Number.isNaN(endMs) ? NaN : (endMs - now) / 86_400_000 });
   }
 
-  console.log(`Feed: ${trades.length} board fills -> ${candidates.length} elite candidates -> ${live.length} still-open (dropped ${dropped} resolved/ended).\n`);
-  console.log(`BET (exact side) | ~price | agree | edge/sh | sharp$ | ~resolves | market`);
-  console.log(`-----------------+--------+-------+---------+--------+-----------+-----------------------------------`);
-  for (const { c, bet, endDays } of live.slice(0, 40)) {
-    const resolves = Number.isNaN(endDays) ? "?" : endDays < 1 ? "<1d" : `${endDays.toFixed(0)}d`;
-    const edge = `+${c.avgEliteEdge.toFixed(3)}`;
-    console.log(`${bet.slice(0, 16).padEnd(16)} |  ${c.avgPrice.toFixed(2)}  |  ${String(c.wallets).padStart(2)}w  |  ${edge.padStart(6)} | ${Math.round(c.usd).toString().padStart(6)} | ${resolves.padStart(9)} | ${c.question.slice(0, 52)}`);
+  // Group by game/event so one game occupies ONE slot (not 5). Distinct bet TYPES within a game stay
+  // separate lines — never merged — so O/U isn't confused with the moneyline. Rank games by their single
+  // strongest market (agreement, then edge), and within a game show markets strongest-first.
+  const byGame = new Map<string, Live[]>();
+  for (const l of live) (byGame.get(l.game) ?? byGame.set(l.game, []).get(l.game)!).push(l);
+  for (const g of byGame.values()) g.sort((a, b) => b.c.wallets - a.c.wallets || b.c.avgEliteEdge - a.c.avgEliteEdge || b.c.usd - a.c.usd);
+  const games = [...byGame.entries()].sort(([, a], [, b]) => b[0]!.c.wallets - a[0]!.c.wallets || b[0]!.c.avgEliteEdge - a[0]!.c.avgEliteEdge || b[0]!.c.usd - a[0]!.c.usd);
+
+  console.log(`Feed: ${trades.length} board fills -> ${candidates.length} elite candidates -> ${live.length} still-open (dropped ${dropped} resolved/ended).`);
+  console.log(`Grouped into ${games.length} distinct games/events, best-first. Each ▸ block is ONE game — its lines are different bets, pick one.\n`);
+  const fmtResolve = (d: number): string => (Number.isNaN(d) ? "?" : d < 1 ? "<1d" : `${d.toFixed(0)}d`);
+  for (const [game, markets] of games.slice(0, 20)) {
+    // Collapse the SAME market (same condition_id) so opposite sides don't show as two bets: keep the
+    // side elite wallets favour, note the dissent. Safe — same condition_id is authoritatively one bet.
+    const byMarket = new Map<string, Live[]>();
+    for (const l of markets) (byMarket.get(l.c.conditionId) ?? byMarket.set(l.c.conditionId, []).get(l.c.conditionId)!).push(l);
+    const lines = [...byMarket.values()].map((sides) => {
+      sides.sort((a, b) => b.c.wallets - a.c.wallets || b.c.usd - a.c.usd);
+      return { top: sides[0]!, dissent: sides[1] ?? null };
+    });
+    lines.sort((a, b) => b.top.c.wallets - a.top.c.wallets || b.top.c.avgEliteEdge - a.top.c.avgEliteEdge || b.top.c.usd - a.top.c.usd);
+    console.log(`▸ ${game}   (resolves ${fmtResolve(lines[0]!.top.endDays)}, ${lines.length} elite market${lines.length > 1 ? "s" : ""})`);
+    for (const { top, dissent } of lines) {
+      const { c, bet, marketType } = top;
+      const type = marketType === game ? "" : ` · ${marketType.replace(`${game}: `, "").slice(0, 22)}`;
+      const split = dissent ? `  [${dissent.c.wallets}w disagree: ${dissent.bet.slice(0, 10)}]` : "";
+      console.log(`    bet ${bet.slice(0, 14).padEnd(14)} @<=${c.avgPrice.toFixed(2)}  ${String(c.wallets).padStart(2)}w  +${c.avgEliteEdge.toFixed(3)}/sh  $${Math.round(c.usd).toString().padStart(5)}${type}${split}`);
+    }
   }
-  console.log(`\nEach row = buy the "BET" side at <=~the shown price. Top few are best: prefer agree>=2, higher edge/sh, higher sharp$.`);
-  console.log(`edge/sh = the copying elite wallets' historical profit per share over entry (a quality proxy, not a guarantee).`);
-  console.log(`Skip anything you can't buy within ~2-3c of the shown price — the spread eats a tiny bet.`);
+  console.log(`\nEach ▸ game = one bet to consider; take the top line (strongest). Other lines are DIFFERENT bets on the same`);
+  console.log(`game (correlated) — only add one if you want that separate angle. "[Nw disagree]" = elite wallets split on that`);
+  console.log(`market. Buy within ~2-3c of the shown price or skip (spread). edge/sh = copiers' historical profit/share (proxy).`);
 }
 
 function selfCheck(): void {

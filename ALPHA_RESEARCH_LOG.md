@@ -351,7 +351,13 @@ collapsed shrunk per-share edge is both strong (≥0.03/sh over ≥8 families) A
 BOTH history halves — the §9 time-persistence signal, which is theme-confounded as PROOF but exactly the
 right practical filter for SELECTING who to copy). Live: 123/148 archive wallets clear the gate; ranked
 by multi-wallet agreement → edge → size, so the top rows are 2–4 elite wallets on the same side. Gamma
-enrichment labels the exact bet (Over/team/Yes) and drops resolved/ended markets.
+enrichment labels the exact bet (Over/team/Yes) and drops resolved/ended markets. Output is GROUPED by
+Polymarket's own event (title stem before " - "), so one game is one slot instead of eating five — its
+distinct bet types (moneyline / O/U / corners) stay separate lines (never merged, to avoid conflating
+different bets), and opposite sides of the SAME market (same condition_id) are netted to one line with
+the dissent flagged. Known gap: a cross-EVENT complement (e.g. "Team to Advance" vs "Stage of
+Elimination", different Polymarket events) isn't auto-merged — deliberately, since forcing it needs
+fragile semantic matching.
 
 Honesty ceiling (unchanged verdict): the edge/share shown is RAW and survivorship-inflated; this is the
 best available RANKING of who to copy, not proof of forward edge. It doubles as forward-test data
