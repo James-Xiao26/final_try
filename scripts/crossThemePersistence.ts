@@ -114,7 +114,11 @@ function correlate(byWallet: Map<string, Row[]>, split: (rows: Row[]) => [Row[],
   return { xs, ys };
 }
 
-function report(label: string, xs: number[], ys: number[], sideA: string, sideB: string): void {
+// kind distinguishes the two split types. A TIME split cannot separate themes, so a single long-running
+// theme (the Iran cluster) resolving across both halves inflates r — high time-persistence is NOT
+// evidence of transferable skill and is labelled as theme-confounded. Only a THEME split (edge on one
+// kind of market vs a DIFFERENT kind) can claim transfer.
+function report(label: string, xs: number[], ys: number[], sideA: string, sideB: string, kind: "time" | "theme"): void {
   const r = pearson(xs, ys);
   const mean = (v: number[]): number => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0);
   const signAgree = xs.length ? xs.filter((x, i) => Math.sign(x) === Math.sign(ys[i]!)).length / xs.length : 0;
@@ -124,10 +128,17 @@ function report(label: string, xs: number[], ys: number[], sideA: string, sideB:
     return;
   }
   console.log(`  mean shrunk edge — ${sideA}: ${mean(xs) >= 0 ? "+" : ""}${mean(xs).toFixed(4)}   ${sideB}: ${mean(ys) >= 0 ? "+" : ""}${mean(ys).toFixed(4)}`);
-  console.log(`  edge-sign agreement across sides: ${(signAgree * 100).toFixed(0)}%`);
+  // Sign agreement is a base-rate artifact when both sides skew positive (a winner sample) — reported
+  // for completeness, but it is NOT informative. r is the signal.
+  console.log(`  edge-sign agreement across sides: ${(signAgree * 100).toFixed(0)}% (base-rate artifact on a winner sample — ignore; use r)`);
   console.log(`  Pearson r(${sideA} edge, ${sideB} edge) = ${r === null ? "n/a" : r.toFixed(3)}`);
-  if (r !== null) {
-    const verdict = r >= 0.3 ? "PERSISTS — evidence of transferable skill" : r <= 0.1 ? "does NOT persist — edge is side-specific, not a general skill" : "weak/ambiguous";
+  if (r === null) return;
+  if (kind === "time") {
+    console.log(`  → persistence over time, but THEME-CONFOUNDED: a time split does not separate themes, so one`);
+    console.log(`    long-running theme (e.g. the Iran cluster) resolving across both halves inflates this.`);
+    console.log(`    NOT evidence of transferable skill — read the theme splits below for that.`);
+  } else {
+    const verdict = r >= 0.3 ? "TRANSFERS — evidence of general, cross-theme skill" : r <= 0.15 ? "does NOT transfer — edge is theme-specific, not general skill" : "weak/ambiguous";
     console.log(`  → ${verdict}`);
   }
 }
@@ -148,6 +159,21 @@ function geoSplit(rows: Row[]): [Row[], Row[]] {
   return [geo, other];
 }
 
+// The sharpened theme test. "Geopolitics" lumps the spring-2026 Iran cluster (the one theme the entire
+// in-sample edge traces to — §4e/§5.5) together with elections and other geo, muddying both sides. This
+// isolates Iran specifically: does a wallet's edge on the Iran cluster transfer to LITERALLY anything
+// else? \b before "iran" avoids matching e.g. "Tirana"; the hyphen in "US-Iran" is a word boundary.
+const IRAN_THEME = /\b(?:iran|hormuz|tehran|khamenei|ayatollah|strait of hormuz)/i;
+function iranSplit(rows: Row[]): [Row[], Row[]] {
+  const iran: Row[] = [];
+  const other: Row[] = [];
+  for (const r of rows) {
+    if (!r.market) continue;
+    (IRAN_THEME.test(r.market) ? iran : other).push(r);
+  }
+  return [iran, other];
+}
+
 async function main(): Promise<void> {
   selfCheck();
   const rows = await fetchArchive();
@@ -165,12 +191,16 @@ async function main(): Promise<void> {
   console.log(`${byWallet.size} distinct wallets in the archive.`);
 
   const time = correlate(byWallet, medianCloseSplit);
-  report("TIME-split persistence: first-half vs second-half history", time.xs, time.ys, "1st-half", "2nd-half");
+  report("TIME-split: first-half vs second-half history", time.xs, time.ys, "1st-half", "2nd-half", "time");
 
-  const theme = correlate(byWallet, geoSplit);
-  report("THEME-split persistence: Geopolitics vs everything else", theme.xs, theme.ys, "geo", "non-geo");
+  const iran = correlate(byWallet, iranSplit);
+  report("THEME-split (SHARPENED): Iran cluster vs everything else", iran.xs, iran.ys, "iran", "non-iran", "theme");
 
-  console.log("\n(r near 0 on both = the leaderboard's edge does not generalize — consistent with §5.5.)");
+  const geo = correlate(byWallet, geoSplit);
+  report("THEME-split: Geopolitics (all) vs everything else", geo.xs, geo.ys, "geo", "non-geo", "theme");
+
+  console.log("\n(The Iran-isolated theme split is the decisive test: r near 0 there = the edge is one");
+  console.log(" theme, not a general skill — consistent with §5.5. The time split cannot show this.)");
 }
 
 // Guards the shrinkage + Pearson math (ponytail: one runnable check for the non-trivial logic).
