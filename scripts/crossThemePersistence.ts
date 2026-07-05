@@ -261,7 +261,7 @@ function selfCheck(): void {
   assert.ok(Math.abs(pearson([1, 2, 3, 4], [2, 4, 6, 8])! - 1) < 1e-9);
   assert.ok(Math.abs(pearson([1, 2, 3, 4], [8, 6, 4, 2])! + 1) < 1e-9);
   // shrunkEdge: 4 distinct families each +0.5 edge -> 2.0 / (4 + 50) = 0.037.
-  const mk = (fam: string): Row => ({ address: "a", market: `topic ${fam} thing`, avg_price: 0.5, outcome: 1, close_time: null });
+  const mk = (fam: string): Row => ({ address: "a", condition_id: fam, market: `topic ${fam} thing`, avg_price: 0.5, outcome: 1, close_time: null });
   const edge = shrunkEdge([mk("alpha"), mk("bravo"), mk("charlie"), mk("delta")]);
   assert.ok(edge !== null && Math.abs(edge - 2 / 54) < 1e-9);
   // Below the family floor -> null.
