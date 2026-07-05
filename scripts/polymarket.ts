@@ -712,6 +712,25 @@ export class PolymarketClient {
     return resolvedOutcomeFromMarket(first);
   }
 
+  // Brief market metadata for a condition_id (Gamma). `outcomes` are the real side labels
+  // ("Over"/"Under", team names, "Yes"/"No"), index-aligned with a trade's outcome_index and with
+  // clobTokenIds — so outcomes[outcome_index] is exactly the side a fill was on. `endDate` is the
+  // scheduled close; `resolved` is true once the UMA oracle settles or the market is closed. For the
+  // copy-list tool: label the exact bet and drop already-decided markets. Queries WITHOUT closed=true so
+  // still-open markets are returned (Gamma includes open by default); a null return = no open market
+  // (closed/hidden/unknown) and the caller drops it.
+  async getMarketBrief(conditionId: string): Promise<{ outcomes: string[]; endDate: string | null; resolved: boolean } | null> {
+    const params = new URLSearchParams({ condition_ids: conditionId });
+    const response = await fetchJson("/markets", params, "general", CONFIG.GAMMA_API_BASE);
+    const first = asArray(response).filter(isRecord)[0];
+    if (!first) return null;
+    return {
+      outcomes: parseJsonArray(first.outcomes).map((entry) => String(entry)),
+      endDate: readString(first, ["endDate", "end_date"]) || null,
+      resolved: first.umaResolutionStatus === "resolved" || first.closed === true
+    };
+  }
+
   async getActivity(address: string, limit = CONFIG.ACTIVITY_LIMIT): Promise<TradeActivity[]> {
     const params = new URLSearchParams({
       user: address,

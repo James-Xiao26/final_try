@@ -19,6 +19,7 @@
 import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { strict as assert } from "node:assert";
+import { PolymarketClient } from "./polymarket.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -49,6 +50,8 @@ interface Trade {
 }
 
 interface Candidate {
+  conditionId: string;
+  outcomeIndex: number;
   question: string;
   side: "YES" | "NO";
   wallets: number;
@@ -71,10 +74,10 @@ export function buildCandidates(trades: Trade[], skill: Map<string, number>, now
       t.price >= opts.minPrice &&
       t.price <= opts.maxPrice
   );
-  const agg = new Map<string, { question: string; yes: boolean; wallets: Set<string>; usd: number; pSum: number; bestSkill: number; latest: string }>();
+  const agg = new Map<string, { conditionId: string; outcomeIndex: number; question: string; yes: boolean; wallets: Set<string>; usd: number; pSum: number; bestSkill: number; latest: string }>();
   for (const t of fresh) {
     const key = `${t.condition_id}:${t.outcome_index}`;
-    const g = agg.get(key) ?? { question: t.market ?? "(unknown)", yes: t.outcome_index === 0, wallets: new Set<string>(), usd: 0, pSum: 0, bestSkill: 0, latest: t.traded_at };
+    const g = agg.get(key) ?? { conditionId: t.condition_id!, outcomeIndex: t.outcome_index ?? 0, question: t.market ?? "(unknown)", yes: t.outcome_index === 0, wallets: new Set<string>(), usd: 0, pSum: 0, bestSkill: 0, latest: t.traded_at };
     g.wallets.add(t.address);
     g.usd += t.usdc_size;
     g.pSum += t.price * t.usdc_size;
@@ -84,7 +87,7 @@ export function buildCandidates(trades: Trade[], skill: Map<string, number>, now
   }
   return [...agg.values()]
     .filter((g) => g.usd >= opts.minLiquidity)
-    .map((g) => ({ question: g.question, side: (g.yes ? "YES" : "NO") as "YES" | "NO", wallets: g.wallets.size, bestSkill: g.bestSkill, usd: g.usd, avgPrice: g.usd > 0 ? g.pSum / g.usd : 0, latestAgeDays: ageDays(g.latest) }))
+    .map((g) => ({ conditionId: g.conditionId, outcomeIndex: g.outcomeIndex, question: g.question, side: (g.yes ? "YES" : "NO") as "YES" | "NO", wallets: g.wallets.size, bestSkill: g.bestSkill, usd: g.usd, avgPrice: g.usd > 0 ? g.pSum / g.usd : 0, latestAgeDays: ageDays(g.latest) }))
     .sort((a, b) => b.wallets - a.wallets || b.bestSkill - a.bestSkill || b.usd - a.usd);
 }
 
@@ -108,13 +111,30 @@ async function main(): Promise<void> {
 
   const candidates = buildCandidates(trades, skill, Date.now(), { freshDays: FRESH_DAYS, minSkill: MIN_SKILL, minPrice: MIN_PRICE, maxPrice: MAX_PRICE, minLiquidity: MIN_LIQUIDITY_USD });
 
-  console.log(`Feed: ${trades.length} board fills. Copy candidates (BUY, last ${FRESH_DAYS}d, skill>=${MIN_SKILL}, ${MIN_PRICE}-${MAX_PRICE}, >=$${MIN_LIQUIDITY_USD} sharp \$): ${candidates.length}\n`);
-  console.log(`buy | ~price | wallets | topSkill |  sharp$ | fresh | market`);
-  console.log(`----+--------+---------+----------+---------+-------+------------------------------------------`);
-  for (const c of candidates.slice(0, 40)) {
-    console.log(`${c.side.padEnd(3)} |  ${c.avgPrice.toFixed(2)}  |   ${String(c.wallets).padStart(2)}    |   ${c.bestSkill.toFixed(1)}    | ${Math.round(c.usd).toString().padStart(7)} | ${c.latestAgeDays.toFixed(1)}d  | ${c.question.slice(0, 58)}`);
+  // Enrich with Gamma: the exact side label (outcomes[outcomeIndex] — "Over"/team/"Yes", NOT a bare
+  // YES/NO), and drop markets already resolved or past their end date (you can't bet a played game).
+  const client = new PolymarketClient();
+  const now = Date.now();
+  interface Live { c: Candidate; bet: string; endDays: number }
+  const live: Live[] = [];
+  let dropped = 0;
+  for (const c of candidates.slice(0, 80)) {
+    const brief = await client.getMarketBrief(c.conditionId).catch(() => null);
+    if (!brief || brief.resolved) { dropped += 1; continue; }
+    const endMs = brief.endDate ? Date.parse(brief.endDate) : NaN;
+    if (!Number.isNaN(endMs) && endMs <= now) { dropped += 1; continue; } // already ended
+    const bet = brief.outcomes[c.outcomeIndex] ?? c.side; // exact label, fall back to YES/NO
+    live.push({ c, bet, endDays: Number.isNaN(endMs) ? NaN : (endMs - now) / 86_400_000 });
   }
-  console.log(`\nMirror at <=~the shown price. Prefer wallets>=2 (agreement) and higher sharp$ (tighter spread).`);
+
+  console.log(`Feed: ${trades.length} board fills -> ${candidates.length} raw candidates -> ${live.length} still-open (dropped ${dropped} resolved/ended).\n`);
+  console.log(`BET (exact side) | ~price | agree | skill |  sharp$ | ~resolves | market`);
+  console.log(`-----------------+--------+-------+-------+---------+-----------+-----------------------------------`);
+  for (const { c, bet, endDays } of live.slice(0, 40)) {
+    const resolves = Number.isNaN(endDays) ? "?" : endDays < 1 ? "<1d" : `${endDays.toFixed(0)}d`;
+    console.log(`${bet.slice(0, 16).padEnd(16)} |  ${c.avgPrice.toFixed(2)}  |  ${String(c.wallets).padStart(2)}w  |  ${c.bestSkill.toFixed(1)}  | ${Math.round(c.usd).toString().padStart(7)} | ${resolves.padStart(9)} | ${c.question.slice(0, 52)}`);
+  }
+  console.log(`\nEach row = buy the "BET" side at <=~the shown price. Prefer agree>=2 and higher sharp$ (tighter spread).`);
   console.log(`Skip anything you can't buy within ~2-3c of the shown price — the spread eats a tiny bet.`);
 }
 
