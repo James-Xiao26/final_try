@@ -63,16 +63,43 @@ async function fetchArchive(): Promise<Row[]> {
   return rows;
 }
 
+// Per-position edge. RAW edge = outcome − entry price: profit/share over what they paid, which already
+// has E=0 under an efficient market. But a wallet can still show positive raw edge WITHOUT skill by
+// tilting to favorites (favorite-longshot bias: favorites tend to be underpriced) or simply by being a
+// board winner (this whole sample beats its entry prices — that's why it's on the board). DE-BIASED edge
+// nets that out: outcome − calibration(entry price), where calibration(p) is the realized win rate of
+// ALL sampled positions entered at price p. It removes any price-level effect AND the common board-wide
+// positive-edge baseline, leaving only each position's idiosyncratic beat over what its price predicted.
+// The decisive question for §9: does the Iran→non-Iran persistence survive on the DE-BIASED edge?
+type EdgeOf = (r: Row) => number;
+const rawEdge: EdgeOf = (r) => r.outcome! - r.avg_price!;
+
+// Realized win rate by entry-price bin, over all resolved positions. Empty bins fall back to the price
+// itself (the efficient-market prior). 20 bins of width 0.05 — enough resolution without starving bins.
+function buildCalibration(rows: Row[]): (price: number) => number {
+  const BINS = 20;
+  const sum = new Array<number>(BINS).fill(0);
+  const cnt = new Array<number>(BINS).fill(0);
+  const bin = (p: number): number => Math.min(BINS - 1, Math.max(0, Math.floor(p * BINS)));
+  for (const r of rows) {
+    if (r.outcome === null || r.avg_price === null) continue;
+    const b = bin(r.avg_price);
+    sum[b]! += r.outcome;
+    cnt[b]! += 1;
+  }
+  return (price: number): number => (cnt[bin(price)]! > 0 ? sum[bin(price)]! / cnt[bin(price)]! : price);
+}
+
 // Family-collapsed, Bayesian-shrunk per-share edge over a set of resolved positions, or null if the
 // set has fewer than MIN_FAMILIES_PER_SIDE distinct families (too thin to trust).
-function shrunkEdge(rows: Row[]): number | null {
+function shrunkEdge(rows: Row[], edgeOf: EdgeOf): number | null {
   const fam = new Map<string, { sum: number; n: number }>();
   for (const r of rows) {
     if (r.outcome === null || r.avg_price === null || !r.market) continue;
     if (!isScorableMarket(r.market)) continue;
     const key = marketFamilyKey(r.market);
     const e = fam.get(key) ?? { sum: 0, n: 0 };
-    e.sum += r.outcome - r.avg_price;
+    e.sum += edgeOf(r);
     e.n += 1;
     fam.set(key, e);
   }
@@ -136,13 +163,13 @@ function deherd(byWallet: Map<string, Row[]>): Map<string, Row[]> {
 }
 
 // Pairs of (side-A edge, side-B edge) across wallets, for wallets where BOTH sides are usable.
-function correlate(byWallet: Map<string, Row[]>, split: (rows: Row[]) => [Row[], Row[]]): { xs: number[]; ys: number[] } {
+function correlate(byWallet: Map<string, Row[]>, split: (rows: Row[]) => [Row[], Row[]], edgeOf: EdgeOf): { xs: number[]; ys: number[] } {
   const xs: number[] = [];
   const ys: number[] = [];
   for (const rows of byWallet.values()) {
     const [a, b] = split(rows);
-    const ea = shrunkEdge(a);
-    const eb = shrunkEdge(b);
+    const ea = shrunkEdge(a, edgeOf);
+    const eb = shrunkEdge(b, edgeOf);
     if (ea === null || eb === null) continue;
     xs.push(ea);
     ys.push(eb);
@@ -236,23 +263,43 @@ async function main(): Promise<void> {
   }
   console.log(`${byWallet.size} distinct wallets in the archive.`);
 
-  const time = correlate(byWallet, medianCloseSplit);
+  // ── Favorite-baseline decomposition: how much of the board's edge is skill vs "favorites win"? ──
+  // Wallet strategy = bet their own side (correct iff outcome=1). Favorite baseline = bet whichever side
+  // the market favored at entry (their side if avg_price>0.5, else the other side). Marginal = the part
+  // that isn't free. This is the money question in miniature: a copier only profits on the marginal.
+  const resolvedRows = rows.filter((r) => r.outcome !== null && r.avg_price !== null);
+  const meanOf = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const walletAcc = meanOf(resolvedRows.map((r) => r.outcome!));
+  const favAcc = meanOf(resolvedRows.map((r) => (r.avg_price! > 0.5 ? r.outcome! : 1 - r.outcome!)));
+  console.log(`\n── Favorite-baseline decomposition (${resolvedRows.length} resolved positions) ──`);
+  console.log(`  wallet side wins: ${(walletAcc * 100).toFixed(1)}%   always-favorite wins: ${(favAcc * 100).toFixed(1)}%   MARGINAL: ${(walletAcc - favAcc >= 0 ? "+" : "")}${((walletAcc - favAcc) * 100).toFixed(1)}pt`);
+  console.log(`  (marginal ≈ 0 ⇒ the board's directional edge is mostly 'favorites win', not skill a copier can sell)`);
+
+  const time = correlate(byWallet, medianCloseSplit, rawEdge);
   report("TIME-split: first-half vs second-half history", time.xs, time.ys, "1st-half", "2nd-half", "time");
 
-  const iran = correlate(byWallet, iranSplit);
-  report("THEME-split (SHARPENED): Iran cluster vs everything else", iran.xs, iran.ys, "iran", "non-iran", "theme");
+  const iran = correlate(byWallet, iranSplit, rawEdge);
+  report("THEME-split (SHARPENED): Iran cluster vs everything else — RAW edge", iran.xs, iran.ys, "iran", "non-iran", "theme");
 
   // Same test, but on distinct books only — strips the herding that inflates the significance above.
   const deherded = deherd(byWallet);
   console.log(`\nDe-herding: ${byWallet.size} wallets → ${deherded.size} with distinct books (Jaccard ≤ ${JACCARD_MAX}).`);
-  const iranDeherd = correlate(deherded, iranSplit);
+  const iranDeherd = correlate(deherded, iranSplit, rawEdge);
   report("THEME-split (Iran-isolated, DE-HERDED — distinct books only)", iranDeherd.xs, iranDeherd.ys, "iran", "non-iran", "theme");
 
-  const geo = correlate(byWallet, geoSplit);
-  report("THEME-split: Geopolitics (all) vs everything else", geo.xs, geo.ys, "geo", "non-geo", "theme");
+  // The decisive refinement: de-bias every position by the pooled price-calibration, then re-run the
+  // Iran split. If persistence survives DE-BIASED edge, it isn't favorite-longshot tilt or the common
+  // board-wide baseline — it's idiosyncratic per-wallet skill. If it collapses, the raw 0.352 was price.
+  const cal = buildCalibration(resolvedRows);
+  const debiasedEdge: EdgeOf = (r) => r.outcome! - cal(r.avg_price!);
+  const iranDebiased = correlate(byWallet, iranSplit, debiasedEdge);
+  report("THEME-split (Iran-isolated, DE-BIASED — favorite/price effect removed)", iranDebiased.xs, iranDebiased.ys, "iran", "non-iran", "theme");
 
-  console.log("\n(Decisive test = the DE-HERDED Iran split: if r holds there it isn't just the crowd");
-  console.log(" double-counted; if it collapses toward 0, the raw r was herding — consistent with §5.5.)");
+  const geo = correlate(byWallet, geoSplit, rawEdge);
+  report("THEME-split: Geopolitics (all) vs everything else — RAW edge", geo.xs, geo.ys, "geo", "non-geo", "theme");
+
+  console.log("\n(Decisive test = the DE-BIASED Iran split: it strips both favorite-longshot tilt and the");
+  console.log(" board-wide baseline. If r holds there, that's the real cross-theme skill signal.)");
 }
 
 // Guards the shrinkage + Pearson math (ponytail: one runnable check for the non-trivial logic).
@@ -260,12 +307,19 @@ function selfCheck(): void {
   // Perfectly correlated series -> r = 1; anti-correlated -> r = -1.
   assert.ok(Math.abs(pearson([1, 2, 3, 4], [2, 4, 6, 8])! - 1) < 1e-9);
   assert.ok(Math.abs(pearson([1, 2, 3, 4], [8, 6, 4, 2])! + 1) < 1e-9);
-  // shrunkEdge: 4 distinct families each +0.5 edge -> 2.0 / (4 + 50) = 0.037.
+  // shrunkEdge (raw): 4 distinct families each +0.5 edge -> 2.0 / (4 + 50) = 0.037.
   const mk = (fam: string): Row => ({ address: "a", condition_id: fam, market: `topic ${fam} thing`, avg_price: 0.5, outcome: 1, close_time: null });
-  const edge = shrunkEdge([mk("alpha"), mk("bravo"), mk("charlie"), mk("delta")]);
+  const edge = shrunkEdge([mk("alpha"), mk("bravo"), mk("charlie"), mk("delta")], rawEdge);
   assert.ok(edge !== null && Math.abs(edge - 2 / 54) < 1e-9);
   // Below the family floor -> null.
-  assert.equal(shrunkEdge([mk("alpha"), mk("bravo")]), null);
+  assert.equal(shrunkEdge([mk("alpha"), mk("bravo")], rawEdge), null);
+  // Calibration: two positions entered at 0.2, one wins one loses -> realized win rate 0.5 at that bin.
+  const cal = buildCalibration([
+    { address: "a", condition_id: "c1", market: "m", avg_price: 0.2, outcome: 1, close_time: null },
+    { address: "a", condition_id: "c2", market: "m", avg_price: 0.2, outcome: 0, close_time: null }
+  ]);
+  assert.ok(Math.abs(cal(0.2) - 0.5) < 1e-9);
+  assert.ok(Math.abs(cal(0.95) - 0.95) < 1e-9); // empty bin -> falls back to the price itself
   // Jaccard: identical sets -> 1, disjoint -> 0, one-shared-of-three -> 1/3.
   assert.ok(Math.abs(jaccard(new Set(["a", "b"]), new Set(["a", "b"])) - 1) < 1e-9);
   assert.equal(jaccard(new Set(["a"]), new Set(["b"])), 0);
