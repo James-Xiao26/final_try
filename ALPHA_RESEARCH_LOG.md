@@ -3,10 +3,12 @@
 Running notes on the attempt to find a tradeable edge in the leaderboard's "smart money" signal
 (smart-money implied odds vs. the market's real odds). Newest findings at the top of each section.
 
-**One-line status (2026-07-03):** No generalizable, tradeable alpha demonstrated. The only positive
-signal is concentrated entirely in one event (US/Iran, spring 2026) and evaporates once you stop
-double-counting correlated markets. Estimated ~15% chance a real forward-persistent edge exists.
-Do not deploy capital on current evidence.
+**One-line status (2026-07-05):** No tradeable alpha demonstrated, but a FIRST non-null lean: the
+cross-theme persistence test (§9) finds a wallet's Iran-cluster edge weakly tracks its non-Iran edge
+(r=0.352, robust to duplicate-book de-herding) — the first sign of possible transferable skill rather
+than one lucky event. Still only "suggestive" (no favorite baseline, common-factor correlation, small n),
+so the prior on a real forward-persistent edge nudges up modestly (~15% → ~20-25%). Do NOT deploy capital
+or flip the live weight; the forward test remains the arbiter.
 
 ---
 
@@ -223,3 +225,49 @@ the ones it can't distinguish from skill.
   distinct *families*, not positions, against both `MIN_SPECIALTY_TRADES` and the shrinkage denominator —
   so a recurring-series grind (one family repeated N times) can no longer mint a specialty chip. Same
   collapse `computeMetrics` uses; no-op for diversified wallets. Tests updated to distinct-family fixtures.
+
+---
+
+## 9. Cross-theme persistence test (2026-07-05) — the FIRST non-null lean, but still not alpha
+
+Built to answer §7's blocked question head-on: does a wallet's edge on one theme transfer to unrelated
+themes, or is the board just one lucky Iran read? `scripts/crossThemePersistence.ts` reads the new
+append-only `closed_positions_archive` (migration 031, backfilled ~1yr by `archiveBackfill.ts`) —
+**32,992 resolved positions across 148 board wallets** — and correlates each wallet's Bayesian-shrunk,
+family-collapsed per-share edge on one side vs the other, across wallets.
+
+Results (n = wallets with ≥4 distinct families on BOTH sides):
+```
+TIME  1st-half vs 2nd-half history      r=0.600  n=145   theme-CONFOUNDED — discard
+THEME Iran cluster vs everything else   r=0.352  n=52    SUGGESTIVE (face-value t≈2.66)
+THEME Iran, DE-HERDED (distinct books)  r=0.352  n=52    UNCHANGED (dedup dropped only 2 of 148)
+THEME Geopolitics(all) vs rest          r=0.184  n=64    weak/ambiguous
+```
+The time split can't separate themes (one long-running theme resolving across both halves inflates it),
+so it's discarded. The **Iran-isolated** split is the real test, and it is the FIRST result in this log
+that leans toward genuine transferable skill: Iran edge does track non-Iran edge (r=0.352, r²≈0.12).
+
+**De-herding was a near no-op and that itself is the finding.** Greedy dedup dropping any wallet whose
+held-market set overlaps a kept wallet's by Jaccard >0.5 removed only 2 of 148 and left r *identical* —
+because the full ~1yr books are large and idiosyncratic even when two wallets both sit in the Iran
+cluster. So **duplicate-wallet herding is ruled OUT** as the driver; r=0.352 is more robust than expected
+(I predicted it would deflate). But Jaccard on full books **cannot** see common-macro-FACTOR
+correlation: distinct books exposed to the same Iran/other outcomes share edge without sharing positions,
+so effective n is still below 52.
+
+Why it stays **"suggestive," NOT alpha**:
+1. De-herding kills duplicate-book herding but not common-factor correlation (above).
+2. **No favorite baseline** — edge = `outcome − entry`, so part of both sides is structural favorite bias,
+   not forecasting; the archive lacks the contemporaneous market price to net it out.
+3. "Everything else" may hide a SECOND correlated theme-cluster → r could be "two macro reads," not
+   general skill.
+4. Survivorship present (board = winners), though here it likely *attenuates* r (selection on total edge
+   restricts range) — which is the one reason the positive isn't trivially dismissable.
+5. §4f precedent: a backtest r that looked significant died under clustering. Backtest-shaped evidence
+   has cried wolf here before.
+
+**Standing decision UNCHANGED:** production `smartMoneyImpliedPrice` stays `skill·√cost`; do NOT flip the
+live weight or deploy capital on this. The **forward test** (survivorship-free, herding-free, and it CAN
+carry a market baseline) remains the arbiter. Net effect: nudges the "~15% chance a real edge exists"
+prior up **modestly**, not decisively. Re-run `crossThemePersistence.ts` as the archive deepens across
+more distinct themes.
