@@ -336,3 +336,23 @@ only that the resolver fires now.)
 instrument that will eventually deliver one. Deploy note: the resolver runs on the Heroku dyno via the
 `/refresh/forward-score` cron, so this fix must be pushed to Heroku (`git push heroku master`) to take
 effect on the daily job — it is not live until then.
+
+---
+
+## 11. Copy-list tool (2026-07-05) — trading the signal at tiny size
+
+For actually starting to trade small (<$1/position), built `scripts/copyList.ts` (`pnpm copylist`): the
+markets ELITE wallets bought in the last few days, so you mirror fresh entries near their price. Two
+deliberate choices from this investigation: (a) it uses FRESH entries, not the Trending divergence
+signal, which mis-fires via the §5.3 timing artifact (confirmed live — the top divergence rows, Becerra/
+Iran, had zero recent trades = stale winners the signal told you to fade); (b) "elite" is a strict cut,
+not the whole board — `scripts/eliteWallets.ts` reads the deep archive and keeps wallets whose family-
+collapsed shrunk per-share edge is both strong (≥0.03/sh over ≥8 families) AND consistent (positive in
+BOTH history halves — the §9 time-persistence signal, which is theme-confounded as PROOF but exactly the
+right practical filter for SELECTING who to copy). Live: 123/148 archive wallets clear the gate; ranked
+by multi-wallet agreement → edge → size, so the top rows are 2–4 elite wallets on the same side. Gamma
+enrichment labels the exact bet (Over/team/Yes) and drops resolved/ended markets.
+
+Honesty ceiling (unchanged verdict): the edge/share shown is RAW and survivorship-inflated; this is the
+best available RANKING of who to copy, not proof of forward edge. It doubles as forward-test data
+generation. Do NOT scale capital on it — the forward test is still the arbiter.
