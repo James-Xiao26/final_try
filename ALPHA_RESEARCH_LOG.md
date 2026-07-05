@@ -186,8 +186,17 @@ the ones it can't distinguish from skill.
   the finding.
 - **Start archiving `wallet_closed_positions`** so the rolling 90-day window stops discarding history.
   In months you'd have multiple distinct crises/elections to test cross-theme persistence properly.
-- **The forward test** (`forwardAlpha.ts`) — the only clean instrument. Needs a daily scheduler and
-  weeks/months to clear several *distinct* themes. Slow precisely because real convergence is rare.
+  **DONE (2026-07-04):** `closed_positions_archive` (migration 031), append-only, written by the daily
+  ingest (`archiveClosedPositions`) and seedable immediately via a one-off `archiveBackfill.ts` (~1yr
+  deep pull; `getClosedPositions` gained an optional `maxDays`). The cross-theme persistence test itself
+  is now built — `crossThemePersistence.ts`: time-split (first vs second half) and geo-vs-non-geo edge
+  persistence, Pearson r across wallets, family-collapsed like the Skill Score. Run `archiveBackfill.ts`
+  then `crossThemePersistence.ts`; r≈0 on both would confirm §5.5.
+- **The forward test** (`forwardAlpha.ts`) — the only clean instrument. Scripts + webhook routes
+  (`/refresh/forward-record`, `/refresh/forward-score`) + package.json entries all exist; the ONLY
+  missing piece is two cron-job.org jobs pointing at those routes (daily record + daily score). `--score`
+  now prints **marginal** edge over the market (ΔBrier / Δacc) so raw accuracy isn't mistaken for alpha.
+  Still needs weeks/months to clear several *distinct* themes. Slow precisely because real convergence is rare.
 
 ## 8. Product fixes surfaced (independent of alpha)
 
@@ -209,6 +218,8 @@ the ones it can't distinguish from skill.
   `getTrendingMarkets`). Cap param defaults off in the pure fns (unit-fixture ergonomics); production
   callers pass the real value.
 
-**Still open (NOT done, same root cause as Fix 1):** `walletSpecialty`/`classifyMarket`
-(`scripts/specialty.ts`) computes per-category edge with the same per-position shrink, so a single
-recurring-family grind can still mint a specialty chip. Apply the same family-collapse there next.
+- **Fix 3 — specialty family-collapse (2026-07-04, closes the item below).** `walletSpecialty`
+  (`scripts/specialty.ts`) now groups each category's resolved positions by `marketFamilyKey` and counts
+  distinct *families*, not positions, against both `MIN_SPECIALTY_TRADES` and the shrinkage denominator —
+  so a recurring-series grind (one family repeated N times) can no longer mint a specialty chip. Same
+  collapse `computeMetrics` uses; no-op for diversified wallets. Tests updated to distinct-family fixtures.
