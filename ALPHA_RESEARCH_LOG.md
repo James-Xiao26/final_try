@@ -3,12 +3,14 @@
 Running notes on the attempt to find a tradeable edge in the leaderboard's "smart money" signal
 (smart-money implied odds vs. the market's real odds). Newest findings at the top of each section.
 
-**One-line status (2026-07-05):** No tradeable alpha demonstrated, but a FIRST non-null lean: the
-cross-theme persistence test (§9) finds a wallet's Iran-cluster edge weakly tracks its non-Iran edge
-(r=0.352, robust to duplicate-book de-herding) — the first sign of possible transferable skill rather
-than one lucky event. Still only "suggestive" (no favorite baseline, common-factor correlation, small n),
-so the prior on a real forward-persistent edge nudges up modestly (~15% → ~20-25%). Do NOT deploy capital
-or flip the live weight; the forward test remains the arbiter.
+**One-line status (2026-07-05):** No tradeable alpha demonstrated, but the strongest lean yet. The
+cross-theme persistence test (§9) finds a wallet's Iran-cluster edge tracks its non-Iran edge, and the
+signal SURVIVED three confound-strips — duplicate-book de-herding, favorite-harvesting (their edge is
+underdog-skill, +0.10/sh profit vs favorites' ~0), and price/favorite-longshot de-biasing — actually
+strengthening to r=0.428 (t≈3.35). One confound remains (common thematic factor), the level is pure
+survivorship, and this is the exact "survives many checks then dies on the independence check" pattern
+that's cried wolf before. Prior nudges ~15% → ~30-35%. Do NOT deploy or flip the live weight; the forward
+test (alive: 55 predictions in 2 days, 0 resolved yet) is the only instrument that kills the last confound.
 
 ---
 
@@ -236,38 +238,48 @@ append-only `closed_positions_archive` (migration 031, backfilled ~1yr by `archi
 **32,992 resolved positions across 148 board wallets** — and correlates each wallet's Bayesian-shrunk,
 family-collapsed per-share edge on one side vs the other, across wallets.
 
-Results (n = wallets with ≥4 distinct families on BOTH sides):
+Results (n = wallets with ≥4 distinct families on BOTH sides), after knocking down three confounds:
 ```
-TIME  1st-half vs 2nd-half history      r=0.600  n=145   theme-CONFOUNDED — discard
-THEME Iran cluster vs everything else   r=0.352  n=52    SUGGESTIVE (face-value t≈2.66)
-THEME Iran, DE-HERDED (distinct books)  r=0.352  n=52    UNCHANGED (dedup dropped only 2 of 148)
-THEME Geopolitics(all) vs rest          r=0.184  n=64    weak/ambiguous
+TIME  1st-half vs 2nd-half history        r=0.600  n=145   theme-CONFOUNDED — discard
+THEME Iran vs rest — RAW edge             r=0.352  n=52    survives...
+THEME Iran vs rest — DE-HERDED books      r=0.352  n=52    ...duplicate-book herding (dedup dropped 2/148)
+THEME Iran vs rest — DE-BIASED (price)    r=0.428  n=52    ...favorite/price/baseline — and STRENGTHENS
+THEME Geopolitics(all) vs rest — RAW      r=0.184  n=64    weak/ambiguous
+Favorite-baseline (PROFIT, all 32,992):  wallet +0.102/sh  vs always-favorite +0.001  MARGINAL +0.101
 ```
-The time split can't separate themes (one long-running theme resolving across both halves inflates it),
-so it's discarded. The **Iran-isolated** split is the real test, and it is the FIRST result in this log
-that leans toward genuine transferable skill: Iran edge does track non-Iran edge (r=0.352, r²≈0.12).
+The time split can't separate themes (one long-running theme across both halves inflates it) — discard.
+The **Iran-isolated** split is the real test, and it survived every confound I could strip in-sample,
+getting *stronger* each time:
+1. **Duplicate-book herding — ruled out.** Jaccard>0.5 book-overlap dedup removed only 2 of 148 wallets
+   and left r identical: full ~1yr books are large/idiosyncratic even when two wallets share the Iran
+   cluster, so the correlation isn't the crowd double-counted.
+2. **Favorite-harvesting — ruled out.** On PROFIT (not win rate), the board makes +0.102/share while
+   always-buying-the-favorite makes ~0 (+0.001, i.e. favorites are ~fairly priced). Their edge is
+   *underdog-skill-shaped*, not settlement-carry on 90¢ certainties. (Their 59.5% win rate is BELOW the
+   favorite's 74% purely because they take underdogs — a lower win rate at a good price is still profit.)
+3. **Favorite-longshot / price-level / board-wide baseline — ruled out.** De-biasing every position by
+   the pooled price→realized-outcome calibration collapses the *level* of edge to ≈0 (mean de-biased Iran
+   +0.005, non-Iran +0.003 — so the board's positive raw edge IS almost entirely the price/baseline
+   effect), yet the cross-theme *correlation* of the residual survives and rises to **r=0.428 (t≈3.35)**.
+   I.e. after removing everything the price predicts, wallets that beat the outcome on Iran still beat it
+   elsewhere. This is the cleanest pro-skill signal in the whole investigation.
 
-**De-herding was a near no-op and that itself is the finding.** Greedy dedup dropping any wallet whose
-held-market set overlaps a kept wallet's by Jaccard >0.5 removed only 2 of 148 and left r *identical* —
-because the full ~1yr books are large and idiosyncratic even when two wallets both sit in the Iran
-cluster. So **duplicate-wallet herding is ruled OUT** as the driver; r=0.352 is more robust than expected
-(I predicted it would deflate). But Jaccard on full books **cannot** see common-macro-FACTOR
-correlation: distinct books exposed to the same Iran/other outcomes share edge without sharing positions,
-so effective n is still below 52.
-
-Why it stays **"suggestive," NOT alpha**:
-1. De-herding kills duplicate-book herding but not common-factor correlation (above).
-2. **No favorite baseline** — edge = `outcome − entry`, so part of both sides is structural favorite bias,
-   not forecasting; the archive lacks the contemporaneous market price to net it out.
-3. "Everything else" may hide a SECOND correlated theme-cluster → r could be "two macro reads," not
-   general skill.
-4. Survivorship present (board = winners), though here it likely *attenuates* r (selection on total edge
-   restricts range) — which is the one reason the positive isn't trivially dismissable.
-5. §4f precedent: a backtest r that looked significant died under clustering. Backtest-shaped evidence
-   has cried wolf here before.
+Why it is STILL only "suggestive," NOT deployable alpha:
+- **The one confound left standing: common thematic FACTOR.** Distinct books exposed to the same handful
+  of theme-level outcome surprises (Iran resolved one way; some other theme another) share residual edge
+  WITHOUT sharing positions — neither Jaccard nor price-de-biasing can see it, so effective n is still
+  below 52 and r could be a few correlated theme-surprises, not N independent skill draws.
+- **The +0.102/share profit edge is pure survivorship** — the sample is board WINNERS, selected because
+  they won; only the cross-theme *correlation* (which selection should attenuate, not create) is the real
+  signal, not the level.
+- **§4f precedent:** every prior signal here also survived several checks before dying on the
+  independence/clustering check. "It keeps surviving" is exactly the pattern that has cried wolf before.
 
 **Standing decision UNCHANGED:** production `smartMoneyImpliedPrice` stays `skill·√cost`; do NOT flip the
-live weight or deploy capital on this. The **forward test** (survivorship-free, herding-free, and it CAN
-carry a market baseline) remains the arbiter. Net effect: nudges the "~15% chance a real edge exists"
-prior up **modestly**, not decisively. Re-run `crossThemePersistence.ts` as the archive deepens across
-more distinct themes.
+live weight or deploy capital. Further in-sample surgery now has diminishing returns and risks p-hacking —
+I've stripped every confound the survivorship sample allows. The **forward test** is the only instrument
+that kills the last confound (independent locked predictions, no survivorship, real market baseline), and
+it is alive: **55 predictions recorded over 2 days (2026-07-03/04), ~27/day, 0 resolved yet** (young, not
+broken). Net: prior on a real forward-persistent edge moves **~15% → ~30-35%** — enough to take seriously,
+NOT enough to bet. Let the forward test resolve across several distinct themes; re-run this as the archive
+deepens.
