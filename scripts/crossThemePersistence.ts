@@ -39,6 +39,7 @@ const MIN_FAMILIES_PER_SIDE = 4; // a side needs this many distinct market famil
 
 interface Row {
   address: string;
+  condition_id: string | null;
   market: string | null;
   avg_price: number | null;
   outcome: number | null;
@@ -51,7 +52,7 @@ async function fetchArchive(): Promise<Row[]> {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from("closed_positions_archive")
-      .select("address, market, avg_price, outcome, close_time")
+      .select("address, condition_id, market, avg_price, outcome, close_time")
       .not("outcome", "is", null)
       .range(from, from + PAGE - 1);
     if (error) throw error;
@@ -97,6 +98,41 @@ function pearson(xs: number[], ys: number[]): number | null {
   }
   if (sxx === 0 || syy === 0) return null;
   return sxy / Math.sqrt(sxx * syy);
+}
+
+// ── De-herding ────────────────────────────────────────────────────────────────────────────────────
+// The confound that keeps r=0.352 at "suggestive": convergence means board wallets hold the SAME bets,
+// so their edges are not independent observations — the crowd is double-counted, inflating n and the
+// significance. This greedily keeps only wallets with DISTINCT books: process richest-book-first, and
+// drop any wallet whose held-market set overlaps an already-kept wallet's by more than JACCARD_MAX. If
+// r survives on the distinct-book subset, the signal isn't just the herd; if it collapses, it was.
+// ponytail: greedy O(n²) dedup (n≈150, trivial); a full linkage clustering isn't worth it here.
+const JACCARD_MAX = 0.5;
+
+function conditionSet(rows: Row[]): Set<string> {
+  const set = new Set<string>();
+  for (const r of rows) if (r.condition_id) set.add(r.condition_id);
+  return set;
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  let inter = 0;
+  for (const x of a) if (b.has(x)) inter += 1;
+  const union = a.size + b.size - inter;
+  return union === 0 ? 0 : inter / union;
+}
+
+function deherd(byWallet: Map<string, Row[]>): Map<string, Row[]> {
+  const wallets = [...byWallet.entries()].sort((a, b) => b[1].length - a[1].length); // richest book first
+  const kept: Set<string>[] = [];
+  const out = new Map<string, Row[]>();
+  for (const [address, rows] of wallets) {
+    const set = conditionSet(rows);
+    if (kept.some((k) => jaccard(set, k) > JACCARD_MAX)) continue; // near-duplicate of a kept book → skip
+    kept.push(set);
+    out.set(address, rows);
+  }
+  return out;
 }
 
 // Pairs of (side-A edge, side-B edge) across wallets, for wallets where BOTH sides are usable.
@@ -206,11 +242,17 @@ async function main(): Promise<void> {
   const iran = correlate(byWallet, iranSplit);
   report("THEME-split (SHARPENED): Iran cluster vs everything else", iran.xs, iran.ys, "iran", "non-iran", "theme");
 
+  // Same test, but on distinct books only — strips the herding that inflates the significance above.
+  const deherded = deherd(byWallet);
+  console.log(`\nDe-herding: ${byWallet.size} wallets → ${deherded.size} with distinct books (Jaccard ≤ ${JACCARD_MAX}).`);
+  const iranDeherd = correlate(deherded, iranSplit);
+  report("THEME-split (Iran-isolated, DE-HERDED — distinct books only)", iranDeherd.xs, iranDeherd.ys, "iran", "non-iran", "theme");
+
   const geo = correlate(byWallet, geoSplit);
   report("THEME-split: Geopolitics (all) vs everything else", geo.xs, geo.ys, "geo", "non-geo", "theme");
 
-  console.log("\n(The Iran-isolated theme split is the decisive test: r near 0 there = the edge is one");
-  console.log(" theme, not a general skill — consistent with §5.5. The time split cannot show this.)");
+  console.log("\n(Decisive test = the DE-HERDED Iran split: if r holds there it isn't just the crowd");
+  console.log(" double-counted; if it collapses toward 0, the raw r was herding — consistent with §5.5.)");
 }
 
 // Guards the shrinkage + Pearson math (ponytail: one runnable check for the non-trivial logic).
@@ -224,6 +266,10 @@ function selfCheck(): void {
   assert.ok(edge !== null && Math.abs(edge - 2 / 54) < 1e-9);
   // Below the family floor -> null.
   assert.equal(shrunkEdge([mk("alpha"), mk("bravo")]), null);
+  // Jaccard: identical sets -> 1, disjoint -> 0, one-shared-of-three -> 1/3.
+  assert.ok(Math.abs(jaccard(new Set(["a", "b"]), new Set(["a", "b"])) - 1) < 1e-9);
+  assert.equal(jaccard(new Set(["a"]), new Set(["b"])), 0);
+  assert.ok(Math.abs(jaccard(new Set(["a", "b"]), new Set(["b", "c"])) - 1 / 3) < 1e-9);
 }
 
 main().catch((error) => {
