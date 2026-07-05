@@ -20,7 +20,6 @@ import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { strict as assert } from "node:assert";
 import { PolymarketClient } from "./polymarket.js";
-import { dailyPointsFromHistory } from "./priceHistory.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -37,7 +36,6 @@ const supabase = createClient(requiredEnv("NEXT_PUBLIC_SUPABASE_URL"), requiredE
 
 const DUST_FLOOR_USD = 10; // same as web/lib/trendingMarkets.ts TRENDING_DUST_FLOOR_USD
 const MIN_PARTICIPANTS = 5; // same as web/lib/trendingMarkets.ts TRENDING_MIN_PARTICIPANTS
-const RESOLVE_EPSILON = 0.03; // final YES-token price within this of {0,1} => resolved
 const ALREADY_DECIDED = 0.05; // skip recording a market already priced within this of {0,1} — no forward value
 const GAP_THRESHOLDS = [0, 0.05, 0.1, 0.2];
 
@@ -180,20 +178,6 @@ async function record(): Promise<void> {
   console.log(`Recorded ${inserts.length} new prediction(s). Table now holds ${existing.size + inserts.length}.`);
 }
 
-// A market's YES token settles to ~1 (YES won) or ~0 (NO won); anything in between = still open.
-async function resolvedOutcome(conditionId: string, client: PolymarketClient): Promise<number | null> {
-  const yesTokenId = await client.getYesTokenId(conditionId);
-  if (!yesTokenId) return null;
-  const raw = await client.getPriceHistory(yesTokenId);
-  const points = dailyPointsFromHistory(raw, 3650, Date.now());
-  let latest: { ts: string; price: number } | null = null;
-  for (const p of points) if (latest === null || p.ts > latest.ts) latest = p;
-  if (latest === null) return null;
-  if (latest.price >= 1 - RESOLVE_EPSILON) return 1;
-  if (latest.price <= RESOLVE_EPSILON) return 0;
-  return null; // still open
-}
-
 async function score(): Promise<void> {
   const { data: pendingData, error: pendingErr } = await supabase
     .from("forward_alpha_predictions")
@@ -212,7 +196,9 @@ async function score(): Promise<void> {
     const due = p.end_date ? Date.parse(p.end_date) <= nowMs : Date.parse(p.recorded_at) <= nowMs - 86_400_000;
     if (!due) continue;
     checked += 1;
-    const outcome = await resolvedOutcome(p.condition_id, client);
+    // Authoritative Gamma/UMA settlement — NOT the last CLOB trade (which sits mid-range on contested
+    // markets and silently never resolved them, biasing the sample to blowouts). See migration notes.
+    const outcome = await client.getResolvedOutcome(p.condition_id);
     if (outcome === null) continue;
     const { error } = await supabase
       .from("forward_alpha_predictions")

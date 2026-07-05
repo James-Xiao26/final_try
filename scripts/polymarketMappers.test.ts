@@ -7,8 +7,34 @@ import {
   mapPosition,
   openUnrealizedPnl,
   parseHoldersResponse,
+  resolvedOutcomeFromMarket,
   type Position
 } from "./polymarket.js";
+
+// --- resolvedOutcomeFromMarket (forward-test resolution) --------------------
+// Reads UMA settlement, NOT the last CLOB trade. Regression guard: a resolved market whose last trade
+// sat mid-range (0.82) must still resolve, since the old last-price heuristic silently dropped those.
+
+test("resolvedOutcomeFromMarket: settled YES market -> 1", () => {
+  assert.equal(resolvedOutcomeFromMarket({ umaResolutionStatus: "resolved", closed: true, outcomePrices: '["1", "0"]' }), 1);
+});
+
+test("resolvedOutcomeFromMarket: settled NO market (outcomePrices index 0 is YES) -> 0", () => {
+  assert.equal(resolvedOutcomeFromMarket({ umaResolutionStatus: "resolved", closed: true, outcomePrices: '["0", "1"]' }), 0);
+});
+
+test("resolvedOutcomeFromMarket: unresolved market -> null even if a side looks high", () => {
+  // Open market whose current price happens to be 0.98 must NOT be read as resolved.
+  assert.equal(resolvedOutcomeFromMarket({ umaResolutionStatus: "", closed: false, outcomePrices: '["0.98", "0.02"]' }), null);
+});
+
+test("resolvedOutcomeFromMarket: closed but no decisive price -> null (stays pending)", () => {
+  assert.equal(resolvedOutcomeFromMarket({ closed: true, outcomePrices: '["0.6", "0.4"]' }), null);
+});
+
+test("resolvedOutcomeFromMarket: missing outcomePrices -> null", () => {
+  assert.equal(resolvedOutcomeFromMarket({ umaResolutionStatus: "resolved", closed: true }), null);
+});
 
 // These mappers are the defensive layer over Polymarket's inconsistent API field names: each field
 // is read from a fallback list of keys, with safe defaults. The tests pin both the canonical shape

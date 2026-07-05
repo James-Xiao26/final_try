@@ -426,6 +426,23 @@ function parseJsonArray(value: unknown): unknown[] {
   return [];
 }
 
+// Authoritative binary resolution from a Gamma market record. A market is settled when the UMA oracle
+// has resolved it (umaResolutionStatus === "resolved", or the market is closed); outcomePrices is then
+// the settled [YES, NO] pair ("1"/"0"), indexed the same as clobTokenIds — index 0 is YES. Returns 1/0,
+// or null if the market isn't resolved yet or has no decisive settlement. This is the RIGHT resolution
+// source for the forward test: a resolved market's last CLOB *trade* often sits mid-range (0.82, 0.08)
+// and never reaches {0,1}, so inferring resolution from price history silently drops contested markets.
+export function resolvedOutcomeFromMarket(market: JsonRecord): number | null {
+  const settled = market.umaResolutionStatus === "resolved" || market.closed === true;
+  if (!settled) return null;
+  const prices = parseJsonArray(market.outcomePrices).map((entry) => Number(entry)).filter((value) => Number.isFinite(value));
+  const yes = prices[0];
+  if (yes === undefined) return null;
+  if (yes >= 0.97) return 1;
+  if (yes <= 0.03) return 0;
+  return null; // settled but not decisive (shouldn't happen for a binary market) — leave pending
+}
+
 interface LeadingOutcome {
   price: number | null;
   label: string | null;
@@ -682,6 +699,17 @@ export class PolymarketClient {
     const first = asArray(response).filter(isRecord)[0];
     if (!first) return null;
     return parseJsonArray(first.clobTokenIds).map((entry) => String(entry))[0] || null;
+  }
+
+  // Authoritative resolution for a condition_id from Gamma (UMA settlement), for the forward test.
+  // Returns 1 (YES won) / 0 (NO won) / null (not resolved, or Gamma has no record). See
+  // resolvedOutcomeFromMarket for why this beats inferring resolution from the last CLOB trade.
+  async getResolvedOutcome(conditionId: string): Promise<number | null> {
+    const params = new URLSearchParams({ condition_ids: conditionId, closed: "true" });
+    const response = await fetchJson("/markets", params, "general", CONFIG.GAMMA_API_BASE);
+    const first = asArray(response).filter(isRecord)[0];
+    if (!first) return null;
+    return resolvedOutcomeFromMarket(first);
   }
 
   async getActivity(address: string, limit = CONFIG.ACTIVITY_LIMIT): Promise<TradeActivity[]> {

@@ -10,7 +10,11 @@ underdog-skill, +0.10/sh profit vs favorites' ~0), and price/favorite-longshot d
 strengthening to r=0.428 (t≈3.35). One confound remains (common thematic factor), the level is pure
 survivorship, and this is the exact "survives many checks then dies on the independence check" pattern
 that's cried wolf before. Prior nudges ~15% → ~30-35%. Do NOT deploy or flip the live weight; the forward
-test (alive: 55 predictions in 2 days, 0 resolved yet) is the only instrument that kills the last confound.
+test is the only instrument that kills the last confound. **2026-07-05 (§10): audited the forward test —
+theme diversity is HEALTHY (Iran only 27% of 55, multi-theme near-term), but its resolver was silently
+BROKEN (inferred resolution from last CLOB trade, which never hits {0,1} on oracle-settled markets, so ~0
+resolved and the resolvable subset was biased to blowouts). Fixed to read Gamma/UMA settlement; 3 stuck
+predictions resolved live. Needs `git push heroku master` to go live on the cron. Alpha verdict unchanged.**
 
 ---
 
@@ -283,3 +287,52 @@ it is alive: **55 predictions recorded over 2 days (2026-07-03/04), ~27/day, 0 r
 broken). Net: prior on a real forward-persistent edge moves **~15% → ~30-35%** — enough to take seriously,
 NOT enough to bet. Let the forward test resolve across several distinct themes; re-run this as the archive
 deepens.
+
+---
+
+## 10. The forward-test instrument itself was broken (2026-07-05) — resolution never fired
+
+Before trusting the forward test to settle the question over the coming months, I audited it. Two findings.
+
+### 10a. Theme diversity — HEALTHY (the good news)
+Worry: the forward sample could be a second Iran monoculture, in which case no amount of waiting clears
+the "several distinct themes" bar. It isn't. Of the 55 locked predictions: **Iran only 27% (15/55), 53
+distinct market families out of 55.** The near-term scorable set (≤90 days to resolution: 4 already past
+end-date, 12 within 30d, 3 within 90d) spans **World Cup football, the LA mayoral race, US Fed rates, a
+Russian parliamentary election, and the Iran cluster** — genuinely multi-theme. So the *first* batch of
+forward results will test cross-theme skill, exactly what §9's last confound needs. Only 5 predictions are
+>1yr out (2028 election etc.).
+
+### 10b. The resolver was silently stuck — FIXED
+`forwardAlpha.resolvedOutcome` inferred resolution from the **last CLOB traded price**, calling a market
+resolved only if that price was within `RESOLVE_EPSILON` (0.03) of {0,1}. But Polymarket markets settle
+**off-market via the UMA oracle** — trading stops with the last *trade* sitting mid-range, which never
+reaches the gate. Probed the 4 past-end predictions live:
+```
+"Will France win on 2026-07-04?"        France WON (YES)  last CLOB trade 0.825 -> read as OPEN (stuck)
+"Paraguay vs France: Team to Advance"   Paraguay LOST     last CLOB trade 0.085 -> read as OPEN (stuck)
+"Spread: France (-1.5)"                  resolved          last CLOB trade 0.595 -> read as OPEN (stuck)
+"Nithya Raman LA mayoral"                (Gamma has no record) getYesTokenId null -> null (stuck)
+```
+**The instrument the entire standing decision defers to was resolving ~nothing — and worse, the markets it
+*could* resolve (last trade cleanly ≥0.97 / ≤0.03) are a biased subset (blowouts / lopsided books), while
+contested markets silently drop.** That would have quietly corrupted the forward Brier toward easy markets
+months from now, and looked like "still accumulating" the whole time.
+
+Fix: read the **authoritative UMA settlement from Gamma** instead of inferring from CLOB trades. Gamma's
+market record carries `umaResolutionStatus="resolved"` + `outcomePrices` (the settled `[YES,NO]` pair,
+`["1","0"]`), indexed the same index-0-is-YES way the forward signal already uses. New pure
+`resolvedOutcomeFromMarket()` + `PolymarketClient.getResolvedOutcome()` (`scripts/polymarket.ts`, unit-
+tested incl. the 0.82-last-trade regression case); `forwardAlpha.resolvedOutcome` deleted, `score()` now
+calls the Gamma resolver. **Verified live: the 3 stuck France-match predictions resolved on the first run
+after the fix** (the LA mayoral one Gamma has no record of — legitimately stays pending). Forward test now
+holds 3 resolved / 52 pending and will actually accumulate.
+
+(First 3 resolved: smart money slightly *underperformed* the market — but it's n=3, all one correlated
+World-Cup event, market went 3/3; statistically meaningless, do not read anything into it. The point is
+only that the resolver fires now.)
+
+**Standing decision still UNCHANGED.** This changes nothing about the alpha verdict — it repairs the
+instrument that will eventually deliver one. Deploy note: the resolver runs on the Heroku dyno via the
+`/refresh/forward-score` cron, so this fix must be pushed to Heroku (`git push heroku master`) to take
+effect on the daily job — it is not live until then.
