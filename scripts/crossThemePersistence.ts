@@ -263,17 +263,24 @@ async function main(): Promise<void> {
   }
   console.log(`${byWallet.size} distinct wallets in the archive.`);
 
-  // ── Favorite-baseline decomposition: how much of the board's edge is skill vs "favorites win"? ──
-  // Wallet strategy = bet their own side (correct iff outcome=1). Favorite baseline = bet whichever side
-  // the market favored at entry (their side if avg_price>0.5, else the other side). Marginal = the part
-  // that isn't free. This is the money question in miniature: a copier only profits on the marginal.
+  // ── Favorite-baseline decomposition: does the board beat "always buy the favorite" on PROFIT? ──
+  // The money metric is edge = outcome − price (profit per share over what you paid), NOT win rate: a
+  // book tilted to underdogs has a low win rate yet can be very profitable. So compare mean wallet edge
+  // to the mean edge of always buying the favorite side at its price. Win rate is shown too, but only to
+  // explain the tilt — a wallet win rate BELOW the favorite's just means they take underdogs, not that
+  // they lose. MARGINAL PROFIT is the part a copier could actually sell.
   const resolvedRows = rows.filter((r) => r.outcome !== null && r.avg_price !== null);
   const meanOf = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
-  const walletAcc = meanOf(resolvedRows.map((r) => r.outcome!));
-  const favAcc = meanOf(resolvedRows.map((r) => (r.avg_price! > 0.5 ? r.outcome! : 1 - r.outcome!)));
+  const walletEdge = meanOf(resolvedRows.map((r) => r.outcome! - r.avg_price!));
+  // Favorite side profit: if the wallet is on the favorite (p≥0.5) it's their own edge; else it's the
+  // OTHER side bought at (1−p): (1−outcome) − (1−p) = p − outcome.
+  const favEdge = meanOf(resolvedRows.map((r) => (r.avg_price! >= 0.5 ? r.outcome! - r.avg_price! : r.avg_price! - r.outcome!)));
+  const walletWin = meanOf(resolvedRows.map((r) => r.outcome!));
+  const favWin = meanOf(resolvedRows.map((r) => (r.avg_price! >= 0.5 ? r.outcome! : 1 - r.outcome!)));
   console.log(`\n── Favorite-baseline decomposition (${resolvedRows.length} resolved positions) ──`);
-  console.log(`  wallet side wins: ${(walletAcc * 100).toFixed(1)}%   always-favorite wins: ${(favAcc * 100).toFixed(1)}%   MARGINAL: ${(walletAcc - favAcc >= 0 ? "+" : "")}${((walletAcc - favAcc) * 100).toFixed(1)}pt`);
-  console.log(`  (marginal ≈ 0 ⇒ the board's directional edge is mostly 'favorites win', not skill a copier can sell)`);
+  console.log(`  PROFIT/share  — wallet edge: ${walletEdge >= 0 ? "+" : ""}${walletEdge.toFixed(4)}   always-favorite: ${favEdge >= 0 ? "+" : ""}${favEdge.toFixed(4)}   MARGINAL: ${walletEdge - favEdge >= 0 ? "+" : ""}${(walletEdge - favEdge).toFixed(4)}`);
+  console.log(`  win rate      — wallet: ${(walletWin * 100).toFixed(1)}%   favorite: ${(favWin * 100).toFixed(1)}%  (wallet lower = underdog tilt, NOT losing — see profit)`);
+  console.log(`  (marginal profit ≤ 0 ⇒ no directional edge a copier can sell over just buying favorites)`);
 
   const time = correlate(byWallet, medianCloseSplit, rawEdge);
   report("TIME-split: first-half vs second-half history", time.xs, time.ys, "1st-half", "2nd-half", "time");
