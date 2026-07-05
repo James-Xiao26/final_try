@@ -10,6 +10,7 @@
     "ingest:rescore": "tsx ingest.ts --rescore-top",
     "forward:record": "tsx forwardAlpha.ts --record",
     "forward:score": "tsx forwardAlpha.ts --score",
+    "copylist": "tsx copyList.ts",
     "webhook": "tsx server.ts",
     "probe": "tsx probeClosedPositions.ts",
     "typecheck": "tsc --noEmit",
