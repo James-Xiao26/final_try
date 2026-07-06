@@ -39,6 +39,7 @@ const padB = 26;
 // null = "All" (since creation). Others window the series to the last N days.
 type Horizon = number | null;
 const HORIZON_OPTIONS: { label: string; value: Horizon }[] = [
+  { label: "24H", value: 1 },
   { label: "7D", value: 7 },
   { label: "30D", value: 30 },
   { label: "90D", value: 90 },
