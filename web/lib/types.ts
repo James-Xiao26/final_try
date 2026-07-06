@@ -344,6 +344,7 @@ export interface ResolvedParticipant {
 export interface ResolvedMarket {
   conditionId: string;
   market: string | null;
+  eventSlug: string | null; // Polymarket event slug — used to group a match's markets (e.g. all of "Brazil vs. Norway")
   winningOutcomeIndex: number;
   winningSide: "YES" | "NO";
   resolvedAt: string;

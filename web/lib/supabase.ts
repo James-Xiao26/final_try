@@ -1460,6 +1460,7 @@ interface ResolvedClosedSelectRow {
   condition_id: string | null;
   outcome_index: number | null;
   market: string | null;
+  event_slug: string | null;
   avg_price: number | null;
   realized_pnl: number | null;
   size: number | null;
@@ -1474,7 +1475,7 @@ export async function getResolvedMarkets(limit = 40): Promise<ResolvedMarket[]> 
   const { rows, missing } = await fetchAllPaged((from, to) =>
     supabase
       .from("wallet_closed_positions")
-      .select("address, condition_id, outcome_index, market, avg_price, realized_pnl, size, close_time, first_traded_at")
+      .select("address, condition_id, outcome_index, market, event_slug, avg_price, realized_pnl, size, close_time, first_traded_at")
       .gte("close_time", cutoff)
       .order("close_time", { ascending: false })
       .range(from, to)
@@ -1536,6 +1537,7 @@ export async function getResolvedMarkets(limit = 40): Promise<ResolvedMarket[]> 
     address: r.address,
     conditionId: r.condition_id,
     market: r.market,
+    eventSlug: r.event_slug,
     outcomeIndex: r.outcome_index,
     avgPrice: toNumber(r.avg_price),
     size: toNumber(r.size),

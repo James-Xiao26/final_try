@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CrowdLookups } from "./marketCrowd";
-import { summarizeResolvedMarkets } from "./resolvedMarkets";
+import { groupResolvedByEvent, summarizeResolvedMarkets } from "./resolvedMarkets";
+import type { ResolvedMarket } from "./types";
 
 // Helper to build a minimal closed-position input.
 interface InputProps {
   address?: string;
   conditionId?: string | null;
   market?: string | null;
+  eventSlug?: string | null;
   outcomeIndex?: number | null;
   avgPrice?: number;
   size?: number;
@@ -21,6 +23,7 @@ function input(p: InputProps = {}) {
     address: "0xa",
     conditionId: "c1",
     market: "Will it rain?",
+    eventSlug: null,
     outcomeIndex: 0,
     avgPrice: 0.4,
     size: 100,
@@ -195,4 +198,111 @@ test("limit parameter slices the result", () => {
   // Newest two
   assert.equal(result[0]?.conditionId, "c3");
   assert.equal(result[1]?.conditionId, "c2");
+});
+
+// ── groupResolvedByEvent ────────────────────────────────────────────────────────
+
+function market(p: Partial<ResolvedMarket>): ResolvedMarket {
+  return {
+    conditionId: "c1",
+    market: "A market",
+    eventSlug: null,
+    winningOutcomeIndex: 0,
+    winningSide: "YES",
+    resolvedAt: "2026-06-10T00:00:00.000Z",
+    traderCount: 1,
+    winners: 1,
+    losers: 0,
+    totalRealizedPnl: 10,
+    participants: [{ address: "0xa", handle: null, rank: 1, skillScore: null, outcomeIndex: 0, side: "YES", won: true, avgEntry: 0.4, size: 100, realizedPnl: 10, realizedPct: 0.25, closeTime: null, firstTradedAt: null }],
+    ...p
+  };
+}
+
+test("groupResolvedByEvent condenses same-event markets and keeps standalones flat", () => {
+  const rows: ResolvedMarket[] = [
+    market({ conditionId: "m1", eventSlug: "bra-nor", market: "Brazil vs. Norway: Total goals over 2.5", resolvedAt: "2026-06-10T02:00:00.000Z", winners: 1, losers: 0, totalRealizedPnl: 30, participants: [{ address: "0xa", handle: null, rank: 1, skillScore: null, outcomeIndex: 0, side: "YES", won: true, avgEntry: 0.4, size: 100, realizedPnl: 30, realizedPct: 0.5, closeTime: null, firstTradedAt: null }] }),
+    market({ conditionId: "m2", eventSlug: "bra-nor", market: "Brazil vs. Norway: Brazil to win", resolvedAt: "2026-06-10T03:00:00.000Z", winners: 0, losers: 1, totalRealizedPnl: -20, participants: [{ address: "0xb", handle: null, rank: 5, skillScore: null, outcomeIndex: 1, side: "NO", won: false, avgEntry: 0.6, size: 50, realizedPnl: -20, realizedPct: -0.4, closeTime: null, firstTradedAt: null }] }),
+    market({ conditionId: "solo", eventSlug: "fed-decision", market: "Fed hike in July?", resolvedAt: "2026-06-11T00:00:00.000Z" })
+  ];
+  const groups = groupResolvedByEvent(rows);
+  assert.equal(groups.length, 2);
+  // Standalone (newest) first.
+  assert.equal(groups[0]?.markets.length, 1);
+  assert.equal(groups[0]?.key, "solo");
+  // The Brazil/Norway group is condensed.
+  const g = groups[1]!;
+  assert.equal(g.markets.length, 2);
+  assert.equal(g.title, "Brazil vs. Norway:".replace(/[\s:]+$/, "")); // common prefix, trailing sep stripped
+  assert.equal(g.traderCount, 2);      // distinct wallets across the two markets
+  assert.equal(g.winners, 1);
+  assert.equal(g.losers, 1);
+  assert.equal(g.totalRealizedPnl, 10);
+  assert.equal(g.resolvedAt, "2026-06-10T03:00:00.000Z"); // latest of the two
+});
+
+test("groupResolvedByEvent leaves a lone market under a slug ungrouped", () => {
+  const groups = groupResolvedByEvent([market({ conditionId: "only", eventSlug: "some-event" })]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0]?.markets.length, 1);
+  assert.equal(groups[0]?.key, "only");
+});
+
+// title extraction: matchup wins even when some markets don't name the teams
+test("group title uses the shared matchup, not the abbreviated slug", () => {
+  const slug = "fifwc-par-fra-2026-07-04-more-markets";
+  const groups = groupResolvedByEvent([
+    market({ conditionId: "a", eventSlug: slug, market: "Paraguay vs. France: O/U 2.5" }),
+    market({ conditionId: "b", eventSlug: slug, market: "Spread: France (-2.5)" }),
+    market({ conditionId: "c", eventSlug: slug, market: "Paraguay vs. France: Team to Advance" })
+  ]);
+  assert.equal(groups[0]?.title, "Paraguay vs. France");
+});
+
+test("group title extracts the matchup from 'Will … draw' questions (not just 'Will')", () => {
+  const slug = "fifwc-bra-nor-2026-07-05";
+  const groups = groupResolvedByEvent([
+    market({ conditionId: "a", eventSlug: slug, market: "Will Brazil vs. Norway end in a draw?" }),
+    market({ conditionId: "b", eventSlug: slug, market: "Will Brazil win on 2026-07-05?" }),
+    market({ conditionId: "c", eventSlug: slug, market: "Will Norway win on 2026-07-05?" })
+  ]);
+  assert.equal(groups[0]?.title, "Brazil vs. Norway");
+});
+
+test("group title falls back to a cleaned slug when there's no matchup", () => {
+  const slug = "world-cup-winner";
+  const groups = groupResolvedByEvent([
+    market({ conditionId: "a", eventSlug: slug, market: "Will Brazil win the 2026 FIFA World Cup?" }),
+    market({ conditionId: "b", eventSlug: slug, market: "Will Spain win the 2026 FIFA World Cup?" })
+  ]);
+  assert.equal(groups[0]?.title, "World Cup Winner");
+});
+
+test("group title keeps accented team names", () => {
+  const slug = "fifwc-civ-nor-2026-06-30-more-markets";
+  const groups = groupResolvedByEvent([
+    market({ conditionId: "a", eventSlug: slug, market: "Côte d'Ivoire vs. Norway: O/U 2.5" }),
+    market({ conditionId: "b", eventSlug: slug, market: "Côte d'Ivoire vs. Norway: Both Teams to Score" })
+  ]);
+  assert.equal(groups[0]?.title, "Côte d'Ivoire vs. Norway");
+});
+
+test("group title cross-references the matchup from a sibling slug", () => {
+  // The exact-score group's own questions never name the teams, but the -more-markets sibling does.
+  const groups = groupResolvedByEvent([
+    market({ conditionId: "a", eventSlug: "fifwc-par-fra-2026-07-04-more-markets", market: "Paraguay vs. France: O/U 2.5" }),
+    market({ conditionId: "b", eventSlug: "fifwc-par-fra-2026-07-04-more-markets", market: "Spread: France (-2.5)" }),
+    market({ conditionId: "c", eventSlug: "fifwc-par-fra-2026-07-04-exact-score", market: "Exact Score: 2-1" }),
+    market({ conditionId: "d", eventSlug: "fifwc-par-fra-2026-07-04-exact-score", market: "Exact Score: 1-0" })
+  ]);
+  const exact = groups.find((g) => g.key === "fifwc-par-fra-2026-07-04-exact-score");
+  assert.equal(exact?.title, "Paraguay vs. France");
+});
+
+test("humanizeSlug drops 3-digit id tokens and dangling prepositions", () => {
+  const groups = groupResolvedByEvent([
+    market({ conditionId: "a", eventSlug: "fed-rate-hike-by", market: "Will the Fed hike by June?" }),
+    market({ conditionId: "b", eventSlug: "fed-rate-hike-by", market: "Will the Fed hold in June?" })
+  ]);
+  assert.equal(groups[0]?.title, "Fed Rate Hike"); // trailing "By" trimmed
 });

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { formatNumber, formatPercent, formatPrice, formatUsd, shortenAddress } from "@/lib/format";
 import type { ResolvedMarket, ResolvedParticipant } from "@/lib/types";
+import { groupResolvedByEvent, type ResolvedEventGroup } from "@/lib/resolvedMarkets";
 import { useScrollLog } from "./useScrollLog";
 
 interface ResolvedMarketsPanelProps {
@@ -145,6 +146,46 @@ function MarketRow({ market }: { market: ResolvedMarket }) {
   );
 }
 
+// A match/event with several resolved markets, condensed into one collapsible header. Expands to the
+// individual market rows (each of which further expands to its participants).
+function EventGroup({ group }: { group: ResolvedEventGroup }) {
+  const [open, setOpen] = useState(false);
+  const pnlUp = group.totalRealizedPnl >= 0;
+
+  return (
+    <div className={`rm-mrow rm-group ${open ? "open" : ""}`}>
+      <div
+        className="rm-mhead"
+        onClick={() => setOpen((v) => !v)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setOpen((v) => !v); }}
+      >
+        <span className="rm-caret">{open ? "▾" : "▸"}</span>
+        <span className="rm-q rm-group-q" title={group.title}>{group.title}</span>
+        <div className="rm-chips">
+          <span className="rm-mkts">{group.markets.length} markets</span>
+          <span className="rm-contacts">{group.traderCount} contact{group.traderCount !== 1 ? "s" : ""}</span>
+          <span className="rm-wl">{group.winners}W / {group.losers}L</span>
+          <span className={`af-pl ${pnlUp ? "up" : "dn"}`}>
+            {pnlUp ? "+" : ""}{formatUsd(group.totalRealizedPnl)}
+          </span>
+          <span className="rm-ago" title={group.resolvedAt} suppressHydrationWarning>
+            resolved {resolvedAgo(group.resolvedAt)}
+          </span>
+        </div>
+      </div>
+      {open ? (
+        <div className="rm-gbody">
+          {group.markets.map((market) => (
+            <MarketRow key={market.conditionId} market={market} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function ResolvedMarketsPanel({ rows: initialRows }: ResolvedMarketsPanelProps) {
   const [rows, setRows] = useState(initialRows);
   const { locked, shellRef, logRef, hoverProps } = useScrollLog(rows);
@@ -190,9 +231,13 @@ export default function ResolvedMarketsPanel({ rows: initialRows }: ResolvedMark
               No resolved markets from board contacts in the last 7 days.
             </p>
           ) : (
-            rows.map((market) => (
-              <MarketRow key={market.conditionId} market={market} />
-            ))
+            groupResolvedByEvent(rows).map((group) =>
+              group.markets.length > 1 ? (
+                <EventGroup key={group.key} group={group} />
+              ) : (
+                <MarketRow key={group.key} market={group.markets[0]!} />
+              )
+            )
           )}
         </div>
       </div>

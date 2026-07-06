@@ -9,6 +9,7 @@ interface ResolvedClosedInput {
   address: string;
   conditionId: string | null;
   market: string | null;
+  eventSlug: string | null;
   outcomeIndex: number | null;
   avgPrice: number;
   size: number;
@@ -98,6 +99,7 @@ export function summarizeResolvedMarkets(
 
     const winningSide = sideLabel(winningOutcomeIndex);
     const market = rows.find((r) => r.market !== null)?.market ?? null;
+    const eventSlug = rows.find((r) => r.eventSlug)?.eventSlug ?? null;
 
     // Build per-participant rows. Every row gets won = (outcomeIndex === winningOutcomeIndex).
     const participants: ResolvedParticipant[] = [];
@@ -166,6 +168,7 @@ export function summarizeResolvedMarkets(
     results.push({
       conditionId,
       market,
+      eventSlug,
       winningOutcomeIndex,
       winningSide: winningSide === "—" ? "YES" : winningSide,
       resolvedAt,
@@ -181,4 +184,140 @@ export function summarizeResolvedMarkets(
   results.sort((a, b) => b.resolvedAt.localeCompare(a.resolvedAt));
 
   return results.slice(0, limit);
+}
+
+// ── Event grouping ────────────────────────────────────────────────────────────
+// A match (e.g. "Brazil vs. Norway") lists many markets — moneyline, totals, spreads — that all share
+// one Polymarket event slug and clutter the resolved feed as separate rows. Group them under one header.
+
+export interface ResolvedEventGroup {
+  key: string;                 // eventSlug for a real group, else the single market's conditionId
+  title: string;               // event header (common question prefix, else humanized slug)
+  markets: ResolvedMarket[];   // >1 for a grouped event; exactly 1 for a standalone market
+  traderCount: number;         // distinct participant wallets across the group
+  winners: number;
+  losers: number;
+  totalRealizedPnl: number;
+  resolvedAt: string;          // latest resolution in the group
+}
+
+// Pull an "A vs. B" matchup out of a market question (sports/esports). The questions embed the matchup
+// in different ways — "Paraguay vs. France: O/U 2.5", "Will Brazil vs. Norway end in a draw?",
+// "LoL: Hanwha Life Esports vs G2 Esports - Game 1 Winner" — so match it anywhere, bounded by a clean
+// stop (":", "-", "(", "?", " end", " on", end-of-string). Returns null when the question has no matchup.
+// \p{L} (any letter) so accented team names survive — "Côte d'Ivoire", not "te d'Ivoire".
+const MATCHUP_RX =
+  /([\p{L}][\p{L}\p{N}.'’&]*(?: [\p{L}\p{N}.'’&]+)*?)\s+vs\.?\s+([\p{L}\p{N}][\p{L}\p{N}.'’&]*(?: [\p{L}\p{N}.'’&]+)*?)(?=[:?]|\s*[-–]|\s+end\b|\s+on\b|\s*\(|$)/u;
+
+function matchupOf(question: string): string | null {
+  const q = question.replace(/^\s*will\s+/i, ""); // "Will Brazil vs. Norway…" → "Brazil vs. Norway…"
+  const m = q.match(MATCHUP_RX);
+  if (!m) return null;
+  const a = m[1]!.trim();
+  const b = m[2]!.trim();
+  return a && b ? `${a} vs. ${b}` : null;
+}
+
+// A match lists its markets under several sibling slugs — "fifwc-par-fra-2026-07-04",
+// "…-more-markets", "…-exact-score", "…-total-corners". Strip the decoration suffix so they share one
+// match key, letting a matchup found under one slug title the others (whose own questions don't name
+// the teams, e.g. "Exact Score: 2-1").
+function matchKeyOf(slug: string): string {
+  return slug.replace(/-(?:more-markets|exact-score|total-corners|player-props|total-goals|goalscorers|1st-half.*)$/, "");
+}
+
+// The matchup shared by the most market questions in the group — the clean event title for a match,
+// even when some markets (spreads, "Team to Advance") don't name the teams.
+function commonMatchup(markets: ResolvedMarket[]): string | null {
+  const counts = new Map<string, number>();
+  for (const m of markets) {
+    const mm = m.market ? matchupOf(m.market) : null;
+    if (mm) counts.set(mm, (counts.get(mm) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [name, count] of counts) {
+    if (count > bestCount) {
+      bestCount = count;
+      best = name;
+    }
+  }
+  return best;
+}
+
+// ponytail: heuristic titles (shared matchup, else humanized slug). Good enough; the market list under
+// the header disambiguates. Upgrade path: cache the real event title during ingest keyed by event_slug.
+// Drop 3-digit + long id/timestamp slug tokens (keep 1-2 digit days/rounds and 4-digit years), drop a
+// leading "Will", and trim dangling trailing prepositions ("…Peace Deal By" → "…Peace Deal").
+const TAIL_STOPWORDS = new Set(["By", "On", "In", "Of", "For", "To", "And", "At", "The", "A"]);
+function humanizeSlug(slug: string): string {
+  const words = slug
+    .split("-")
+    .filter((t) => t.length > 0 && !/^\d{3}$/.test(t) && !/^\d{5,}$/.test(t))
+    .map((t) => t.charAt(0).toUpperCase() + t.slice(1));
+  while (words.length > 0 && words[0] === "Will") words.shift();
+  while (words.length > 1 && TAIL_STOPWORDS.has(words[words.length - 1]!)) words.pop();
+  return words.join(" ");
+}
+
+// Group resolved markets by their Polymarket event slug. Markets with no slug, or whose slug appears
+// only once, stay standalone (a one-market group). Groups are ordered newest-resolution-first, matching
+// the flat feed. Pure — the component renders standalone groups as plain rows and multi-market groups
+// as one collapsible header.
+export function groupResolvedByEvent(markets: ResolvedMarket[]): ResolvedEventGroup[] {
+  const bySlug = new Map<string, ResolvedMarket[]>();
+  const standalone: ResolvedMarket[] = [];
+  for (const m of markets) {
+    if (!m.eventSlug) {
+      standalone.push(m);
+      continue;
+    }
+    const g = bySlug.get(m.eventSlug);
+    if (g) g.push(m);
+    else bySlug.set(m.eventSlug, [m]);
+  }
+
+  // Cross-reference matchups across a match's sibling slugs: a matchup found under any slug titles every
+  // slug sharing its match key (so "…-exact-score", whose own questions don't name the teams, still
+  // reads "Paraguay vs. France").
+  const matchupByKey = new Map<string, string>();
+  for (const [slug, group] of bySlug) {
+    if (group.length <= 1) continue;
+    const mm = commonMatchup(group);
+    if (mm) {
+      const k = matchKeyOf(slug);
+      if (!matchupByKey.has(k)) matchupByKey.set(k, mm);
+    }
+  }
+
+  const groups: ResolvedEventGroup[] = [];
+  const pushGroup = (key: string, slug: string | null, group: ResolvedMarket[]): void => {
+    const addresses = new Set<string>();
+    let winners = 0;
+    let losers = 0;
+    let totalRealizedPnl = 0;
+    let resolvedAt = "";
+    for (const m of group) {
+      winners += m.winners;
+      losers += m.losers;
+      totalRealizedPnl += m.totalRealizedPnl;
+      if (m.resolvedAt > resolvedAt) resolvedAt = m.resolvedAt;
+      for (const p of m.participants) addresses.add(p.address);
+    }
+    let title = group[0]?.market ?? "—";
+    if (group.length > 1 && slug) {
+      const matchup = commonMatchup(group) ?? matchupByKey.get(matchKeyOf(slug)) ?? null;
+      title = matchup ?? (humanizeSlug(slug) || title);
+    }
+    groups.push({ key, title, markets: group, traderCount: addresses.size, winners, losers, totalRealizedPnl, resolvedAt });
+  };
+
+  for (const [slug, group] of bySlug) {
+    if (group.length > 1) pushGroup(slug, slug, group);
+    else standalone.push(group[0]!); // a lone market under a slug isn't a group
+  }
+  for (const m of standalone) pushGroup(m.conditionId, m.eventSlug, [m]);
+
+  groups.sort((a, b) => b.resolvedAt.localeCompare(a.resolvedAt));
+  return groups;
 }

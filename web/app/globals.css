@@ -561,6 +561,15 @@ input:focus { border-color: var(--green) !important; }
 .rm-outcome.yes { color: var(--green); border: 1px solid rgba(54,236,208,0.28); background: rgba(54,236,208,0.05); }
 .rm-outcome.no { color: var(--red); border: 1px solid rgba(255,122,89,0.32); background: rgba(255,122,89,0.06); }
 
+/* condensed event group (a match's markets under one header) */
+.rm-group-q { cursor: pointer; }
+.rm-mrow.rm-group.open .rm-group-q, .rm-group .rm-mhead:hover .rm-group-q { color: var(--green); }
+.rm-mkts { font-family: var(--font-display); font-weight: 600; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--green); border: 1px solid rgba(54,236,208,0.28); background: rgba(54,236,208,0.05); padding: 3px 9px; border-radius: 2px; white-space: nowrap; }
+.rm-gbody { padding: 0 0 6px 20px; border-left: 1px solid rgba(54,236,208,0.1); margin-left: 20px; }
+.rm-gbody .rm-mhead { padding-top: 11px; padding-bottom: 11px; }
+.rm-gbody .rm-q { font-size: 13px; font-weight: 400; }
+
 .rm-contacts { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .rm-wl { font-family: var(--font-plex-mono); font-size: 11px; color: var(--muted-d); white-space: nowrap; }
 .rm-ago { font-size: 11px; color: var(--muted-d); white-space: nowrap; }
