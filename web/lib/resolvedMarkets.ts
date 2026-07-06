@@ -9,6 +9,7 @@ interface ResolvedClosedInput {
   address: string;
   conditionId: string | null;
   market: string | null;
+  eventSlug: string | null;
   outcomeIndex: number | null;
   avgPrice: number;
   size: number;
@@ -98,6 +99,7 @@ export function summarizeResolvedMarkets(
 
     const winningSide = sideLabel(winningOutcomeIndex);
     const market = rows.find((r) => r.market !== null)?.market ?? null;
+    const eventSlug = rows.find((r) => r.eventSlug)?.eventSlug ?? null;
 
     // Build per-participant rows. Every row gets won = (outcomeIndex === winningOutcomeIndex).
     const participants: ResolvedParticipant[] = [];
@@ -166,6 +168,7 @@ export function summarizeResolvedMarkets(
     results.push({
       conditionId,
       market,
+      eventSlug,
       winningOutcomeIndex,
       winningSide: winningSide === "—" ? "YES" : winningSide,
       resolvedAt,
@@ -181,4 +184,91 @@ export function summarizeResolvedMarkets(
   results.sort((a, b) => b.resolvedAt.localeCompare(a.resolvedAt));
 
   return results.slice(0, limit);
+}
+
+// ── Event grouping ────────────────────────────────────────────────────────────
+// A match (e.g. "Brazil vs. Norway") lists many markets — moneyline, totals, spreads — that all share
+// one Polymarket event slug and clutter the resolved feed as separate rows. Group them under one header.
+
+export interface ResolvedEventGroup {
+  key: string;                 // eventSlug for a real group, else the single market's conditionId
+  title: string;               // event header (common question prefix, else humanized slug)
+  markets: ResolvedMarket[];   // >1 for a grouped event; exactly 1 for a standalone market
+  traderCount: number;         // distinct participant wallets across the group
+  winners: number;
+  losers: number;
+  totalRealizedPnl: number;
+  resolvedAt: string;          // latest resolution in the group
+}
+
+// Longest shared leading substring of the group's market questions, trimmed to a clean boundary —
+// gives "Brazil vs. Norway" from "Brazil vs. Norway: Total goals…" + "Brazil vs. Norway: Brazil win".
+function commonTitle(markets: ResolvedMarket[]): string {
+  const names = markets.map((m) => m.market ?? "").filter((s) => s.length > 0);
+  if (names.length === 0) return "";
+  let prefix = names[0]!;
+  for (const s of names.slice(1)) {
+    let i = 0;
+    while (i < prefix.length && i < s.length && prefix[i] === s[i]) i += 1;
+    prefix = prefix.slice(0, i);
+  }
+  return prefix.replace(/[\s:—\-–|,.]+$/, "").trim(); // strip trailing separators
+}
+
+// ponytail: heuristic titles (common prefix, else humanized slug). Good enough; the market list under
+// the header disambiguates. Upgrade path: cache the real event title during ingest keyed by event_slug.
+function humanizeSlug(slug: string): string {
+  const words = slug
+    .split("-")
+    .filter((t) => t.length > 0 && !/^\d{4}$/.test(t) && !/^\d{1,2}$/.test(t))
+    .map((t) => t.charAt(0).toUpperCase() + t.slice(1));
+  return words.join(" ");
+}
+
+// Group resolved markets by their Polymarket event slug. Markets with no slug, or whose slug appears
+// only once, stay standalone (a one-market group). Groups are ordered newest-resolution-first, matching
+// the flat feed. Pure — the component renders standalone groups as plain rows and multi-market groups
+// as one collapsible header.
+export function groupResolvedByEvent(markets: ResolvedMarket[]): ResolvedEventGroup[] {
+  const bySlug = new Map<string, ResolvedMarket[]>();
+  const standalone: ResolvedMarket[] = [];
+  for (const m of markets) {
+    if (!m.eventSlug) {
+      standalone.push(m);
+      continue;
+    }
+    const g = bySlug.get(m.eventSlug);
+    if (g) g.push(m);
+    else bySlug.set(m.eventSlug, [m]);
+  }
+
+  const groups: ResolvedEventGroup[] = [];
+  const pushGroup = (key: string, slug: string | null, group: ResolvedMarket[]): void => {
+    const addresses = new Set<string>();
+    let winners = 0;
+    let losers = 0;
+    let totalRealizedPnl = 0;
+    let resolvedAt = "";
+    for (const m of group) {
+      winners += m.winners;
+      losers += m.losers;
+      totalRealizedPnl += m.totalRealizedPnl;
+      if (m.resolvedAt > resolvedAt) resolvedAt = m.resolvedAt;
+      for (const p of m.participants) addresses.add(p.address);
+    }
+    const title =
+      group.length > 1
+        ? commonTitle(group) || (slug ? humanizeSlug(slug) : "") || (group[0]?.market ?? "—")
+        : group[0]?.market ?? "—";
+    groups.push({ key, title, markets: group, traderCount: addresses.size, winners, losers, totalRealizedPnl, resolvedAt });
+  };
+
+  for (const [slug, group] of bySlug) {
+    if (group.length > 1) pushGroup(slug, slug, group);
+    else standalone.push(group[0]!); // a lone market under a slug isn't a group
+  }
+  for (const m of standalone) pushGroup(m.conditionId, m.eventSlug, [m]);
+
+  groups.sort((a, b) => b.resolvedAt.localeCompare(a.resolvedAt));
+  return groups;
 }
