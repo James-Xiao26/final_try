@@ -493,6 +493,28 @@ export function sidePayouts(participants: CrowdParticipant[], topN = 8): SidePay
   return rankSides(holders, topN);
 }
 
+// A single market holder (from the live /holders endpoint), enriched with leaderboard identity where
+// the address is a tracked wallet. `shares` = $ payout if this side wins.
+export interface HolderInput {
+  address: string;
+  handle: string | null;
+  rank: number | null;
+  outcomeIndex: number; // 0 = YES, 1 = NO
+  shares: number;
+}
+
+// Rank the *whole market's* current holders (not just tracked wallets) on each side by payout. Used for
+// live markets, where /holders gives the full current book.
+export function sidePayoutsFromHolders(holders: HolderInput[], topN = 8): SidePayouts {
+  const raw: RawHolder[] = [];
+  for (const h of holders) {
+    const side = h.outcomeIndex === 0 ? "YES" : h.outcomeIndex === 1 ? "NO" : null;
+    if (!side || h.shares <= 0) continue;
+    raw.push({ address: h.address, handle: h.handle, rank: h.rank, side, payout: h.shares });
+  }
+  return rankSides(raw, topN);
+}
+
 // Reconstruct each wallet's net holdings on each side as of `cutoffMs`, from its tracked fills (BUY
 // adds shares, SELL removes). For a resolved market, pass (resolution time − 24h) to answer "who was
 // holding a day before it settled". payout = net shares held = $1/share at resolution.
@@ -611,4 +633,8 @@ export interface MarketAnalytics {
   // For a grouped event (e.g. "World Cup Winner"): the sibling candidate markets, so the page can offer
   // a dropdown to switch between them. Empty for a plain standalone Yes/No market.
   eventMarkets: EventMarketOption[];
+  // The whole market's current holders (live /holders), enriched with leaderboard identity. Populated
+  // for live markets; empty for resolved ones (balances zero out on redemption — the page falls back to
+  // reconstructing tracked holdings 24h before settlement).
+  holders: HolderInput[];
 }

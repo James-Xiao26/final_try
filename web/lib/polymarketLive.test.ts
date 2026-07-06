@@ -1,6 +1,31 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { mapLiveMarketRow, mergeSeries } from "./polymarketLive";
+import { mapLiveMarketRow, mergeSeries, parseMarketHolders } from "./polymarketLive";
+
+test("parseMarketHolders flattens per-token holders, lowercases, keeps balance + outcome", () => {
+  const rows = [
+    { token: "tYes", holders: [
+      { proxyWallet: "0xABC", name: "VOL", amount: 2800000.5, outcomeIndex: 0 },
+      { proxyWallet: "0xdef", pseudonym: "Foo", amount: 100, outcomeIndex: 0 }
+    ] },
+    { token: "tNo", holders: [
+      { wallet: "0xGHI", amount: 500, outcomeIndex: 1 },
+      { proxyWallet: "0xzzz", amount: 0, outcomeIndex: 1 } // zero balance → dropped
+    ] }
+  ];
+  const holders = parseMarketHolders(rows);
+  assert.deepEqual(holders, [
+    { address: "0xabc", name: "VOL", outcomeIndex: 0, shares: 2800000.5 },
+    { address: "0xdef", name: "Foo", outcomeIndex: 0, shares: 100 },
+    { address: "0xghi", name: null, outcomeIndex: 1, shares: 500 }
+  ]);
+});
+
+test("parseMarketHolders tolerates junk", () => {
+  assert.deepEqual(parseMarketHolders(null), []);
+  assert.deepEqual(parseMarketHolders([{ token: "t" }]), []); // no holders array
+  assert.deepEqual(parseMarketHolders([{ holders: [{}, "junk", 5] }]), []); // no address
+});
 
 const SEC = (iso: string) => Date.parse(iso) / 1000;
 

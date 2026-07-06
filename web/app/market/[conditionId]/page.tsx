@@ -19,6 +19,7 @@ import {
   pnlDistribution,
   sidePayouts,
   sidePayoutsAt,
+  sidePayoutsFromHolders,
   smartMoneyLean,
   summarizeWhaleMoves
 } from "@/lib/marketAnalytics";
@@ -131,10 +132,15 @@ export default async function MarketPage({ params }: MarketPageProps) {
   const whaleSummary = summarizeWhaleMoves(whales);
   const participants = detail?.participants ?? [];
   const conc = concentration(participants);
-  // Live market: current open holders. Resolved market: reconstruct who was holding 24h before it settled.
+  // Resolved market: reconstruct who was holding 24h before it settled (tracked wallets — full-book
+  // history isn't available). Live market: the whole current book from /holders, falling back to tracked
+  // open positions if that fetch came back empty.
+  const allHolders = !meta?.closed && analytics.holders.length > 0;
   const payouts = meta?.closed
     ? sidePayoutsAt(participants, resolutionCutoffMs(meta, participants))
-    : sidePayouts(participants);
+    : allHolders
+      ? sidePayoutsFromHolders(analytics.holders)
+      : sidePayouts(participants);
   const pnl = pnlDistribution(participants);
   const lean = smartMoneyLean(participants);
 
@@ -259,8 +265,8 @@ export default async function MarketPage({ params }: MarketPageProps) {
           <div className="ma-section-head"><h2>Top <span className="g">Holders</span> by Payout</h2></div>
           <SidePayoutChart data={payouts} />
           <p className="ma-caption">
-            Largest tracked holders on each side{meta?.closed ? " 24h before this market resolved" : ""}, ranked by
-            their payout if that side wins (shares held settle at $1 each — i.e. cost ÷ entry price). YES holders
+            Largest {allHolders ? "holders" : "tracked holders"} on each side{meta?.closed ? " 24h before this market resolved" : ""}, ranked
+            by their payout if that side wins (shares held settle at $1 each — i.e. cost ÷ entry price). YES holders
             {meta?.closed ? " were owed " : " stand to collect "}{formatCompactUsd(payouts.yesTotal)}, NO holders {formatCompactUsd(payouts.noTotal)}.
           </p>
         </section>

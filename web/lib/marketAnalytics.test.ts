@@ -9,6 +9,7 @@ import {
   pnlDistribution,
   sidePayouts,
   sidePayoutsAt,
+  sidePayoutsFromHolders,
   smartMoneyLean,
   summarizeWhaleMoves,
   type MarketMeta,
@@ -221,6 +222,21 @@ test("sidePayouts ranks open holders per side by payout and excludes closed", ()
   assert.equal(sp.yesTotal, 1000);
   assert.equal(sp.noTotal, 500);
   assert.equal(sp.max, 700); // largest single holder across both sides
+});
+
+test("sidePayoutsFromHolders ranks the whole book per side by shares", () => {
+  const sp = sidePayoutsFromHolders([
+    { address: "0x1", handle: "a", rank: 3, outcomeIndex: 0, shares: 800 },
+    { address: "0x2", handle: null, rank: null, outcomeIndex: 0, shares: 1200 },
+    { address: "0x3", handle: "b", rank: null, outcomeIndex: 1, shares: 500 },
+    { address: "0x4", handle: null, rank: null, outcomeIndex: 1, shares: 0 },   // zero → dropped
+    { address: "0x5", handle: null, rank: null, outcomeIndex: 5, shares: 900 }  // not a YES/NO leg → dropped
+  ]);
+  assert.deepEqual(sp.yes.map((h) => [h.address, h.payout]), [["0x2", 1200], ["0x1", 800]]);
+  assert.deepEqual(sp.no.map((h) => [h.address, h.payout]), [["0x3", 500]]);
+  assert.equal(sp.yesTotal, 2000);
+  assert.equal(sp.noTotal, 500);
+  assert.equal(sp.max, 1200);
 });
 
 test("sidePayoutsAt reconstructs net holdings from fills up to the cutoff", () => {

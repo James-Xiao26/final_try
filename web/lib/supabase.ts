@@ -7,8 +7,8 @@ import { HORIZONS } from "./types";
 import { groupWalletTrades, applyClosedBasis } from "./walletTrades";
 import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis, type TradeBasis } from "./recentTrades";
 import { buildCrowdMarketDetail, type CrowdClosedPosition, type CrowdLookups, type CrowdOpenPosition, type CrowdTradeFill } from "./marketCrowd";
-import type { EventMarketOption, MarketAnalytics, MarketMeta, PricePoint, WhaleFillInput } from "./marketAnalytics";
-import { fetchEventCandidates, fetchLiveMarket, fetchLivePriceSeries, fetchLiveWalletDetail, type LiveMarket } from "./polymarketLive";
+import type { EventMarketOption, HolderInput, MarketAnalytics, MarketMeta, PricePoint, WhaleFillInput } from "./marketAnalytics";
+import { fetchEventCandidates, fetchLiveMarket, fetchLivePriceSeries, fetchLiveWalletDetail, fetchMarketHolders, type LiveMarket } from "./polymarketLive";
 import { summarizeResolvedMarkets } from "./resolvedMarkets";
 import { buildTrendingMarkets, MAX_WHALE_COST_SHARE, qualifyingConditionIds, TRENDING_MIN_PARTICIPANTS } from "./trendingMarkets";
 
@@ -1206,6 +1206,21 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
     }
   }
 
+  // The whole market's current holders, for the top-holders-by-payout chart. Only for live markets —
+  // a resolved market's balances zero out on redemption, so the page reconstructs tracked holdings 24h
+  // before settlement instead. Enrich with leaderboard identity (handle/rank) where we know the wallet.
+  let holders: HolderInput[] = [];
+  if (resolvedMeta !== null && !resolvedMeta.closed) {
+    const raw = await fetchMarketHolders(conditionId);
+    holders = raw.map((h) => ({
+      address: h.address,
+      handle: handleByAddress.get(h.address) ?? h.name,
+      rank: rankByAddress.get(h.address) ?? null,
+      outcomeIndex: h.outcomeIndex,
+      shares: h.shares
+    }));
+  }
+
   const lookups: CrowdLookups = { rankByAddress, handleByAddress, skillByAddress };
   const detail =
     addresses.length > 0
@@ -1225,7 +1240,7 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
     tradedAt: f.tradedAt
   }));
 
-  return { conditionId, meta: resolvedMeta, detail, priceRows, whaleFills, eventMarkets };
+  return { conditionId, meta: resolvedMeta, detail, priceRows, whaleFills, eventMarkets, holders };
 }
 
 // Home-page Trending panel: the `limit` currently-hottest markets by 24h volume, plus how the

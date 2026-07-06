@@ -252,6 +252,46 @@ export async function fetchEventCandidates(conditionId: string): Promise<EventCa
   return candidates.length > 0 ? candidates : null;
 }
 
+// One current holder of a market outcome token, from the Data API /holders endpoint. `shares` is the
+// token balance (each winning share settles at $1, so shares = the $ payout if this side wins).
+export interface MarketHolder {
+  address: string;
+  name: string | null;      // Polymarket display name / pseudonym, if any
+  outcomeIndex: number;     // 0 = YES, 1 = NO
+  shares: number;
+}
+
+// Pure: flatten a /holders response — [{ token, holders: [{ proxyWallet, amount, outcomeIndex, … }] }]
+// — into MarketHolders. Defensive against Polymarket's field-name drift (mirrors scripts'
+// parseHoldersResponse, but keeps the balance + outcome so we can rank by payout). Exported for tests.
+export function parseMarketHolders(rows: unknown): MarketHolder[] {
+  const out: MarketHolder[] = [];
+  for (const group of Array.isArray(rows) ? rows : []) {
+    if (typeof group !== "object" || group === null) continue;
+    const holders = (group as Record<string, unknown>).holders;
+    for (const h of Array.isArray(holders) ? holders : []) {
+      if (typeof h !== "object" || h === null) continue;
+      const rec = h as Record<string, unknown>;
+      const address = readStr(rec, ["proxyWallet", "user", "wallet", "address"]).toLowerCase();
+      const shares = readNum(rec, ["amount", "shares", "balance", "size"]);
+      if (!address || shares <= 0) continue;
+      out.push({
+        address,
+        name: readStr(rec, ["name", "pseudonym"]) || null,
+        outcomeIndex: readNum(rec, ["outcomeIndex"]),
+        shares
+      });
+    }
+  }
+  return out;
+}
+
+// Top holders of a market's two outcome tokens (current balances), largest-first per token as the API
+// returns them. `limit` is per token (Data API caps ~20). Read-only, Next-Data-Cached, degrades to [].
+export async function fetchMarketHolders(conditionId: string, limit = 12): Promise<MarketHolder[]> {
+  return parseMarketHolders(await fetchDataApi("/holders", { market: conditionId, limit: String(limit) }));
+}
+
 // Live wallet detail (open positions + recent trade history) from the Data API, for a wallet whose
 // detail the batch pipeline never cached. Ingest only persists positions/fills for the ~TOP_N
 // leaderboard wallets, so an eligible-but-non-board wallet — e.g. a World Cup specialist linked from
