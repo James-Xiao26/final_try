@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "date": "2026-07-05",
+    "market": "Mexico vs. England: Team to Advance",
+    "bet": "Mexico",
+    "conditionId": "0x94e50623d3cfdc1256e16ff372062d42c282bec8af620bb732a19fb4b0dce580",
+    "outcomeIndex": 0,
+    "price": 0.48,
+    "stakeUsd": 0.5,
+    "resolvedOutcome": 0,
+    "resolvedAt": "2026-07-06T03:54:24.121Z",
+    "note": "copylist top pick, 4-wallet agreement"
+  }
+]
