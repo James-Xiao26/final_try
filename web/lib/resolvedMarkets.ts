@@ -201,27 +201,62 @@ export interface ResolvedEventGroup {
   resolvedAt: string;          // latest resolution in the group
 }
 
-// Longest shared leading substring of the group's market questions, trimmed to a clean boundary —
-// gives "Brazil vs. Norway" from "Brazil vs. Norway: Total goals…" + "Brazil vs. Norway: Brazil win".
-function commonTitle(markets: ResolvedMarket[]): string {
-  const names = markets.map((m) => m.market ?? "").filter((s) => s.length > 0);
-  if (names.length === 0) return "";
-  let prefix = names[0]!;
-  for (const s of names.slice(1)) {
-    let i = 0;
-    while (i < prefix.length && i < s.length && prefix[i] === s[i]) i += 1;
-    prefix = prefix.slice(0, i);
-  }
-  return prefix.replace(/[\s:—\-–|,.]+$/, "").trim(); // strip trailing separators
+// Pull an "A vs. B" matchup out of a market question (sports/esports). The questions embed the matchup
+// in different ways — "Paraguay vs. France: O/U 2.5", "Will Brazil vs. Norway end in a draw?",
+// "LoL: Hanwha Life Esports vs G2 Esports - Game 1 Winner" — so match it anywhere, bounded by a clean
+// stop (":", "-", "(", "?", " end", " on", end-of-string). Returns null when the question has no matchup.
+// \p{L} (any letter) so accented team names survive — "Côte d'Ivoire", not "te d'Ivoire".
+const MATCHUP_RX =
+  /([\p{L}][\p{L}\p{N}.'’&]*(?: [\p{L}\p{N}.'’&]+)*?)\s+vs\.?\s+([\p{L}\p{N}][\p{L}\p{N}.'’&]*(?: [\p{L}\p{N}.'’&]+)*?)(?=[:?]|\s*[-–]|\s+end\b|\s+on\b|\s*\(|$)/u;
+
+function matchupOf(question: string): string | null {
+  const q = question.replace(/^\s*will\s+/i, ""); // "Will Brazil vs. Norway…" → "Brazil vs. Norway…"
+  const m = q.match(MATCHUP_RX);
+  if (!m) return null;
+  const a = m[1]!.trim();
+  const b = m[2]!.trim();
+  return a && b ? `${a} vs. ${b}` : null;
 }
 
-// ponytail: heuristic titles (common prefix, else humanized slug). Good enough; the market list under
+// A match lists its markets under several sibling slugs — "fifwc-par-fra-2026-07-04",
+// "…-more-markets", "…-exact-score", "…-total-corners". Strip the decoration suffix so they share one
+// match key, letting a matchup found under one slug title the others (whose own questions don't name
+// the teams, e.g. "Exact Score: 2-1").
+function matchKeyOf(slug: string): string {
+  return slug.replace(/-(?:more-markets|exact-score|total-corners|player-props|total-goals|goalscorers|1st-half.*)$/, "");
+}
+
+// The matchup shared by the most market questions in the group — the clean event title for a match,
+// even when some markets (spreads, "Team to Advance") don't name the teams.
+function commonMatchup(markets: ResolvedMarket[]): string | null {
+  const counts = new Map<string, number>();
+  for (const m of markets) {
+    const mm = m.market ? matchupOf(m.market) : null;
+    if (mm) counts.set(mm, (counts.get(mm) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [name, count] of counts) {
+    if (count > bestCount) {
+      bestCount = count;
+      best = name;
+    }
+  }
+  return best;
+}
+
+// ponytail: heuristic titles (shared matchup, else humanized slug). Good enough; the market list under
 // the header disambiguates. Upgrade path: cache the real event title during ingest keyed by event_slug.
+// Drop 3-digit + long id/timestamp slug tokens (keep 1-2 digit days/rounds and 4-digit years), drop a
+// leading "Will", and trim dangling trailing prepositions ("…Peace Deal By" → "…Peace Deal").
+const TAIL_STOPWORDS = new Set(["By", "On", "In", "Of", "For", "To", "And", "At", "The", "A"]);
 function humanizeSlug(slug: string): string {
   const words = slug
     .split("-")
-    .filter((t) => t.length > 0 && !/^\d{4}$/.test(t) && !/^\d{1,2}$/.test(t))
+    .filter((t) => t.length > 0 && !/^\d{3}$/.test(t) && !/^\d{5,}$/.test(t))
     .map((t) => t.charAt(0).toUpperCase() + t.slice(1));
+  while (words.length > 0 && words[0] === "Will") words.shift();
+  while (words.length > 1 && TAIL_STOPWORDS.has(words[words.length - 1]!)) words.pop();
   return words.join(" ");
 }
 
@@ -242,6 +277,19 @@ export function groupResolvedByEvent(markets: ResolvedMarket[]): ResolvedEventGr
     else bySlug.set(m.eventSlug, [m]);
   }
 
+  // Cross-reference matchups across a match's sibling slugs: a matchup found under any slug titles every
+  // slug sharing its match key (so "…-exact-score", whose own questions don't name the teams, still
+  // reads "Paraguay vs. France").
+  const matchupByKey = new Map<string, string>();
+  for (const [slug, group] of bySlug) {
+    if (group.length <= 1) continue;
+    const mm = commonMatchup(group);
+    if (mm) {
+      const k = matchKeyOf(slug);
+      if (!matchupByKey.has(k)) matchupByKey.set(k, mm);
+    }
+  }
+
   const groups: ResolvedEventGroup[] = [];
   const pushGroup = (key: string, slug: string | null, group: ResolvedMarket[]): void => {
     const addresses = new Set<string>();
@@ -256,10 +304,11 @@ export function groupResolvedByEvent(markets: ResolvedMarket[]): ResolvedEventGr
       if (m.resolvedAt > resolvedAt) resolvedAt = m.resolvedAt;
       for (const p of m.participants) addresses.add(p.address);
     }
-    const title =
-      group.length > 1
-        ? commonTitle(group) || (slug ? humanizeSlug(slug) : "") || (group[0]?.market ?? "—")
-        : group[0]?.market ?? "—";
+    let title = group[0]?.market ?? "—";
+    if (group.length > 1 && slug) {
+      const matchup = commonMatchup(group) ?? matchupByKey.get(matchKeyOf(slug)) ?? null;
+      title = matchup ?? (humanizeSlug(slug) || title);
+    }
     groups.push({ key, title, markets: group, traderCount: addresses.size, winners, losers, totalRealizedPnl, resolvedAt });
   };
 

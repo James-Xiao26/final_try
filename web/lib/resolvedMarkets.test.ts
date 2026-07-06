@@ -247,3 +247,62 @@ test("groupResolvedByEvent leaves a lone market under a slug ungrouped", () => {
   assert.equal(groups[0]?.markets.length, 1);
   assert.equal(groups[0]?.key, "only");
 });
+
+// title extraction: matchup wins even when some markets don't name the teams
+test("group title uses the shared matchup, not the abbreviated slug", () => {
+  const slug = "fifwc-par-fra-2026-07-04-more-markets";
+  const groups = groupResolvedByEvent([
+    market({ conditionId: "a", eventSlug: slug, market: "Paraguay vs. France: O/U 2.5" }),
+    market({ conditionId: "b", eventSlug: slug, market: "Spread: France (-2.5)" }),
+    market({ conditionId: "c", eventSlug: slug, market: "Paraguay vs. France: Team to Advance" })
+  ]);
+  assert.equal(groups[0]?.title, "Paraguay vs. France");
+});
+
+test("group title extracts the matchup from 'Will … draw' questions (not just 'Will')", () => {
+  const slug = "fifwc-bra-nor-2026-07-05";
+  const groups = groupResolvedByEvent([
+    market({ conditionId: "a", eventSlug: slug, market: "Will Brazil vs. Norway end in a draw?" }),
+    market({ conditionId: "b", eventSlug: slug, market: "Will Brazil win on 2026-07-05?" }),
+    market({ conditionId: "c", eventSlug: slug, market: "Will Norway win on 2026-07-05?" })
+  ]);
+  assert.equal(groups[0]?.title, "Brazil vs. Norway");
+});
+
+test("group title falls back to a cleaned slug when there's no matchup", () => {
+  const slug = "world-cup-winner";
+  const groups = groupResolvedByEvent([
+    market({ conditionId: "a", eventSlug: slug, market: "Will Brazil win the 2026 FIFA World Cup?" }),
+    market({ conditionId: "b", eventSlug: slug, market: "Will Spain win the 2026 FIFA World Cup?" })
+  ]);
+  assert.equal(groups[0]?.title, "World Cup Winner");
+});
+
+test("group title keeps accented team names", () => {
+  const slug = "fifwc-civ-nor-2026-06-30-more-markets";
+  const groups = groupResolvedByEvent([
+    market({ conditionId: "a", eventSlug: slug, market: "Côte d'Ivoire vs. Norway: O/U 2.5" }),
+    market({ conditionId: "b", eventSlug: slug, market: "Côte d'Ivoire vs. Norway: Both Teams to Score" })
+  ]);
+  assert.equal(groups[0]?.title, "Côte d'Ivoire vs. Norway");
+});
+
+test("group title cross-references the matchup from a sibling slug", () => {
+  // The exact-score group's own questions never name the teams, but the -more-markets sibling does.
+  const groups = groupResolvedByEvent([
+    market({ conditionId: "a", eventSlug: "fifwc-par-fra-2026-07-04-more-markets", market: "Paraguay vs. France: O/U 2.5" }),
+    market({ conditionId: "b", eventSlug: "fifwc-par-fra-2026-07-04-more-markets", market: "Spread: France (-2.5)" }),
+    market({ conditionId: "c", eventSlug: "fifwc-par-fra-2026-07-04-exact-score", market: "Exact Score: 2-1" }),
+    market({ conditionId: "d", eventSlug: "fifwc-par-fra-2026-07-04-exact-score", market: "Exact Score: 1-0" })
+  ]);
+  const exact = groups.find((g) => g.key === "fifwc-par-fra-2026-07-04-exact-score");
+  assert.equal(exact?.title, "Paraguay vs. France");
+});
+
+test("humanizeSlug drops 3-digit id tokens and dangling prepositions", () => {
+  const groups = groupResolvedByEvent([
+    market({ conditionId: "a", eventSlug: "fed-rate-hike-by", market: "Will the Fed hike by June?" }),
+    market({ conditionId: "b", eventSlug: "fed-rate-hike-by", market: "Will the Fed hold in June?" })
+  ]);
+  assert.equal(groups[0]?.title, "Fed Rate Hike"); // trailing "By" trimmed
+});
