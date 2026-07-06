@@ -441,60 +441,37 @@ export function marketResolution(meta: MarketMeta | null, latestYes?: number | n
   return null;
 }
 
-// ── Side payout ranking ─────────────────────────────────────────────────────────
+// ── Top holders (single combined ranking) ────────────────────────────────────────
 
-// One holder currently in the market, on one side, with the $ they'd be paid if that side wins.
-// payout = shares held (each winning share settles at $1) = cost / entry price, so this is inherently
-// "based on their payout using their entry price".
-export interface SidePayoutHolder {
-  address: string;
-  handle: string | null;
-  rank: number | null;
-  payout: number; // shares held = USD payout if this side wins
-}
-
-export interface SidePayouts {
-  yes: SidePayoutHolder[]; // top holders on YES, descending by payout
-  no: SidePayoutHolder[];  // top holders on NO, descending by payout
-  yesTotal: number;        // total payout-if-wins committed across all YES holders
-  noTotal: number;
-  max: number;             // largest single-holder payout across both sides (bar scaling)
-}
-
-interface RawHolder {
+// One top holder, as one bar in the combined chart: their $ amount on the market and which side.
+export interface HolderBar {
   address: string;
   handle: string | null;
   rank: number | null;
   side: "YES" | "NO";
-  payout: number;
+  amount: number; // USD magnitude — cost basis for tracked/reconstructed holders, current value for
+                  // the live whole-book case (see the two builders below)
 }
 
-function rankSides(holders: RawHolder[], topN: number): SidePayouts {
-  const bySide = (side: "YES" | "NO"): RawHolder[] =>
-    holders.filter((h) => h.side === side && h.payout > 0).sort((a, b) => b.payout - a.payout);
-  const yes = bySide("YES");
-  const no = bySide("NO");
+export interface TopHolders {
+  bars: HolderBar[]; // combined YES+NO, descending by amount, top N
+  max: number;       // largest amount, for bar scaling
+  yesTotal: number;
+  noTotal: number;
+}
+
+function rankHolders(bars: HolderBar[], topN: number): TopHolders {
+  const valid = bars.filter((h) => h.amount > 0).sort((a, b) => b.amount - a.amount);
   return {
-    yes: yes.slice(0, topN),
-    no: no.slice(0, topN),
-    yesTotal: yes.reduce((a, h) => a + h.payout, 0),
-    noTotal: no.reduce((a, h) => a + h.payout, 0),
-    max: Math.max(0, ...[...yes, ...no].map((h) => h.payout))
+    bars: valid.slice(0, topN),
+    max: valid[0]?.amount ?? 0,
+    yesTotal: valid.filter((h) => h.side === "YES").reduce((a, h) => a + h.amount, 0),
+    noTotal: valid.filter((h) => h.side === "NO").reduce((a, h) => a + h.amount, 0)
   };
 }
 
-// Rank the currently-open holders on each side by their payout-if-their-side-wins. Uses the
-// authoritative open-position size. This is "who is holding right now" — for a resolved market use
-// sidePayoutsAt instead (there are no open positions left).
-export function sidePayouts(participants: CrowdParticipant[], topN = 8): SidePayouts {
-  const holders = participants
-    .filter((p) => p.state === "open" && p.size > 0 && (p.side === "YES" || p.side === "NO"))
-    .map((p) => ({ address: p.address, handle: p.handle, rank: p.rank, side: p.side as "YES" | "NO", payout: p.size }));
-  return rankSides(holders, topN);
-}
-
 // A single market holder (from the live /holders endpoint), enriched with leaderboard identity where
-// the address is a tracked wallet. `shares` = $ payout if this side wins.
+// the address is a tracked wallet. `shares` = token balance = $1/share payout if this side wins.
 export interface HolderInput {
   address: string;
   handle: string | null;
@@ -503,37 +480,55 @@ export interface HolderInput {
   shares: number;
 }
 
-// Rank the *whole market's* current holders (not just tracked wallets) on each side by payout. Used for
-// live markets, where /holders gives the full current book.
-export function sidePayoutsFromHolders(holders: HolderInput[], topN = 8): SidePayouts {
-  const raw: RawHolder[] = [];
+// Live market: rank the WHOLE current book (all holders, not just tracked wallets). /holders gives
+// shares only, so we value each holder's stake at the current market price for their side — a real
+// dollar figure ("money on the line") standing in for the cost we can't see for untracked wallets.
+export function topHoldersFromBook(holders: HolderInput[], yesPrice: number | null, topN = 10): TopHolders {
+  const p = yesPrice ?? 0.5;
+  const bars: HolderBar[] = [];
   for (const h of holders) {
     const side = h.outcomeIndex === 0 ? "YES" : h.outcomeIndex === 1 ? "NO" : null;
-    if (!side || h.shares <= 0) continue;
-    raw.push({ address: h.address, handle: h.handle, rank: h.rank, side, payout: h.shares });
+    if (!side) continue;
+    bars.push({
+      address: h.address,
+      handle: h.handle,
+      rank: h.rank,
+      side,
+      amount: h.shares * (side === "YES" ? p : 1 - p)
+    });
   }
-  return rankSides(raw, topN);
+  return rankHolders(bars, topN);
 }
 
-// Reconstruct each wallet's net holdings on each side as of `cutoffMs`, from its tracked fills (BUY
-// adds shares, SELL removes). For a resolved market, pass (resolution time − 24h) to answer "who was
-// holding a day before it settled". payout = net shares held = $1/share at resolution.
-export function sidePayoutsAt(participants: CrowdParticipant[], cutoffMs: number, topN = 8): SidePayouts {
-  const holders: RawHolder[] = [];
+// Resolved (or fallback) market: reconstruct each tracked wallet's NET amount bet on each side as of
+// `cutoffMs`, from its fills (BUY adds cost + shares, SELL removes both). `amount` here is the actual
+// dollars wagered (price × size), and `side` is whichever leg the wallet still net-holds. Pass
+// (resolution time − 24h) to answer "who had money on each side a day before it settled".
+export function topHoldersAt(participants: CrowdParticipant[], cutoffMs: number, topN = 10): TopHolders {
+  const bars: HolderBar[] = [];
   for (const p of participants) {
-    let yesNet = 0;
-    let noNet = 0;
+    let yesShares = 0;
+    let yesCost = 0;
+    let noShares = 0;
+    let noCost = 0;
     for (const f of p.fills) {
       if (Date.parse(f.tradedAt) > cutoffMs) continue; // only fills up to the cutoff
-      const signed = (f.side ?? "").toUpperCase() === "SELL" ? -(f.size ?? 0) : f.size ?? 0;
-      if (f.outcomeIndex === 0) yesNet += signed;
-      else if (f.outcomeIndex === 1) noNet += signed;
+      const sign = (f.side ?? "").toUpperCase() === "SELL" ? -1 : 1;
+      const size = f.size ?? 0;
+      const cost = (f.price ?? 0) * size;
+      if (f.outcomeIndex === 0) {
+        yesShares += sign * size;
+        yesCost += sign * cost;
+      } else if (f.outcomeIndex === 1) {
+        noShares += sign * size;
+        noCost += sign * cost;
+      }
     }
     const ident = { address: p.address, handle: p.handle, rank: p.rank };
-    if (yesNet > 0) holders.push({ ...ident, side: "YES", payout: yesNet });
-    if (noNet > 0) holders.push({ ...ident, side: "NO", payout: noNet });
+    if (yesShares > 0 && yesCost > 0) bars.push({ ...ident, side: "YES", amount: yesCost });
+    if (noShares > 0 && noCost > 0) bars.push({ ...ident, side: "NO", amount: noCost });
   }
-  return rankSides(holders, topN);
+  return rankHolders(bars, topN);
 }
 
 // ── Multi-outcome candidates ──────────────────────────────────────────────────────

@@ -5,8 +5,9 @@ import PassedMarketName from "@/components/PassedMarketName";
 import CrowdParticipants from "@/components/CrowdParticipants";
 import PriceChart from "@/components/PriceChart";
 import WhaleFeed from "@/components/WhaleFeed";
-import SidePayoutChart from "@/components/SidePayoutChart";
+import TopHoldersChart from "@/components/TopHoldersChart";
 import EventMarketPicker from "@/components/EventMarketPicker";
+import AutoRefresh from "@/components/AutoRefresh";
 import PnlHistogram from "@/components/PnlHistogram";
 import MetricCard from "@/components/MetricCard";
 import { formatCompactUsd } from "@/lib/format";
@@ -17,9 +18,8 @@ import {
   detectWhaleTrades,
   marketResolution,
   pnlDistribution,
-  sidePayouts,
-  sidePayoutsAt,
-  sidePayoutsFromHolders,
+  topHoldersAt,
+  topHoldersFromBook,
   smartMoneyLean,
   summarizeWhaleMoves
 } from "@/lib/marketAnalytics";
@@ -105,6 +105,7 @@ export default async function MarketPage({ params }: MarketPageProps) {
     const timedOut = analytics === null;
     return (
       <main className="page">
+        {timedOut ? <AutoRefresh /> : null}
         <Link href="/markets" className="wl-back">← Back to Markets</Link>
         <section className="panel" style={{ marginTop: 16, padding: 28 }}>
           <h1 className="brand">{timedOut ? "Still loading this market…" : "Market analytics unavailable"}</h1>
@@ -113,7 +114,7 @@ export default async function MarketPage({ params }: MarketPageProps) {
           </Suspense>
           <p className="subtitle">
             {timedOut
-              ? "This market isn’t in our cache yet, so we’re fetching it live from Polymarket — give it a moment and refresh."
+              ? "This market isn’t in our cache yet, so we’re fetching it live from Polymarket — this page will refresh itself automatically in a moment."
               : "We couldn’t pull a snapshot for this market and no tracked wallet currently holds a position in it."}
           </p>
           <a className="ma-ext" href="https://polymarket.com" target="_blank" rel="noopener noreferrer">
@@ -132,20 +133,21 @@ export default async function MarketPage({ params }: MarketPageProps) {
   const whaleSummary = summarizeWhaleMoves(whales);
   const participants = detail?.participants ?? [];
   const conc = concentration(participants);
-  // Resolved market: reconstruct who was holding 24h before it settled (tracked wallets — full-book
-  // history isn't available). Live market: the whole current book from /holders, falling back to tracked
-  // open positions if that fetch came back empty.
-  const allHolders = !meta?.closed && analytics.holders.length > 0;
-  const payouts = meta?.closed
-    ? sidePayoutsAt(participants, resolutionCutoffMs(meta, participants))
-    : allHolders
-      ? sidePayoutsFromHolders(analytics.holders)
-      : sidePayouts(participants);
   const pnl = pnlDistribution(participants);
   const lean = smartMoneyLean(participants);
 
   // Current YES price: prefer the tracked daily series, then the convergence mark, then the markets row.
   const currentPrice = series.latest ?? detail?.curPrice ?? meta?.lastTradePrice ?? null;
+
+  // Top holders by dollar amount (single combined chart). Live market: the whole current book from
+  // /holders, valued at the live price. Resolved market: reconstruct the tracked wallets' net amount bet
+  // 24h before it settled. Fallback (live but empty book): tracked wallets' current net cost.
+  const allHolders = !meta?.closed && analytics.holders.length > 0;
+  const holders = meta?.closed
+    ? topHoldersAt(participants, resolutionCutoffMs(meta, participants))
+    : allHolders
+      ? topHoldersFromBook(analytics.holders, currentPrice)
+      : topHoldersAt(participants, Date.now());
   const traderCount = detail?.traderCount ?? 0;
   const hasSmartMoney = traderCount > 0;
 
@@ -262,12 +264,21 @@ export default async function MarketPage({ params }: MarketPageProps) {
       {/* ── Advanced analytics grid ───────────────────────────── */}
       <div className="ma-grid">
         <section className="panel ma-section">
-          <div className="ma-section-head"><h2>Top <span className="g">Holders</span> by Payout</h2></div>
-          <SidePayoutChart data={payouts} />
+          <div className="ma-section-head">
+            <h2>Top <span className="g">Holders</span></h2>
+            <div className="ma-legend">
+              <span className="ma-leg th-yes">YES</span>
+              <span className="ma-leg th-no">NO</span>
+            </div>
+          </div>
+          <TopHoldersChart data={holders} />
           <p className="ma-caption">
-            Largest {allHolders ? "holders" : "tracked holders"} on each side{meta?.closed ? " 24h before this market resolved" : ""}, ranked
-            by their payout if that side wins (shares held settle at $1 each — i.e. cost ÷ entry price). YES holders
-            {meta?.closed ? " were owed " : " stand to collect "}{formatCompactUsd(payouts.yesTotal)}, NO holders {formatCompactUsd(payouts.noTotal)}.
+            The biggest {allHolders ? "holders" : "tracked holders"} on this market, ranked by dollar amount and colored by
+            the side they’re on{meta?.closed ? ", as of 24h before it resolved" : ""}.{" "}
+            {allHolders
+              ? "Amounts are each holder’s stake valued at the current price."
+              : "Amounts are each wallet’s cost basis (what they bet)."}{" "}
+            YES {formatCompactUsd(holders.yesTotal)} vs NO {formatCompactUsd(holders.noTotal)} across the top holders shown.
           </p>
         </section>
 
