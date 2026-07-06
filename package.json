@@ -14,6 +14,8 @@
     "ingest:rescore": "pnpm --filter edgeboard-scripts ingest:rescore",
     "forward:record": "pnpm --filter edgeboard-scripts forward:record",
     "forward:score": "pnpm --filter edgeboard-scripts forward:score",
+    "copylist:record": "pnpm --filter edgeboard-scripts copylist:record",
+    "copylist:score": "pnpm --filter edgeboard-scripts copylist:score",
     "webhook": "pnpm --filter edgeboard-scripts webhook",
     "heroku-postbuild": "echo \"Scheduler-only deploy: skipping web build\""
   },

@@ -362,3 +362,31 @@ fragile semantic matching.
 Honesty ceiling (unchanged verdict): the edge/share shown is RAW and survivorship-inflated; this is the
 best available RANKING of who to copy, not proof of forward edge. It doubles as forward-test data
 generation. Do NOT scale capital on it — the forward test is still the arbiter.
+
+### 11a. In-sample copy backtest (2026-07-05) — encouraging STRUCTURE, inflated LEVEL
+Quick gut-check on the archive: "if I'd copied elite wallets' entries (0.10–0.90 price band) and held to
+resolution, what would $1/bet have returned?" One bet per (condition_id, outcome_index); 14,816 distinct
+market-sides across 133 elite wallets.
+```
+ALL elite copies        win 64.0%   mean $/$1 +0.308   (survivorship-inflated — ignore the level)
+  by AGREEMENT (copylist's headline signal — validated in sample):
+  1 wallet   n=12789   win 63.2%   +0.294
+  2 wallets  n= 1250   win 67.3%   +0.375
+  3+ wallets n=  777   win 71.4%   +0.419      <- monotonic: more elite agreement = better
+  by PRICE: favorites .65-.90 win 89% +0.171 | mids win 68% | longshots .10-.35 win 31% median -1.00 (lottery)
+NON-elite board wallets  win 54.3%   +0.092      <- elite filter ~3x's the return, +10pt win rate
+```
+Reads: the STRUCTURE is real and pro-copylist — agreement predicts, and the elite filter earns its keep.
+The LEVEL (+30%/bet) is rigged (elite = wallets picked because they won; the agreement gradient is also
+partly circular since a market 3 elite wallets won on is what made them elite). Only the forward test
+gives the honest number.
+
+### 11b. Copylist forward test (2026-07-05) — survivorship-FREE, built
+`scripts/copylistForward.ts` (`copylist:record`/`copylist:score`) + migration 032 (`copylist_predictions`)
++ webhook routes `/refresh/copylist-record`+`/refresh/copylist-score`, same proven pattern as the
+convergence forward test (§7). `--record` locks each copylist (market, side) the moment it qualifies —
+freezing the entry price you'd copy at + the elite-agreement count — and never revises it; `--score`
+settles via Gamma/UMA and prints win rate + mean $/$1 OVERALL and BY agreement bucket (does 2–3 wallets
+beat 1 out-of-sample?). Shares `buildCandidates`/`copyPnlPerDollar` (extracted to `copyCandidates.ts`)
+with the live tool, so it tests exactly what `copylist` shows. Needs migration 032 applied + two daily
+cron-job.org jobs. This is the arbiter for the copylist signal; the in-sample +30% is NOT.

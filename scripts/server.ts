@@ -22,16 +22,18 @@ const ROOT = resolve(fileURLToPath(import.meta.url), "../../");
 // to keep in-flight /activity payloads from exhausting memory (R14). Override per-deploy via env.
 const PARTIAL_WALLET_CONCURRENCY = process.env.PARTIAL_WALLET_CONCURRENCY ?? "8";
 
-type JobMode = "feed" | "markets" | "rescore" | "forward:record" | "forward:score";
+type JobMode = "feed" | "markets" | "rescore" | "forward:record" | "forward:score" | "copylist:record" | "copylist:score";
 
-// mode -> the root package.json script it runs. Most are ingest:<mode>; the forward-alpha jobs are
-// their own scripts, so the mapping is explicit rather than a string-concatenated "ingest:" prefix.
+// mode -> the root package.json script it runs. Most are ingest:<mode>; the forward-alpha and copylist
+// jobs are their own scripts, so the mapping is explicit rather than a string-concatenated prefix.
 const COMMAND: Record<JobMode, string> = {
   feed: "ingest:feed",
   markets: "ingest:markets",
   rescore: "ingest:rescore",
   "forward:record": "forward:record",
   "forward:score": "forward:score",
+  "copylist:record": "copylist:record",
+  "copylist:score": "copylist:score",
 };
 
 // Single global guard: only ONE job runs at a time, regardless of mode. The jobs share this dyno's
@@ -82,6 +84,8 @@ const ROUTES: Record<string, JobMode> = {
   "/refresh/rescore": "rescore",
   "/refresh/forward-record": "forward:record",
   "/refresh/forward-score": "forward:score",
+  "/refresh/copylist-record": "copylist:record",
+  "/refresh/copylist-score": "copylist:score",
 };
 
 const server = createServer((req, res) => {
