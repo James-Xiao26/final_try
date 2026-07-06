@@ -7,6 +7,8 @@ import {
   marketResolution,
   parseEventCandidates,
   pnlDistribution,
+  topHoldersAt,
+  topHoldersFromBook,
   smartMoneyLean,
   summarizeWhaleMoves,
   type MarketMeta,
@@ -201,6 +203,53 @@ test("concentration excludes zero-cost participants", () => {
   const c = concentration([participant({ size: 0, avgEntry: null, value: null })]);
   assert.equal(c.count, 0);
   assert.equal(c.total, 0);
+});
+
+// ── top holders (combined) ──────────────────────────────────────────────────────
+
+test("topHoldersFromBook values the whole book at the live price, one combined ranking", () => {
+  // YES price 0.4 → YES stakes worth shares*0.4, NO stakes worth shares*0.6.
+  const th = topHoldersFromBook(
+    [
+      { address: "0x1", handle: "a", rank: 3, outcomeIndex: 0, shares: 1000 }, // YES → $400
+      { address: "0x2", handle: null, rank: null, outcomeIndex: 1, shares: 1000 }, // NO → $600
+      { address: "0x3", handle: null, rank: null, outcomeIndex: 5, shares: 900 } // not YES/NO → dropped
+    ],
+    0.4
+  );
+  assert.deepEqual(th.bars.map((b) => [b.address, b.side, b.amount]), [
+    ["0x2", "NO", 600],
+    ["0x1", "YES", 400]
+  ]);
+  assert.equal(th.max, 600);
+  assert.equal(th.yesTotal, 400);
+  assert.equal(th.noTotal, 600);
+});
+
+test("topHoldersAt reconstructs each wallet's net amount bet per side up to the cutoff", () => {
+  const fill = (o: number, side: string, size: number, price: number, day: string) => ({
+    outcomeIndex: o,
+    side,
+    price,
+    size,
+    usdcSize: null,
+    tradedAt: `${day}T00:00:00Z`
+  });
+  const cutoff = Date.parse("2026-01-10T23:59:59Z");
+  const ps = [
+    // net YES cost = 500*0.5 − 200*0.5 = 150; Jan-12 buy is after cutoff and ignored.
+    participant({ address: "0x1", fills: [fill(0, "BUY", 500, 0.5, "2026-01-05"), fill(0, "SELL", 200, 0.5, "2026-01-08"), fill(0, "BUY", 1000, 0.5, "2026-01-12")] }),
+    // net NO cost = 400*0.6 = 240.
+    participant({ address: "0x2", fills: [fill(1, "BUY", 400, 0.6, "2026-01-06")] }),
+    // fully sold out before cutoff → not a holder.
+    participant({ address: "0x3", fills: [fill(0, "BUY", 100, 0.5, "2026-01-05"), fill(0, "SELL", 100, 0.5, "2026-01-07")] })
+  ];
+  const th = topHoldersAt(ps, cutoff);
+  assert.deepEqual(th.bars.map((b) => [b.address, b.side, b.amount]), [
+    ["0x2", "NO", 240],
+    ["0x1", "YES", 150]
+  ]);
+  assert.equal(th.max, 240);
 });
 
 // ── pnlDistribution ───────────────────────────────────────────────────────────

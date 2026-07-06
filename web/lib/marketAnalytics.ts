@@ -441,16 +441,97 @@ export function marketResolution(meta: MarketMeta | null, latestYes?: number | n
   return null;
 }
 
-// ── Multi-outcome candidates ──────────────────────────────────────────────────────
+// ── Top holders (single combined ranking) ────────────────────────────────────────
 
-// One favored option of a grouped event (e.g. a team in "World Cup Winner"), with its YES price line.
-export interface PriceLine {
-  label: string;        // candidate name, e.g. "Spain"
-  points: PricePoint[]; // its YES price series
+// One top holder, as one bar in the combined chart: their $ amount on the market and which side.
+export interface HolderBar {
+  address: string;
+  handle: string | null;
+  rank: number | null;
+  side: "YES" | "NO";
+  amount: number; // USD magnitude — cost basis for tracked/reconstructed holders, current value for
+                  // the live whole-book case (see the two builders below)
 }
 
-// Colors for the price chart's lines: index 0 is the primary (tracked) line, 1+ the other candidates.
-export const PRICE_LINE_COLORS = ["#36ecd0", "#5aa9ff", "#c08bff"] as const;
+export interface TopHolders {
+  bars: HolderBar[]; // combined YES+NO, descending by amount, top N
+  max: number;       // largest amount, for bar scaling
+  yesTotal: number;
+  noTotal: number;
+}
+
+function rankHolders(bars: HolderBar[], topN: number): TopHolders {
+  const valid = bars.filter((h) => h.amount > 0).sort((a, b) => b.amount - a.amount);
+  return {
+    bars: valid.slice(0, topN),
+    max: valid[0]?.amount ?? 0,
+    yesTotal: valid.filter((h) => h.side === "YES").reduce((a, h) => a + h.amount, 0),
+    noTotal: valid.filter((h) => h.side === "NO").reduce((a, h) => a + h.amount, 0)
+  };
+}
+
+// A single market holder (from the live /holders endpoint), enriched with leaderboard identity where
+// the address is a tracked wallet. `shares` = token balance = $1/share payout if this side wins.
+export interface HolderInput {
+  address: string;
+  handle: string | null;
+  rank: number | null;
+  outcomeIndex: number; // 0 = YES, 1 = NO
+  shares: number;
+}
+
+// Live market: rank the WHOLE current book (all holders, not just tracked wallets). /holders gives
+// shares only, so we value each holder's stake at the current market price for their side — a real
+// dollar figure ("money on the line") standing in for the cost we can't see for untracked wallets.
+export function topHoldersFromBook(holders: HolderInput[], yesPrice: number | null, topN = 10): TopHolders {
+  const p = yesPrice ?? 0.5;
+  const bars: HolderBar[] = [];
+  for (const h of holders) {
+    const side = h.outcomeIndex === 0 ? "YES" : h.outcomeIndex === 1 ? "NO" : null;
+    if (!side) continue;
+    bars.push({
+      address: h.address,
+      handle: h.handle,
+      rank: h.rank,
+      side,
+      amount: h.shares * (side === "YES" ? p : 1 - p)
+    });
+  }
+  return rankHolders(bars, topN);
+}
+
+// Resolved (or fallback) market: reconstruct each tracked wallet's NET amount bet on each side as of
+// `cutoffMs`, from its fills (BUY adds cost + shares, SELL removes both). `amount` here is the actual
+// dollars wagered (price × size), and `side` is whichever leg the wallet still net-holds. Pass
+// (resolution time − 24h) to answer "who had money on each side a day before it settled".
+export function topHoldersAt(participants: CrowdParticipant[], cutoffMs: number, topN = 10): TopHolders {
+  const bars: HolderBar[] = [];
+  for (const p of participants) {
+    let yesShares = 0;
+    let yesCost = 0;
+    let noShares = 0;
+    let noCost = 0;
+    for (const f of p.fills) {
+      if (Date.parse(f.tradedAt) > cutoffMs) continue; // only fills up to the cutoff
+      const sign = (f.side ?? "").toUpperCase() === "SELL" ? -1 : 1;
+      const size = f.size ?? 0;
+      const cost = (f.price ?? 0) * size;
+      if (f.outcomeIndex === 0) {
+        yesShares += sign * size;
+        yesCost += sign * cost;
+      } else if (f.outcomeIndex === 1) {
+        noShares += sign * size;
+        noCost += sign * cost;
+      }
+    }
+    const ident = { address: p.address, handle: p.handle, rank: p.rank };
+    if (yesShares > 0 && yesCost > 0) bars.push({ ...ident, side: "YES", amount: yesCost });
+    if (noShares > 0 && noCost > 0) bars.push({ ...ident, side: "NO", amount: noCost });
+  }
+  return rankHolders(bars, topN);
+}
+
+// ── Multi-outcome candidates ──────────────────────────────────────────────────────
 
 interface RawEventMarket {
   groupItemTitle?: unknown;
@@ -532,14 +613,23 @@ export interface MarketMeta {
 // gracefully: a market with smart-money flow but no markets row, or a listed market with no tracked
 // wallets, both still render what they can. The page runs the pure derivations above over `priceRows`
 // and `whaleFills`.
+// One selectable sibling market in a grouped event (for the market-switch dropdown).
+export interface EventMarketOption {
+  label: string;       // candidate name, e.g. "Spain"
+  conditionId: string; // its own market page
+}
+
 export interface MarketAnalytics {
   conditionId: string;
   meta: MarketMeta | null;
   detail: CrowdMarketDetail | null;
   priceRows: PricePoint[];
   whaleFills: WhaleFillInput[];
-  // For multi-outcome events: the OTHER top-favored candidate lines to overlay (the tracked market is
-  // the primary line, built from priceRows), and the tracked candidate's label for the legend.
-  extraLines: PriceLine[];
-  primaryLabel: string | null;
+  // For a grouped event (e.g. "World Cup Winner"): the sibling candidate markets, so the page can offer
+  // a dropdown to switch between them. Empty for a plain standalone Yes/No market.
+  eventMarkets: EventMarketOption[];
+  // The whole market's current holders (live /holders), enriched with leaderboard identity. Populated
+  // for live markets; empty for resolved ones (balances zero out on redemption — the page falls back to
+  // reconstructing tracked holdings 24h before settlement).
+  holders: HolderInput[];
 }

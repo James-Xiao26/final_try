@@ -5,7 +5,9 @@ import PassedMarketName from "@/components/PassedMarketName";
 import CrowdParticipants from "@/components/CrowdParticipants";
 import PriceChart from "@/components/PriceChart";
 import WhaleFeed from "@/components/WhaleFeed";
-import ConcentrationChart from "@/components/ConcentrationChart";
+import TopHoldersChart from "@/components/TopHoldersChart";
+import EventMarketPicker from "@/components/EventMarketPicker";
+import AutoRefresh from "@/components/AutoRefresh";
 import PnlHistogram from "@/components/PnlHistogram";
 import MetricCard from "@/components/MetricCard";
 import { formatCompactUsd } from "@/lib/format";
@@ -16,21 +18,30 @@ import {
   detectWhaleTrades,
   marketResolution,
   pnlDistribution,
-  PRICE_LINE_COLORS,
+  topHoldersAt,
+  topHoldersFromBook,
   smartMoneyLean,
   summarizeWhaleMoves
 } from "@/lib/marketAnalytics";
-import type { CSSProperties } from "react";
+import type { CrowdParticipant } from "@/lib/types";
+import type { MarketMeta } from "@/lib/marketAnalytics";
+
+const DAY_MS = 86_400_000;
+
+// For a resolved market, the timestamp 24h before it settled — prefer the market's end date, else fall
+// back to 24h before the last tracked fill in it.
+function resolutionCutoffMs(meta: MarketMeta | null, participants: CrowdParticipant[]): number {
+  const endMs = meta?.endDate ? Date.parse(meta.endDate) : NaN;
+  if (Number.isFinite(endMs)) return endMs - DAY_MS;
+  let last = 0;
+  for (const p of participants) for (const f of p.fills) last = Math.max(last, Date.parse(f.tradedAt));
+  return (last || Date.now()) - DAY_MS;
+}
 
 export const revalidate = 300;
 
 interface MarketPageProps {
   params: { conditionId: string };
-}
-
-// Sets the legend swatch color via a CSS variable the `.ma-leg::before` reads.
-function legColor(color: string): CSSProperties {
-  return { ["--leg-color" as string]: color } as CSSProperties;
 }
 
 function cents(v: number | null): string {
@@ -94,6 +105,7 @@ export default async function MarketPage({ params }: MarketPageProps) {
     const timedOut = analytics === null;
     return (
       <main className="page">
+        {timedOut ? <AutoRefresh /> : null}
         <Link href="/markets" className="wl-back">← Back to Markets</Link>
         <section className="panel" style={{ marginTop: 16, padding: 28 }}>
           <h1 className="brand">{timedOut ? "Still loading this market…" : "Market analytics unavailable"}</h1>
@@ -102,7 +114,7 @@ export default async function MarketPage({ params }: MarketPageProps) {
           </Suspense>
           <p className="subtitle">
             {timedOut
-              ? "This market isn’t in our cache yet, so we’re fetching it live from Polymarket — give it a moment and refresh."
+              ? "This market isn’t in our cache yet, so we’re fetching it live from Polymarket — this page will refresh itself automatically in a moment."
               : "We couldn’t pull a snapshot for this market and no tracked wallet currently holds a position in it."}
           </p>
           <a className="ma-ext" href="https://polymarket.com" target="_blank" rel="noopener noreferrer">
@@ -126,6 +138,16 @@ export default async function MarketPage({ params }: MarketPageProps) {
 
   // Current YES price: prefer the tracked daily series, then the convergence mark, then the markets row.
   const currentPrice = series.latest ?? detail?.curPrice ?? meta?.lastTradePrice ?? null;
+
+  // Top holders by dollar amount (single combined chart). Live market: the whole current book from
+  // /holders, valued at the live price. Resolved market: reconstruct the tracked wallets' net amount bet
+  // 24h before it settled. Fallback (live but empty book): tracked wallets' current net cost.
+  const allHolders = !meta?.closed && analytics.holders.length > 0;
+  const holders = meta?.closed
+    ? topHoldersAt(participants, resolutionCutoffMs(meta, participants))
+    : allHolders
+      ? topHoldersFromBook(analytics.holders, currentPrice)
+      : topHoldersAt(participants, Date.now());
   const traderCount = detail?.traderCount ?? 0;
   const hasSmartMoney = traderCount > 0;
 
@@ -157,6 +179,9 @@ export default async function MarketPage({ params }: MarketPageProps) {
               {!meta?.closed ? <span className="ma-tag muted">Resolves {resolutionLabel(meta?.endDate ?? null)}</span> : null}
             </div>
             <h1 className="ma-title">{title}</h1>
+            {analytics.eventMarkets.length > 1 ? (
+              <EventMarketPicker markets={analytics.eventMarkets} current={conditionId} />
+            ) : null}
             {meta?.slug ? (
               <a className="ma-ext" href={`https://polymarket.com/event/${meta.slug}`} target="_blank" rel="noopener noreferrer">
                 View on Polymarket <ExternalLink size={12} />
@@ -215,26 +240,15 @@ export default async function MarketPage({ params }: MarketPageProps) {
         <div className="ma-section-head">
           <h2>Price <span className="g">History</span></h2>
           <div className="ma-legend">
-            {analytics.extraLines.length > 0 ? (
-              <>
-                <span className="ma-leg" style={legColor(PRICE_LINE_COLORS[0] ?? "#36ecd0")}>{analytics.primaryLabel ?? "YES"}</span>
-                {analytics.extraLines.map((l, i) => (
-                  <span key={l.label} className="ma-leg" style={legColor(PRICE_LINE_COLORS[(i + 1) % PRICE_LINE_COLORS.length] ?? "#36ecd0")}>
-                    {l.label}
-                  </span>
-                ))}
-              </>
-            ) : (
-              <span className="ma-leg price">YES price</span>
-            )}
+            <span className="ma-leg price">YES price</span>
             <span className="ma-leg buy">Whale buy</span>
             <span className="ma-leg sell">Whale sell</span>
           </div>
         </div>
-        <PriceChart series={series} whales={whales.trades} extraLines={analytics.extraLines} />
+        <PriceChart series={series} whales={whales.trades} />
         <p className="ma-caption">
-          YES implied probability over time (intraday resolution), with tracked whale trades overlaid at
-          their YES-equivalent price so buys/sells sit on the line (marker size ∝ trade value).
+          YES implied probability over time (intraday resolution) for this market, with tracked whale
+          trades overlaid at their YES-equivalent price so buys/sells sit on the line (marker size ∝ trade value).
         </p>
       </section>
 
@@ -250,11 +264,21 @@ export default async function MarketPage({ params }: MarketPageProps) {
       {/* ── Advanced analytics grid ───────────────────────────── */}
       <div className="ma-grid">
         <section className="panel ma-section">
-          <div className="ma-section-head"><h2>Holder <span className="g">Concentration</span></h2></div>
-          <ConcentrationChart data={conc} />
+          <div className="ma-section-head">
+            <h2>Top <span className="g">Holders</span></h2>
+            <div className="ma-legend">
+              <span className="ma-leg th-yes">YES</span>
+              <span className="ma-leg th-no">NO</span>
+            </div>
+          </div>
+          <TopHoldersChart data={holders} />
           <p className="ma-caption">
-            How committed capital is distributed. Top-5 wallets hold {conc.count > 0 ? `${(conc.top5Share * 100).toFixed(0)}%` : "—"} of
-            tracked capital (HHI {conc.count > 0 ? conc.hhi.toFixed(2) : "—"}). A high HHI means a few big convictions drive this market.
+            The biggest {allHolders ? "holders" : "tracked holders"} on this market, ranked by dollar amount and colored by
+            the side they’re on{meta?.closed ? ", as of 24h before it resolved" : ""}.{" "}
+            {allHolders
+              ? "Amounts are each holder’s stake valued at the current price."
+              : "Amounts are each wallet’s cost basis (what they bet)."}{" "}
+            YES {formatCompactUsd(holders.yesTotal)} vs NO {formatCompactUsd(holders.noTotal)} across the top holders shown.
           </p>
         </section>
 

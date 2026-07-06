@@ -7,8 +7,8 @@ import { HORIZONS } from "./types";
 import { groupWalletTrades, applyClosedBasis } from "./walletTrades";
 import { groupRecentTrades, positionKey, type ClosedBasis, type OpenBasis, type TradeBasis } from "./recentTrades";
 import { buildCrowdMarketDetail, type CrowdClosedPosition, type CrowdLookups, type CrowdOpenPosition, type CrowdTradeFill } from "./marketCrowd";
-import type { MarketAnalytics, MarketMeta, PriceLine, PricePoint, WhaleFillInput } from "./marketAnalytics";
-import { fetchEventCandidates, fetchLiveMarket, fetchLivePriceSeries, fetchLiveWalletDetail, type LiveMarket } from "./polymarketLive";
+import type { EventMarketOption, HolderInput, MarketAnalytics, MarketMeta, PricePoint, WhaleFillInput } from "./marketAnalytics";
+import { fetchEventCandidates, fetchLiveMarket, fetchLivePriceSeries, fetchLiveWalletDetail, fetchMarketHolders, type LiveMarket } from "./polymarketLive";
 import { summarizeResolvedMarkets } from "./resolvedMarkets";
 import { buildTrendingMarkets, MAX_WHALE_COST_SHARE, qualifyingConditionIds, TRENDING_MIN_PARTICIPANTS } from "./trendingMarkets";
 
@@ -1186,33 +1186,39 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
     }
   }
 
-  // ── Multi-outcome candidate lines ───────────────────────────────────────────────
-  // For a grouped event (e.g. "World Cup Winner"), overlay the top-3 favored candidates. The tracked
-  // market is the primary line (priceRows); fetch the two other top candidates' series as extras. Skip
-  // the lookup for plain Yes/No markets to avoid a needless Gamma call.
-  let extraLines: PriceLine[] = [];
-  let primaryLabel: string | null = null;
-  // A market is worth the candidate lookup when it might belong to a multi-candidate event. Two signals:
+  // ── Sibling markets in a grouped event ──────────────────────────────────────────
+  // For a grouped event (e.g. "World Cup Winner"), collect the sibling candidate markets so the page can
+  // offer a dropdown to switch between them. Skip the lookup for plain Yes/No markets to avoid a needless
+  // Gamma call. A market is worth the candidate lookup when it might belong to a multi-candidate event:
   //  • the live fetch found a `groupItemTitle` (this market is a leg of a grouped event) — required
   //    because grouped legs are themselves Yes/No markets, so topOutcome can't reveal them; and
   //  • the (listed) `markets` row's topOutcome isn't Yes/No — mapEvent rolls a multi-outcome event up to
   //    its favored candidate label there.
   // Plain standalone Yes/No markets match neither and skip the extra Gamma call.
+  let eventMarkets: EventMarketOption[] = [];
   const liveGrouped = live?.groupItemTitle != null;
   const metaMaybeMulti = resolvedMeta !== null && resolvedMeta.topOutcome !== "Yes" && resolvedMeta.topOutcome !== "No";
   const maybeMulti = resolvedMeta === null || liveGrouped || metaMaybeMulti;
   if (maybeMulti) {
     const candidates = await fetchEventCandidates(conditionId);
     if (candidates && candidates.length > 1) {
-      const lc = conditionId.toLowerCase();
-      const top3 = candidates.slice(0, 3);
-      primaryLabel = candidates.find((c) => c.conditionId.toLowerCase() === lc)?.label ?? resolvedMeta?.topOutcome ?? null;
-      const others = top3.filter((c) => c.conditionId.toLowerCase() !== lc).slice(0, 2);
-      const fetched = await Promise.all(
-        others.map(async (c) => ({ label: c.label, points: await fetchLivePriceSeries(c.yesTokenId, false) }))
-      );
-      extraLines = fetched.filter((l) => l.points.length > 0);
+      eventMarkets = candidates.map((c) => ({ label: c.label, conditionId: c.conditionId }));
     }
+  }
+
+  // The whole market's current holders, for the top-holders-by-payout chart. Only for live markets —
+  // a resolved market's balances zero out on redemption, so the page reconstructs tracked holdings 24h
+  // before settlement instead. Enrich with leaderboard identity (handle/rank) where we know the wallet.
+  let holders: HolderInput[] = [];
+  if (resolvedMeta !== null && !resolvedMeta.closed) {
+    const raw = await fetchMarketHolders(conditionId);
+    holders = raw.map((h) => ({
+      address: h.address,
+      handle: handleByAddress.get(h.address) ?? h.name,
+      rank: rankByAddress.get(h.address) ?? null,
+      outcomeIndex: h.outcomeIndex,
+      shares: h.shares
+    }));
   }
 
   const lookups: CrowdLookups = { rankByAddress, handleByAddress, skillByAddress };
@@ -1234,7 +1240,7 @@ export async function getMarketAnalytics(conditionId: string): Promise<MarketAna
     tradedAt: f.tradedAt
   }));
 
-  return { conditionId, meta: resolvedMeta, detail, priceRows, whaleFills, extraLines, primaryLabel };
+  return { conditionId, meta: resolvedMeta, detail, priceRows, whaleFills, eventMarkets, holders };
 }
 
 // Home-page Trending panel: the `limit` currently-hottest markets by 24h volume, plus how the
