@@ -11,6 +11,7 @@
     "forward:record": "tsx forwardAlpha.ts --record",
     "forward:score": "tsx forwardAlpha.ts --score",
     "copylist": "tsx copyList.ts",
+    "trades": "tsx trades.ts",
     "webhook": "tsx server.ts",
     "probe": "tsx probeClosedPositions.ts",
     "typecheck": "tsc --noEmit",
