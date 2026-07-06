@@ -441,16 +441,80 @@ export function marketResolution(meta: MarketMeta | null, latestYes?: number | n
   return null;
 }
 
-// ── Multi-outcome candidates ──────────────────────────────────────────────────────
+// ── Side payout ranking ─────────────────────────────────────────────────────────
 
-// One favored option of a grouped event (e.g. a team in "World Cup Winner"), with its YES price line.
-export interface PriceLine {
-  label: string;        // candidate name, e.g. "Spain"
-  points: PricePoint[]; // its YES price series
+// One holder currently in the market, on one side, with the $ they'd be paid if that side wins.
+// payout = shares held (each winning share settles at $1) = cost / entry price, so this is inherently
+// "based on their payout using their entry price".
+export interface SidePayoutHolder {
+  address: string;
+  handle: string | null;
+  rank: number | null;
+  payout: number; // shares held = USD payout if this side wins
 }
 
-// Colors for the price chart's lines: index 0 is the primary (tracked) line, 1+ the other candidates.
-export const PRICE_LINE_COLORS = ["#36ecd0", "#5aa9ff", "#c08bff"] as const;
+export interface SidePayouts {
+  yes: SidePayoutHolder[]; // top holders on YES, descending by payout
+  no: SidePayoutHolder[];  // top holders on NO, descending by payout
+  yesTotal: number;        // total payout-if-wins committed across all YES holders
+  noTotal: number;
+  max: number;             // largest single-holder payout across both sides (bar scaling)
+}
+
+interface RawHolder {
+  address: string;
+  handle: string | null;
+  rank: number | null;
+  side: "YES" | "NO";
+  payout: number;
+}
+
+function rankSides(holders: RawHolder[], topN: number): SidePayouts {
+  const bySide = (side: "YES" | "NO"): RawHolder[] =>
+    holders.filter((h) => h.side === side && h.payout > 0).sort((a, b) => b.payout - a.payout);
+  const yes = bySide("YES");
+  const no = bySide("NO");
+  return {
+    yes: yes.slice(0, topN),
+    no: no.slice(0, topN),
+    yesTotal: yes.reduce((a, h) => a + h.payout, 0),
+    noTotal: no.reduce((a, h) => a + h.payout, 0),
+    max: Math.max(0, ...[...yes, ...no].map((h) => h.payout))
+  };
+}
+
+// Rank the currently-open holders on each side by their payout-if-their-side-wins. Uses the
+// authoritative open-position size. This is "who is holding right now" — for a resolved market use
+// sidePayoutsAt instead (there are no open positions left).
+export function sidePayouts(participants: CrowdParticipant[], topN = 8): SidePayouts {
+  const holders = participants
+    .filter((p) => p.state === "open" && p.size > 0 && (p.side === "YES" || p.side === "NO"))
+    .map((p) => ({ address: p.address, handle: p.handle, rank: p.rank, side: p.side as "YES" | "NO", payout: p.size }));
+  return rankSides(holders, topN);
+}
+
+// Reconstruct each wallet's net holdings on each side as of `cutoffMs`, from its tracked fills (BUY
+// adds shares, SELL removes). For a resolved market, pass (resolution time − 24h) to answer "who was
+// holding a day before it settled". payout = net shares held = $1/share at resolution.
+export function sidePayoutsAt(participants: CrowdParticipant[], cutoffMs: number, topN = 8): SidePayouts {
+  const holders: RawHolder[] = [];
+  for (const p of participants) {
+    let yesNet = 0;
+    let noNet = 0;
+    for (const f of p.fills) {
+      if (Date.parse(f.tradedAt) > cutoffMs) continue; // only fills up to the cutoff
+      const signed = (f.side ?? "").toUpperCase() === "SELL" ? -(f.size ?? 0) : f.size ?? 0;
+      if (f.outcomeIndex === 0) yesNet += signed;
+      else if (f.outcomeIndex === 1) noNet += signed;
+    }
+    const ident = { address: p.address, handle: p.handle, rank: p.rank };
+    if (yesNet > 0) holders.push({ ...ident, side: "YES", payout: yesNet });
+    if (noNet > 0) holders.push({ ...ident, side: "NO", payout: noNet });
+  }
+  return rankSides(holders, topN);
+}
+
+// ── Multi-outcome candidates ──────────────────────────────────────────────────────
 
 interface RawEventMarket {
   groupItemTitle?: unknown;
@@ -532,14 +596,19 @@ export interface MarketMeta {
 // gracefully: a market with smart-money flow but no markets row, or a listed market with no tracked
 // wallets, both still render what they can. The page runs the pure derivations above over `priceRows`
 // and `whaleFills`.
+// One selectable sibling market in a grouped event (for the market-switch dropdown).
+export interface EventMarketOption {
+  label: string;       // candidate name, e.g. "Spain"
+  conditionId: string; // its own market page
+}
+
 export interface MarketAnalytics {
   conditionId: string;
   meta: MarketMeta | null;
   detail: CrowdMarketDetail | null;
   priceRows: PricePoint[];
   whaleFills: WhaleFillInput[];
-  // For multi-outcome events: the OTHER top-favored candidate lines to overlay (the tracked market is
-  // the primary line, built from priceRows), and the tracked candidate's label for the legend.
-  extraLines: PriceLine[];
-  primaryLabel: string | null;
+  // For a grouped event (e.g. "World Cup Winner"): the sibling candidate markets, so the page can offer
+  // a dropdown to switch between them. Empty for a plain standalone Yes/No market.
+  eventMarkets: EventMarketOption[];
 }

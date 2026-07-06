@@ -7,6 +7,8 @@ import {
   marketResolution,
   parseEventCandidates,
   pnlDistribution,
+  sidePayouts,
+  sidePayoutsAt,
   smartMoneyLean,
   summarizeWhaleMoves,
   type MarketMeta,
@@ -201,6 +203,49 @@ test("concentration excludes zero-cost participants", () => {
   const c = concentration([participant({ size: 0, avgEntry: null, value: null })]);
   assert.equal(c.count, 0);
   assert.equal(c.total, 0);
+});
+
+// ── sidePayouts ───────────────────────────────────────────────────────────────
+
+test("sidePayouts ranks open holders per side by payout and excludes closed", () => {
+  const ps = [
+    participant({ address: "0x1", side: "YES", outcomeIndex: 0, size: 300 }),
+    participant({ address: "0x2", side: "YES", outcomeIndex: 0, size: 700 }),
+    participant({ address: "0x3", side: "NO", outcomeIndex: 1, size: 500 }),
+    participant({ address: "0x4", side: "NO", outcomeIndex: 1, size: 0 }),   // no shares → dropped
+    participant({ address: "0x5", side: "YES", outcomeIndex: 0, size: 999, state: "closed" }) // closed → dropped
+  ];
+  const sp = sidePayouts(ps);
+  assert.deepEqual(sp.yes.map((h) => h.address), ["0x2", "0x1"]); // descending by payout
+  assert.deepEqual(sp.no.map((h) => h.address), ["0x3"]);
+  assert.equal(sp.yesTotal, 1000);
+  assert.equal(sp.noTotal, 500);
+  assert.equal(sp.max, 700); // largest single holder across both sides
+});
+
+test("sidePayoutsAt reconstructs net holdings from fills up to the cutoff", () => {
+  const fill = (o: number, side: string, size: number, day: string) => ({
+    outcomeIndex: o,
+    side,
+    price: 0.5,
+    size,
+    usdcSize: null,
+    tradedAt: `${day}T00:00:00Z`
+  });
+  // cutoff = end of Jan 10. A later BUY (Jan 12) and an interim SELL (Jan 08) must be respected.
+  const cutoff = Date.parse("2026-01-10T23:59:59Z");
+  const ps = [
+    // net YES = 500 - 200 = 300 by cutoff; the Jan-12 buy is after cutoff and ignored.
+    participant({ address: "0x1", fills: [fill(0, "BUY", 500, "2026-01-05"), fill(0, "SELL", 200, "2026-01-08"), fill(0, "BUY", 1000, "2026-01-12")] }),
+    // net NO = 400 by cutoff.
+    participant({ address: "0x2", fills: [fill(1, "BUY", 400, "2026-01-06")] }),
+    // fully sold out before cutoff → not a holder.
+    participant({ address: "0x3", fills: [fill(0, "BUY", 100, "2026-01-05"), fill(0, "SELL", 100, "2026-01-07")] })
+  ];
+  const sp = sidePayoutsAt(ps, cutoff);
+  assert.deepEqual(sp.yes.map((h) => [h.address, h.payout]), [["0x1", 300]]);
+  assert.deepEqual(sp.no.map((h) => [h.address, h.payout]), [["0x2", 400]]);
+  assert.equal(sp.max, 400);
 });
 
 // ── pnlDistribution ───────────────────────────────────────────────────────────

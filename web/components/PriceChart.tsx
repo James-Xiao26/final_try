@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PriceLine, PricePoint, PriceSeries, WhaleTrade } from "@/lib/marketAnalytics";
-import { PRICE_LINE_COLORS } from "@/lib/marketAnalytics";
+import type { PricePoint, PriceSeries, WhaleTrade } from "@/lib/marketAnalytics";
 import { formatCompactUsd, shortenAddress } from "@/lib/format";
 
 interface PriceChartProps {
   series: PriceSeries;
   whales: WhaleTrade[];
-  // Other top-favored candidate lines to overlay (multi-outcome events). The primary line is `series`.
-  extraLines?: PriceLine[];
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
@@ -48,7 +45,7 @@ const HORIZON_OPTIONS: { label: string; value: Horizon }[] = [
   { label: "All", value: null }
 ];
 
-export default function PriceChart({ series, whales, extraLines = [] }: PriceChartProps) {
+export default function PriceChart({ series, whales }: PriceChartProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(920);
   const [hoverX, setHoverX] = useState<number | null>(null);
@@ -78,23 +75,22 @@ export default function PriceChart({ series, whales, extraLines = [] }: PriceCha
 
   const options = useMemo(() => HORIZON_OPTIONS.filter((o) => o.value === null || o.value < spanDays), [spanDays]);
 
-  // Window the points / whales / extra lines to the selected horizon (relative to the last point).
+  // Window the points / whales to the selected horizon (relative to the last point).
   const view = useMemo(() => {
     const pts = series.points;
     if (pts.length === 0) {
-      return { points: [] as PricePoint[], whales: [] as WhaleTrade[], extras: [] as PriceLine[] };
+      return { points: [] as PricePoint[], whales: [] as WhaleTrade[] };
     }
     if (horizon === null) {
-      return { points: pts, whales, extras: extraLines };
+      return { points: pts, whales };
     }
     const lastMs = tms(pts[pts.length - 1]?.ts ?? "");
     const cutoff = lastMs - horizon * DAY_MS;
     return {
       points: pts.filter((p) => tms(p.ts) >= cutoff),
-      whales: whales.filter((w) => w.ts >= cutoff),
-      extras: extraLines.map((l) => ({ label: l.label, points: l.points.filter((p) => tms(p.ts) >= cutoff) }))
+      whales: whales.filter((w) => w.ts >= cutoff)
     };
-  }, [series.points, whales, extraLines, horizon]);
+  }, [series.points, whales, horizon]);
 
   useEffect(() => {
     setDrawn(false);
@@ -106,16 +102,14 @@ export default function PriceChart({ series, whales, extraLines = [] }: PriceCha
 
   const model = useMemo(() => {
     if (points.length === 0) return null;
-    const extras = view.extras.filter((l) => l.points.length > 0);
     const times = points.map((p) => tms(p.ts));
-    // Domain spans the primary line, every extra candidate line, and the whale timestamps.
-    const allTimes = [...times, ...extras.flatMap((l) => l.points.map((p) => tms(p.ts)))];
-    const startMs = Math.min(...allTimes);
-    const endMs = Math.max(Math.max(...allTimes), ...view.whales.map((w) => w.ts).filter(Number.isFinite));
+    // Domain spans the price line and the whale timestamps.
+    const startMs = Math.min(...times);
+    const endMs = Math.max(Math.max(...times), ...view.whales.map((w) => w.ts).filter(Number.isFinite));
     const tspan = endMs - startMs || 1;
 
-    // y-axis padded a little around the visible range (primary + extra lines) so nothing is clipped.
-    const allPrices = [...points.map((p) => p.price), ...extras.flatMap((l) => l.points.map((p) => p.price))];
+    // y-axis padded a little around the visible range so nothing is clipped.
+    const allPrices = points.map((p) => p.price);
     const vMin = Math.min(...allPrices);
     const vMax = Math.max(...allPrices);
     const lo = Math.max(0, vMin - 0.03);
@@ -135,7 +129,6 @@ export default function PriceChart({ series, whales, extraLines = [] }: PriceCha
     let line = pathOf(points);
     if (endMs > lastTime) line += ` L${nx(endMs).toFixed(1)} ${ny(lastPrice).toFixed(1)}`;
     const area = `${line} L${nx(endMs).toFixed(1)} ${ny(lo).toFixed(1)} L${nx(startMs).toFixed(1)} ${ny(lo).toFixed(1)} Z`;
-    const extraPaths = extras.map((l, i) => ({ label: l.label, d: pathOf(l.points), color: PRICE_LINE_COLORS[(i + 1) % PRICE_LINE_COLORS.length] }));
 
     const ticksSeen = new Set<string>();
     const xticks = Array.from({ length: 4 }, (_, k) => {
@@ -163,8 +156,8 @@ export default function PriceChart({ series, whales, extraLines = [] }: PriceCha
         return { w, x: nx(w.ts), y: py, r };
       });
 
-    return { times, startMs, endMs, nx, ny, line, area, extraPaths, xticks, yticks, markers };
-  }, [points, view.whales, view.extras, width]);
+    return { times, startMs, endMs, nx, ny, line, area, xticks, yticks, markers };
+  }, [points, view.whales, width]);
 
   // Nearest point to the hovered x (in px), for the crosshair readout.
   let hover: { x: number; y: number; ts: number; price: number } | null = null;
@@ -242,20 +235,6 @@ export default function PriceChart({ series, whales, extraLines = [] }: PriceCha
         ))}
 
         <path d={model.area} fill="url(#maPrice)" style={{ opacity: drawn ? 1 : 0, transition: "opacity 1s ease .2s" }} />
-
-        {/* Other top-favored candidate lines (multi-outcome events), drawn behind the primary line */}
-        {model.extraPaths.map((e, i) => (
-          <path
-            key={`ex${i}`}
-            d={e.d}
-            fill="none"
-            stroke={e.color}
-            strokeWidth="1.6"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            style={{ opacity: drawn ? 0.85 : 0, transition: "opacity .9s ease" }}
-          />
-        ))}
 
         <path
           d={model.line}

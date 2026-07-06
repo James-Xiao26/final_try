@@ -5,7 +5,8 @@ import PassedMarketName from "@/components/PassedMarketName";
 import CrowdParticipants from "@/components/CrowdParticipants";
 import PriceChart from "@/components/PriceChart";
 import WhaleFeed from "@/components/WhaleFeed";
-import ConcentrationChart from "@/components/ConcentrationChart";
+import SidePayoutChart from "@/components/SidePayoutChart";
+import EventMarketPicker from "@/components/EventMarketPicker";
 import PnlHistogram from "@/components/PnlHistogram";
 import MetricCard from "@/components/MetricCard";
 import { formatCompactUsd } from "@/lib/format";
@@ -16,21 +17,30 @@ import {
   detectWhaleTrades,
   marketResolution,
   pnlDistribution,
-  PRICE_LINE_COLORS,
+  sidePayouts,
+  sidePayoutsAt,
   smartMoneyLean,
   summarizeWhaleMoves
 } from "@/lib/marketAnalytics";
-import type { CSSProperties } from "react";
+import type { CrowdParticipant } from "@/lib/types";
+import type { MarketMeta } from "@/lib/marketAnalytics";
+
+const DAY_MS = 86_400_000;
+
+// For a resolved market, the timestamp 24h before it settled — prefer the market's end date, else fall
+// back to 24h before the last tracked fill in it.
+function resolutionCutoffMs(meta: MarketMeta | null, participants: CrowdParticipant[]): number {
+  const endMs = meta?.endDate ? Date.parse(meta.endDate) : NaN;
+  if (Number.isFinite(endMs)) return endMs - DAY_MS;
+  let last = 0;
+  for (const p of participants) for (const f of p.fills) last = Math.max(last, Date.parse(f.tradedAt));
+  return (last || Date.now()) - DAY_MS;
+}
 
 export const revalidate = 300;
 
 interface MarketPageProps {
   params: { conditionId: string };
-}
-
-// Sets the legend swatch color via a CSS variable the `.ma-leg::before` reads.
-function legColor(color: string): CSSProperties {
-  return { ["--leg-color" as string]: color } as CSSProperties;
 }
 
 function cents(v: number | null): string {
@@ -121,6 +131,10 @@ export default async function MarketPage({ params }: MarketPageProps) {
   const whaleSummary = summarizeWhaleMoves(whales);
   const participants = detail?.participants ?? [];
   const conc = concentration(participants);
+  // Live market: current open holders. Resolved market: reconstruct who was holding 24h before it settled.
+  const payouts = meta?.closed
+    ? sidePayoutsAt(participants, resolutionCutoffMs(meta, participants))
+    : sidePayouts(participants);
   const pnl = pnlDistribution(participants);
   const lean = smartMoneyLean(participants);
 
@@ -157,6 +171,9 @@ export default async function MarketPage({ params }: MarketPageProps) {
               {!meta?.closed ? <span className="ma-tag muted">Resolves {resolutionLabel(meta?.endDate ?? null)}</span> : null}
             </div>
             <h1 className="ma-title">{title}</h1>
+            {analytics.eventMarkets.length > 1 ? (
+              <EventMarketPicker markets={analytics.eventMarkets} current={conditionId} />
+            ) : null}
             {meta?.slug ? (
               <a className="ma-ext" href={`https://polymarket.com/event/${meta.slug}`} target="_blank" rel="noopener noreferrer">
                 View on Polymarket <ExternalLink size={12} />
@@ -215,26 +232,15 @@ export default async function MarketPage({ params }: MarketPageProps) {
         <div className="ma-section-head">
           <h2>Price <span className="g">History</span></h2>
           <div className="ma-legend">
-            {analytics.extraLines.length > 0 ? (
-              <>
-                <span className="ma-leg" style={legColor(PRICE_LINE_COLORS[0] ?? "#36ecd0")}>{analytics.primaryLabel ?? "YES"}</span>
-                {analytics.extraLines.map((l, i) => (
-                  <span key={l.label} className="ma-leg" style={legColor(PRICE_LINE_COLORS[(i + 1) % PRICE_LINE_COLORS.length] ?? "#36ecd0")}>
-                    {l.label}
-                  </span>
-                ))}
-              </>
-            ) : (
-              <span className="ma-leg price">YES price</span>
-            )}
+            <span className="ma-leg price">YES price</span>
             <span className="ma-leg buy">Whale buy</span>
             <span className="ma-leg sell">Whale sell</span>
           </div>
         </div>
-        <PriceChart series={series} whales={whales.trades} extraLines={analytics.extraLines} />
+        <PriceChart series={series} whales={whales.trades} />
         <p className="ma-caption">
-          YES implied probability over time (intraday resolution), with tracked whale trades overlaid at
-          their YES-equivalent price so buys/sells sit on the line (marker size ∝ trade value).
+          YES implied probability over time (intraday resolution) for this market, with tracked whale
+          trades overlaid at their YES-equivalent price so buys/sells sit on the line (marker size ∝ trade value).
         </p>
       </section>
 
@@ -250,11 +256,12 @@ export default async function MarketPage({ params }: MarketPageProps) {
       {/* ── Advanced analytics grid ───────────────────────────── */}
       <div className="ma-grid">
         <section className="panel ma-section">
-          <div className="ma-section-head"><h2>Holder <span className="g">Concentration</span></h2></div>
-          <ConcentrationChart data={conc} />
+          <div className="ma-section-head"><h2>Top <span className="g">Holders</span> by Payout</h2></div>
+          <SidePayoutChart data={payouts} />
           <p className="ma-caption">
-            How committed capital is distributed. Top-5 wallets hold {conc.count > 0 ? `${(conc.top5Share * 100).toFixed(0)}%` : "—"} of
-            tracked capital (HHI {conc.count > 0 ? conc.hhi.toFixed(2) : "—"}). A high HHI means a few big convictions drive this market.
+            Largest tracked holders on each side{meta?.closed ? " 24h before this market resolved" : ""}, ranked by
+            their payout if that side wins (shares held settle at $1 each — i.e. cost ÷ entry price). YES holders
+            {meta?.closed ? " were owed " : " stand to collect "}{formatCompactUsd(payouts.yesTotal)}, NO holders {formatCompactUsd(payouts.noTotal)}.
           </p>
         </section>
 
