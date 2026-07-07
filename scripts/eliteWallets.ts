@@ -27,6 +27,7 @@ export interface ArchiveRow {
   avg_price: number | null;
   outcome: number | null;
   close_time: string | null;
+  event_slug: string | null;
 }
 
 export interface WalletQuality {
@@ -83,16 +84,19 @@ export function rankWallets(rows: ArchiveRow[], opts: RankOpts): WalletQuality[]
   return out.sort((a, b) => b.edge - a.edge);
 }
 
-// Load the archive (paged) and return the elite wallets as address -> quality.
+// Load the archive (paged) and return the elite wallets as address -> quality. An optional `rowFilter`
+// restricts which resolved positions count toward a wallet's edge — pass an isSportsText gate to rank
+// wallets purely on their SPORTS history, i.e. select the best sports bettors (see copyList.ts).
 export async function loadEliteWallets(
   supabase: { from: (t: string) => any },
-  opts: RankOpts
+  opts: RankOpts,
+  rowFilter?: (row: ArchiveRow) => boolean
 ): Promise<Map<string, WalletQuality>> {
   const rows: ArchiveRow[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
       .from("closed_positions_archive")
-      .select("address, market, avg_price, outcome, close_time")
+      .select("address, market, avg_price, outcome, close_time, event_slug")
       .not("outcome", "is", null)
       .range(from, from + 999);
     if (error) throw error;
@@ -100,7 +104,8 @@ export async function loadEliteWallets(
     rows.push(...batch);
     if (batch.length < 1000) break;
   }
+  const scoped = rowFilter ? rows.filter(rowFilter) : rows;
   const map = new Map<string, WalletQuality>();
-  for (const w of rankWallets(rows, opts)) map.set(w.address, w);
+  for (const w of rankWallets(scoped, opts)) map.set(w.address, w);
   return map;
 }

@@ -27,6 +27,7 @@ import { strict as assert } from "node:assert";
 import { PolymarketClient } from "./polymarket.js";
 import { loadEliteWallets, type WalletQuality } from "./eliteWallets.js";
 import { buildCandidates, type Trade, type Candidate } from "./copyCandidates.js";
+import { isSportsText } from "./sports.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -43,6 +44,7 @@ const FRESH_DAYS = Number(process.env.COPY_FRESH_DAYS ?? 3); // only trades this
 const MIN_PRICE = 0.1; // skip near-decided extremes (no edge, wide relative spread)
 const MAX_PRICE = 0.9;
 const MIN_LIQUIDITY_USD = Number(process.env.COPY_MIN_LIQ ?? 100); // total sharp $ into the side — a liquidity/spread proxy
+const ENRICH_MAX = Number(process.env.COPY_ENRICH_MAX ?? 250); // how many top candidates to Gamma-enrich + sports-gate
 // Elite-wallet gates (see eliteWallets.ts). Lower COPY_MIN_EDGE to widen the pool on a thin day.
 const ELITE_OPTS = {
   minFamilies: Number(process.env.COPY_MIN_FAMILIES ?? 8),
@@ -52,12 +54,19 @@ const ELITE_OPTS = {
 
 async function main(): Promise<void> {
   selfCheck();
-  const elite = await loadEliteWallets(supabase, ELITE_OPTS);
-  console.log(`Elite wallets (deep-archive edge>=${ELITE_OPTS.minEdge}/sh, consistent over time, >=${ELITE_OPTS.minFamilies} families): ${elite.size}`);
+  // STRICTLY SPORTS: rank wallets on their sports-only archive history, so `elite` = the best SPORTS
+  // bettors (proven, consistent forecasting edge on sports markets), not all-category leaders.
+  const elite = await loadEliteWallets(supabase, ELITE_OPTS, (r) => isSportsText(r.market, r.event_slug));
+  console.log(`Best SPORTS bettors (sports-only deep-archive edge>=${ELITE_OPTS.minEdge}/sh, consistent over time, >=${ELITE_OPTS.minFamilies} sports families): ${elite.size}`);
   if (elite.size === 0) {
-    console.log("No wallets clear the elite gate — lower COPY_MIN_EDGE or backfill the archive (archiveBackfill.ts).");
+    console.log("No wallets clear the sports elite gate — lower COPY_MIN_EDGE/COPY_MIN_FAMILIES or backfill the archive (archiveBackfill.ts).");
     return;
   }
+  console.log("\nTop sports bettors to follow (address · sports edge/share · sports families):");
+  for (const w of [...elite.values()].sort((a, b) => b.edge - a.edge).slice(0, 15)) {
+    console.log(`  ${w.address}  +${w.edge.toFixed(3)}/sh  ${w.families} fam`);
+  }
+  console.log("");
 
   const trades: Trade[] = [];
   for (let from = 0; ; from += 1000) {
@@ -77,11 +86,15 @@ async function main(): Promise<void> {
   interface Live { c: Candidate; bet: string; marketType: string; game: string; endDays: number }
   const live: Live[] = [];
   let dropped = 0;
-  for (const c of candidates.slice(0, 80)) {
+  let nonSports = 0;
+  for (const c of candidates.slice(0, ENRICH_MAX)) {
     const brief = await client.getMarketBrief(c.conditionId).catch(() => null);
     if (!brief || brief.resolved) { dropped += 1; continue; }
     const endMs = brief.endDate ? Date.parse(brief.endDate) : NaN;
     if (!Number.isNaN(endMs) && endMs <= now) { dropped += 1; continue; } // already ended
+    // STRICTLY SPORTS market gate — classify the richest text Gamma gives us (event title catches soccer/
+    // World Cup games whose bare question, e.g. "Will Argentina win?", has no sports keyword).
+    if (!isSportsText(brief.eventTitle, brief.groupItemTitle, c.question)) { nonSports += 1; continue; }
     const bet = brief.outcomes[c.outcomeIndex] ?? c.side; // exact label, fall back to YES/NO
     // Game = Polymarket's event title stem (before " - "), its authoritative grouping. Falls back to
     // the market question when a market has no event, so standalone markets stay their own group.
@@ -98,7 +111,7 @@ async function main(): Promise<void> {
   for (const g of byGame.values()) g.sort((a, b) => b.c.wallets - a.c.wallets || b.c.avgEliteEdge - a.c.avgEliteEdge || b.c.usd - a.c.usd);
   const games = [...byGame.entries()].sort(([, a], [, b]) => b[0]!.c.wallets - a[0]!.c.wallets || b[0]!.c.avgEliteEdge - a[0]!.c.avgEliteEdge || b[0]!.c.usd - a[0]!.c.usd);
 
-  console.log(`Feed: ${trades.length} board fills -> ${candidates.length} elite candidates -> ${live.length} still-open (dropped ${dropped} resolved/ended).`);
+  console.log(`Feed: ${trades.length} board fills -> ${candidates.length} sports-elite candidates -> ${live.length} still-open sports markets (dropped ${dropped} resolved/ended, ${nonSports} non-sports).`);
   console.log(`Grouped into ${games.length} distinct games/events, best-first. Each ▸ block is ONE game — its lines are different bets, pick one.\n`);
   const fmtResolve = (d: number): string => (Number.isNaN(d) ? "?" : d < 1 ? "<1d" : `${d.toFixed(0)}d`);
   for (const [game, markets] of games.slice(0, 20)) {

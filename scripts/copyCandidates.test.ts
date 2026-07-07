@@ -1,7 +1,29 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildCandidates, copyPnlPerDollar, type Trade } from "./copyCandidates.js";
+import { buildCandidates, buildHoldingCandidates, copyPnlPerDollar, type Trade, type Holding } from "./copyCandidates.js";
 import type { WalletQuality } from "./eliteWallets.js";
+
+// --- buildHoldingCandidates: agreement from current elite holdings, priced at cur_price ---
+test("buildHoldingCandidates aggregates elite holders of a side; pays current price, notes their entry", () => {
+  const elite = new Map<string, WalletQuality>([
+    ["a", { address: "a", edge: 0.08, families: 10, firstHalfEdge: 0.05, secondHalfEdge: 0.06 }],
+    ["b", { address: "b", edge: 0.04, families: 9, firstHalfEdge: 0.04, secondHalfEdge: 0.05 }]
+  ]);
+  const h = (address: string, cond: string, oi: number, size: number, entry: number, cur: number): Holding => ({ address, condition_id: cond, market: `Market ${cond}`, outcome_index: oi, size, avg_price: entry, cur_price: cur });
+  const holdings: Holding[] = [
+    h("a", "m1", 0, 1000, 0.2, 0.35), // elite, cost $200, cur 0.35
+    h("b", "m1", 0, 500, 0.3, 0.35), // 2nd elite same side -> wallets=2, cost $150
+    h("c", "m1", 0, 1000, 0.2, 0.35), // NON-elite -> ignored
+    h("a", "m2", 0, 10, 0.2, 0.35), // cost $2 < dust -> dropped
+    h("a", "m3", 0, 1000, 0.9, 0.97) // cur 0.97 > maxPrice -> dropped
+  ];
+  const out = buildHoldingCandidates(holdings, elite, { minPrice: 0.1, maxPrice: 0.9, minLiquidity: 100, dustUsd: 10 });
+  assert.equal(out.length, 1);
+  assert.equal(out[0]!.wallets, 2);
+  assert.ok(Math.abs(out[0]!.avgPrice - 0.35) < 1e-9); // pay current price
+  assert.ok(Math.abs(out[0]!.theirAvgEntry! - (0.2 * 200 + 0.3 * 150) / 350) < 1e-9); // cost-weighted entry
+  assert.ok(Math.abs(out[0]!.usd - 350) < 1e-9);
+});
 
 // --- buildCandidates: only elite wallets, fresh BUYs, price band, liquidity floor; ranked ---
 test("buildCandidates keeps only fresh elite BUYs and aggregates a market-side", () => {

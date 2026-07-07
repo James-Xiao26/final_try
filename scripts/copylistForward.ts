@@ -16,6 +16,7 @@ import { createClient } from "@supabase/supabase-js";
 import { PolymarketClient } from "./polymarket.js";
 import { loadEliteWallets } from "./eliteWallets.js";
 import { buildCandidates, copyPnlPerDollar, type Trade } from "./copyCandidates.js";
+import { isSportsText } from "./sports.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -48,7 +49,8 @@ async function fetchTrades(): Promise<Trade[]> {
 }
 
 async function record(): Promise<void> {
-  const [elite, trades] = await Promise.all([loadEliteWallets(supabase, ELITE_OPTS), fetchTrades()]);
+  // STRICTLY SPORTS — matches copyList.ts: sports-only elite pool + sports-only market gate below.
+  const [elite, trades] = await Promise.all([loadEliteWallets(supabase, ELITE_OPTS, (r) => isSportsText(r.market, r.event_slug)), fetchTrades()]);
   const candidates = buildCandidates(trades, elite, Date.now(), { freshDays: FRESH_DAYS, minPrice: 0.1, maxPrice: 0.9, minLiquidity: MIN_LIQUIDITY_USD });
 
   const { data: existingData, error: existingErr } = await supabase.from("copylist_predictions").select("condition_id, outcome_index");
@@ -65,6 +67,7 @@ async function record(): Promise<void> {
     if (!brief || brief.resolved) { skipped += 1; continue; }
     const endMs = brief.endDate ? Date.parse(brief.endDate) : NaN;
     if (!Number.isNaN(endMs) && endMs <= Date.now()) { skipped += 1; continue; } // already ended
+    if (!isSportsText(brief.eventTitle, brief.groupItemTitle, c.question)) { skipped += 1; continue; } // strictly sports
     inserts.push({
       condition_id: c.conditionId,
       outcome_index: c.outcomeIndex,
