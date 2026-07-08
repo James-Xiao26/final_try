@@ -722,7 +722,7 @@ export class PolymarketClient {
   // tool: label the exact bet, group markets by game, and drop already-decided ones. Queries WITHOUT
   // closed=true so still-open markets are returned (Gamma includes open by default); a null return = no
   // open market (closed/hidden/unknown) and the caller drops it.
-  async getMarketBrief(conditionId: string): Promise<{ outcomes: string[]; endDate: string | null; resolved: boolean; eventTitle: string | null; groupItemTitle: string | null } | null> {
+  async getMarketBrief(conditionId: string): Promise<{ outcomes: string[]; endDate: string | null; resolved: boolean; eventTitle: string | null; groupItemTitle: string | null; gameStartTime: string | null } | null> {
     const params = new URLSearchParams({ condition_ids: conditionId });
     const response = await fetchJson("/markets", params, "general", CONFIG.GAMMA_API_BASE);
     const first = asArray(response).filter(isRecord)[0];
@@ -733,7 +733,11 @@ export class PolymarketClient {
       endDate: readString(first, ["endDate", "end_date"]) || null,
       resolved: first.umaResolutionStatus === "resolved" || first.closed === true,
       eventTitle: (events[0] && readString(events[0], ["title"])) || null,
-      groupItemTitle: readString(first, ["groupItemTitle"]) || null
+      groupItemTitle: readString(first, ["groupItemTitle"]) || null,
+      // Single-game markets carry the real kickoff here; futures/season markets have none. Used by the
+      // copy list to drop in-game (live) entries so only PRE-GAME bets count. Format is Gamma's loose
+      // "YYYY-MM-DD HH:MM:SS+00", which Date.parse handles.
+      gameStartTime: readString(first, ["gameStartTime", "game_start_time"]) || null
     };
   }
 

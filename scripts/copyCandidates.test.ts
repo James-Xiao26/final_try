@@ -50,6 +50,23 @@ test("buildCandidates keeps only fresh elite BUYs and aggregates a market-side",
   assert.ok(Math.abs(out[0]!.avgEliteEdge - (0.08 + 0.05) / 2) < 1e-9);
 });
 
+test("buildCandidates drops in-game bets when a gameStart is known, keeps pre-game", () => {
+  const now = Date.parse("2026-07-05T12:00:00Z");
+  const kickoff = Date.parse("2026-07-05T00:00:00Z"); // game started 12h ago
+  const mk = (address: string, cond: string, price: number, tradedAt: string): Trade => ({ address, condition_id: cond, market: `Market ${cond}`, outcome_index: 0, side: "BUY", price, usdc_size: 500, traded_at: tradedAt });
+  const elite = new Map<string, WalletQuality>(["a", "b"].map((x) => [x, { address: x, edge: 0.05, families: 9, firstHalfEdge: 0.01, secondHalfEdge: 0.01 }]));
+  const trades: Trade[] = [
+    mk("a", "game", 0.5, "2026-07-04T20:00:00Z"), // pre-kickoff -> counts
+    mk("b", "game", 0.5, "2026-07-05T01:00:00Z"), // AFTER kickoff (live) -> dropped
+    mk("a", "fut", 0.5, "2026-07-05T01:00:00Z") // futures: not in gameStart map -> counts
+  ];
+  const gameStart = new Map<string, number>([["game", kickoff]]);
+  const out = buildCandidates(trades, elite, now, { freshDays: 3, minPrice: 0.1, maxPrice: 0.9, minLiquidity: 100 }, gameStart);
+  const game = out.find((c) => c.conditionId === "game")!;
+  assert.equal(game.wallets, 1); // only the pre-kickoff wallet
+  assert.ok(out.some((c) => c.conditionId === "fut")); // futures untouched
+});
+
 test("buildCandidates ranks more-agreement first", () => {
   const now = Date.parse("2026-07-05T00:00:00Z");
   const mk = (address: string, cond: string, price: number): Trade => ({ address, condition_id: cond, market: `Market ${cond}`, outcome_index: 0, side: "BUY", price, usdc_size: 500, traded_at: new Date(now).toISOString() });

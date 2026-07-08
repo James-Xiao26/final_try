@@ -41,8 +41,15 @@ export interface Holding {
 // Collapse fresh ELITE BUYs into one candidate per (market, side): distinct elite wallets on it, mean
 // elite edge, total $, $-weighted avg entry price, freshest trade. Only trades from wallets in the
 // `elite` map count. Pure so it's unit-testable. Ranked best-first: agreement, then edge, then size.
-export function buildCandidates(trades: Trade[], elite: Map<string, WalletQuality>, nowMs: number, opts: { freshDays: number; minPrice: number; maxPrice: number; minLiquidity: number }): Candidate[] {
+// `gameStart` (optional): conditionId -> game kickoff (ms). A trade placed at/after its market's kickoff
+// is an in-game (live) bet and is dropped — only PRE-GAME entries count. Markets absent from the map
+// (futures/season markets with no single kickoff) keep all their trades.
+export function buildCandidates(trades: Trade[], elite: Map<string, WalletQuality>, nowMs: number, opts: { freshDays: number; minPrice: number; maxPrice: number; minLiquidity: number }, gameStart?: Map<string, number>): Candidate[] {
   const ageDays = (t: string): number => (nowMs - Date.parse(t)) / 86_400_000;
+  const isPreGame = (t: Trade): boolean => {
+    const start = gameStart?.get(t.condition_id!);
+    return start === undefined || Date.parse(t.traded_at) < start;
+  };
   const fresh = trades.filter(
     (t) =>
       t.side === "BUY" &&
@@ -50,7 +57,8 @@ export function buildCandidates(trades: Trade[], elite: Map<string, WalletQualit
       ageDays(t.traded_at) <= opts.freshDays &&
       elite.has(t.address) &&
       t.price >= opts.minPrice &&
-      t.price <= opts.maxPrice
+      t.price <= opts.maxPrice &&
+      isPreGame(t)
   );
   const agg = new Map<string, { conditionId: string; outcomeIndex: number; question: string; yes: boolean; wallets: Set<string>; usd: number; pSum: number; latest: string }>();
   for (const t of fresh) {
