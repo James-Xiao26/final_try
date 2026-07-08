@@ -46,6 +46,11 @@ const EVAL_PAGES = Number(process.env.SCOUT_EVAL_PAGES ?? 8); // cap /closed-pos
 const MIN_BETS = Number(process.env.SCOUT_MIN_BETS ?? 8); // never-blank target
 const MIN_LIQ = Number(process.env.SCOUT_MIN_LIQ ?? 3000); // only scout games liquid enough to actually copy
 const DUST_SHARES = Number(process.env.SCOUT_DUST_SHARES ?? 20); // ignore a holder's dust position
+// Best-of-the-best gates. Price band drops longshot exact-scores (@0.01–0.09) and near-locks (@0.91–1.00)
+// where the shown edge/sh is a structural longshot mirage, not copyable signal (same band copyList.ts uses).
+const MIN_PRICE = Number(process.env.SCOUT_MIN_PRICE ?? 0.1);
+const MAX_PRICE = Number(process.env.SCOUT_MAX_PRICE ?? 0.9);
+const PER_EVENT_MAX = Number(process.env.SCOUT_PER_EVENT_MAX ?? 3); // top-N strongest bets shown per game
 const CACHE_FILE = new URL("./sportsScouts.json", import.meta.url);
 
 export interface GameMarket {
@@ -145,7 +150,7 @@ export interface Bet { g: GameMarket; outcomeIndex: number; wallets: number; avg
 
 // Aggregate GOOD wallets' held sides into one bet per (game, side): distinct good wallets, their mean
 // edge, total $ at current price. Pure — unit-tested.
-export function buildBets(held: HeldSide[], gamesById: Map<string, GameMarket>, evals: Map<string, WalletEval>, good: (q: WalletEval) => boolean): Bet[] {
+export function buildBets(held: HeldSide[], gamesById: Map<string, GameMarket>, evals: Map<string, WalletEval>, good: (q: WalletEval) => boolean, bounds?: { minPrice: number; maxPrice: number }): Bet[] {
   const agg = new Map<string, { g: GameMarket; oi: number; addrs: Set<string>; edgeSum: number; shares: number }>();
   for (const h of held) {
     const q = evals.get(h.address);
@@ -163,6 +168,9 @@ export function buildBets(held: HeldSide[], gamesById: Map<string, GameMarket>, 
       const price = a.g.prices[a.oi] ?? null;
       return { g: a.g, outcomeIndex: a.oi, wallets: a.addrs.size, avgEdge: a.edgeSum / a.addrs.size, usd: a.shares * (price ?? 0), price };
     })
+    // Best-of-the-best: keep only bets with a known price inside the copyable band. A null price is
+    // uncopyable (no entry to mirror); an extreme price is a longshot/lock, not real forecasting edge.
+    .filter((b) => !bounds || (b.price !== null && b.price >= bounds.minPrice && b.price <= bounds.maxPrice))
     .sort((x, y) => y.wallets - x.wallets || y.avgEdge - x.avgEdge || y.g.liquidity - x.g.liquidity || y.usd - x.usd);
 }
 
@@ -213,8 +221,9 @@ async function main(): Promise<void> {
   // strict→loose: the first level clearing MIN_BETS wins; if none clears, each non-empty level overwrites
   // so we end on the loosest non-empty.
   let chosen: { label: string; ok: (q: WalletEval) => boolean; bets: Bet[] } = { label: "none", ok: () => false, bets: [] };
+  const band = { minPrice: MIN_PRICE, maxPrice: MAX_PRICE };
   for (const lvl of LEVELS) {
-    const bets = buildBets(held, gamesById, evals, lvl.ok);
+    const bets = buildBets(held, gamesById, evals, lvl.ok, band);
     if (bets.length > 0) chosen = { label: lvl.label, ok: lvl.ok, bets };
     if (bets.length >= MIN_BETS) break;
   }
@@ -245,12 +254,25 @@ async function main(): Promise<void> {
   for (const b of chosen.bets) { const k = stem(b.g.eventTitle); (byEvent.get(k) ?? byEvent.set(k, []).get(k)!).push(b); }
   const events = [...byEvent.entries()].sort(([, a], [, b]) => Math.max(...b.map((x) => x.wallets)) - Math.max(...a.map((x) => x.wallets)) || b[0]!.avgEdge - a[0]!.avgEdge);
   const fmtIn = (ms: number): string => { const h = (ms - now) / 3_600_000; return h < 1 ? "<1h" : h < 24 ? `${h.toFixed(0)}h` : `${(h / 24).toFixed(0)}d`; };
-  console.log(`\n=== SPORTS BETS TO TAKE (${chosen.bets.length}) — all pre-game, best-first ===\n`);
+  console.log(`\n=== SPORTS BETS TO TAKE — best-of-the-best, all pre-game, best-first (top ${PER_EVENT_MAX}/game) ===\n`);
   for (const [event, bets] of events.slice(0, 25)) {
-    bets.sort((a, b) => b.wallets - a.wallets || b.avgEdge - a.avgEdge || b.usd - a.usd);
+    // Collapse opposite sides of the SAME market (same conditionId) to one line — keep the side the vetted
+    // wallets favour, so a moneyline never shows as two contradictory bets. Then show only the strongest
+    // few markets per game (the rest are correlated angles on the same match — pick one).
+    const byMarket = new Map<string, Bet[]>();
+    for (const b of bets) (byMarket.get(b.g.conditionId) ?? byMarket.set(b.g.conditionId, []).get(b.g.conditionId)!).push(b);
+    const lines = [...byMarket.values()].map((sides) => {
+      sides.sort((a, b) => b.wallets - a.wallets || b.avgEdge - a.avgEdge || b.usd - a.usd);
+      return sides[0]!;
+    });
+    lines.sort((a, b) => b.wallets - a.wallets || b.avgEdge - a.avgEdge || b.usd - a.usd);
+    // Always keep the strongest line (never-blank); secondary lines only if >1 wallet backs them — a lone
+    // wallet is a single opinion, not the multi-wallet agreement this list ranks on.
+    const shown = lines.slice(0, PER_EVENT_MAX).filter((b, i) => i === 0 || b.wallets >= 2);
     const liq = Math.round(Math.max(...bets.map((b) => b.g.liquidity)));
-    console.log(`▸ ${event}   (starts ${fmtIn(bets[0]!.g.gameStartMs)}, ~$${liq.toLocaleString()} liq)`);
-    for (const b of bets) {
+    const more = lines.length - shown.length;
+    console.log(`▸ ${event}   (starts ${fmtIn(shown[0]!.g.gameStartMs)}, ~$${liq.toLocaleString()} liq${more > 0 ? `, +${more} weaker market${more > 1 ? "s" : ""} hidden` : ""})`);
+    for (const b of shown) {
       const bet = b.g.outcomes[b.outcomeIndex] ?? `outcome ${b.outcomeIndex}`;
       const type = stem(b.g.question) === event ? "" : ` · ${b.g.question.slice(0, 26)}`;
       const px = b.price === null ? "?" : b.price.toFixed(2);
@@ -258,7 +280,8 @@ async function main(): Promise<void> {
     }
   }
   console.log(`\nPay near the shown price or skip (spread). "w" = distinct vetted wallets holding that side pre-game;`);
-  console.log(`edge/sh = their historical sports profit per share (proxy). Discovery + eval cached in sportsScouts.json.`);
+  console.log(`edge/sh = their historical sports profit per share (proxy). Only the top ${PER_EVENT_MAX} markets per game are shown —`);
+  console.log(`take the top line; others are correlated angles on the same match. Discovery + eval cached in sportsScouts.json.`);
 }
 
 async function loadBoardAddresses(): Promise<Set<string>> {

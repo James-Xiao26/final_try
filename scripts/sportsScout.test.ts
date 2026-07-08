@@ -37,3 +37,20 @@ test("buildBets ignores holdings whose game isn't in the upcoming set", () => {
   const held: HeldSide[] = [{ conditionId: "GONE", outcomeIndex: 0, address: "a", shares: 100 }];
   assert.equal(buildBets(held, games, evals, () => true).length, 0);
 });
+
+test("buildBets price band drops longshots/locks (and unknown prices) when bounds given", () => {
+  // Home @0.60 in-band; Away @0.40 in-band; add a longshot market and a lock market.
+  const longshot: GameMarket = { ...game("ls"), outcomes: ["Yes", "No"], prices: [0.04, 0.96] };
+  const games = new Map<string, GameMarket>([["m1", game("m1")], ["ls", longshot]]);
+  const evals = new Map<string, WalletEval>([["a", q(0.1)]]);
+  const held: HeldSide[] = [
+    { conditionId: "m1", outcomeIndex: 0, address: "a", shares: 100 }, // @0.60 kept
+    { conditionId: "ls", outcomeIndex: 0, address: "a", shares: 100 }, // @0.04 longshot dropped
+    { conditionId: "ls", outcomeIndex: 1, address: "a", shares: 100 } // @0.96 lock dropped
+  ];
+  const bets = buildBets(held, games, evals, () => true, { minPrice: 0.1, maxPrice: 0.9 });
+  assert.equal(bets.length, 1);
+  assert.equal(bets[0]!.g.conditionId, "m1");
+  // Without bounds, all three sides survive.
+  assert.equal(buildBets(held, games, evals, () => true).length, 3);
+});
