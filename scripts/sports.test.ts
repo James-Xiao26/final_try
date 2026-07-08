@@ -10,6 +10,14 @@ test("isSportsText: matches unambiguous sports texts across question/title/slug"
   assert.ok(isSportsText("Alcaraz to win Wimbledon"));
 });
 
+test("isSportsText: catches team-matchup markets via their sport slug prefix", () => {
+  // Bare matchup titles have no league word — the slug prefix is what identifies the sport.
+  assert.ok(isSportsText("Athletics vs. Detroit Tigers: O/U 5.5", null, "mlb-ath-det-2026-07-07"));
+  assert.ok(isSportsText("Will Spain win on 2026-07-06?", null, "fifwc-prt-esp-2026-07-06"));
+  assert.ok(isSportsText("LoL: T1 vs FURIA - Game 1 Winner", null, "lol-t1-fur-2026-07-06")); // esports
+  assert.ok(!isSportsText("Athletics vs. Detroit Tigers")); // no slug, no league word -> not matched
+});
+
 test("isSportsText: rejects non-sports (incl. bare 'vs' politics)", () => {
   assert.ok(!isSportsText("Trump vs Biden 2028")); // no league/sport term
   assert.ok(!isSportsText("Bitcoin above $100k?", null, "bitcoin-100k"));

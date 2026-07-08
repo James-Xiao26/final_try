@@ -16,3 +16,6 @@ scripts/_*.mjs
 .agents/
 .claude/skills/
 skills-lock.json
+
+# Sports scout wallet-eval cache (rebuildable, grows per run)
+scripts/sportsScouts.json
