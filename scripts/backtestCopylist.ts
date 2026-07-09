@@ -254,8 +254,105 @@ async function main(): Promise<void> {
     const rows = d7.filter((x) => pred(x.life));
     console.log(`  ${label.padEnd(22)}  ${fmt(stats(clusterMean(rows)))}`);
   }
-  console.log("\n(Survivorship-scoped: archive = current board wallets, so LEVEL is inflated. Walk-forward");
-  console.log(" removes the circular 'selected on what I score' defect. Gross of fees/slippage beyond the haircut.)");
+  // ── TIMESTAMPED-ENTRY COPY (the cleanest construction available) ─────────────────────────────────
+  // /activity has REAL entry timestamps, killing the lookahead the archive can't resolve: copy each
+  // elite TEST-window BUY at the market's first daily close STRICTLY AFTER the entry day — a price
+  // that is guaranteed observable and post-dates the information ("elite wallet bought"). Selection
+  // is still train-only. The one residual confound is universe selection (the archive holds today's
+  // board wallets, whose presence correlates with test-window success).
+  console.log(`\n── TIMESTAMPED-ENTRY COPY: elite test-window BUYs @ next-day close +${HAIRCUT * 100}c (null = 0) ──`);
+  const outcomeOf = new Map<string, number>();
+  for (const r of clean) if (r.condition_id) outcomeOf.set(`${r.condition_id}:${r.outcome_index}`, r.outcome!);
+  const client = new PolymarketClient();
+  interface Entry { addr: string; cond: string; idx: number; dayTs: string; market: string }
+  const entries: Entry[] = [];
+  for (const addr of elite.keys()) {
+    const acts = await client.getActivity(addr).catch(() => []);
+    for (const a of acts) {
+      if (a.side !== "BUY" || !a.conditionId || a.timestamp * 1000 < cutoff) continue;
+      if (a.price < MIN_PRICE || a.price > MAX_PRICE || !a.market || !isScorableMarket(a.market)) continue;
+      entries.push({ addr, cond: a.conditionId, idx: a.outcomeIndex, dayTs: new Date(a.timestamp * 1000).toISOString().slice(0, 10), market: a.market });
+    }
+  }
+  console.log(`  ${entries.length} timestamped elite BUYs in the test window (last ~500 activities/wallet).`);
+  const entryPrices = await loadMarketPrices([...new Set(entries.map((e) => e.cond))]);
+  const tsAll: { key: string; v: number; life: number; top: boolean }[] = [];
+  let unresolved = 0, noPrice = 0;
+  for (const e of entries) {
+    const side = outcomeOf.get(`${e.cond}:${e.idx}`) ?? (outcomeOf.has(`${e.cond}:${1 - e.idx}`) ? 1 - outcomeOf.get(`${e.cond}:${1 - e.idx}`)! : null);
+    if (side === null) { unresolved += 1; continue; }
+    const series = entryPrices.get(e.cond);
+    const next = series?.find((p) => p.ts > e.dayTs && p.ts <= new Date(Date.parse(`${e.dayTs}T00:00:00Z`) + 5 * 86_400_000).toISOString().slice(0, 10));
+    if (!next || !series) { noPrice += 1; continue; }
+    const sidePrice = e.idx === 0 ? next.price : 1 - next.price;
+    if (sidePrice < MIN_PRICE || sidePrice > MAX_PRICE) continue;
+    const life = (Date.parse(series[series.length - 1]!.ts) - Date.parse(series[0]!.ts)) / 86_400_000;
+    tsAll.push({ key: marketFamilyKey(e.market), v: copyPnl(Math.min(0.99, sidePrice + HAIRCUT), side), life, top: topWallets.has(e.addr) });
+  }
+  console.log(`  scored ${tsAll.length} copies (${unresolved} unresolved, ${noPrice} no next-day price).`);
+  console.log(`  all elite            ${fmt(stats(clusterMean(tsAll.map((x) => ({ key: x.key, v: x.v })))))}`);
+  console.log(`  top-15 by train edge ${fmt(stats(clusterMean(tsAll.filter((x) => x.top).map((x) => ({ key: x.key, v: x.v })))))}`);
+  console.log(`  life > 30d           ${fmt(stats(clusterMean(tsAll.filter((x) => x.life > 30).map((x) => ({ key: x.key, v: x.v })))))}`);
+  console.log(`  life <= 30d          ${fmt(stats(clusterMean(tsAll.filter((x) => x.life <= 30).map((x) => ({ key: x.key, v: x.v })))))}`);
+  // ── SURVIVORSHIP-FREE UNIVERSE: promoted-by-cutoff candidates ────────────────────────────────────
+  // The last confound: the archive holds TODAY'S board wallets, whose presence correlates with test-
+  // window success. candidate_wallets fixes it — `promoted_at` timestamps the moment the system judged
+  // a wallet elite-grade (skill >= 4), and RETIRED failures stay in the table. Universe = every wallet
+  // promoted BEFORE the cutoff, winners and later-flameouts alike; copy their post-cutoff BUYs at
+  // next-day close. This is the honest historical estimate of the copy policy's level.
+  // Candidate promotions only began 2026-06-17 (the pipeline is young), so this test's cutoff is
+  // data-driven, not the archive median: select on promotions before 06-21 (includes the big 06-20
+  // batch), copy strictly after. Shorter window (~3 weeks), but the selection precedes every copy.
+  const PROMO_CUTOFF_MS = Date.parse("2026-06-21T00:00:00Z");
+  const { data: candData, error: candErr } = await supabase
+    .from("candidate_wallets")
+    .select("address, promoted_at, status")
+    .not("promoted_at", "is", null)
+    .lt("promoted_at", new Date(PROMO_CUTOFF_MS).toISOString());
+  if (candErr) throw candErr;
+  const promoted = (candData ?? []) as { address: string; status: string }[];
+  const retiredSet = new Set(promoted.filter((c) => c.status === "retired").map((c) => c.address));
+  console.log(`\n── SURVIVORSHIP-FREE COPY: ${promoted.length} wallets promoted pre-06-21 (${retiredSet.size} since RETIRED — failures included) ──`);
+  const pEntries: Entry[] = [];
+  for (const c of promoted) {
+    const acts = await client.getActivity(c.address).catch(() => []);
+    for (const a of acts) {
+      if (a.side !== "BUY" || !a.conditionId || a.timestamp * 1000 < PROMO_CUTOFF_MS) continue;
+      if (a.price < MIN_PRICE || a.price > MAX_PRICE || !a.market || !isScorableMarket(a.market)) continue;
+      pEntries.push({ addr: c.address, cond: a.conditionId, idx: a.outcomeIndex, dayTs: new Date(a.timestamp * 1000).toISOString().slice(0, 10), market: a.market });
+    }
+  }
+  console.log(`  ${pEntries.length} timestamped BUYs post-cutoff.`);
+  const pPrices = await loadMarketPrices([...new Set(pEntries.map((e) => e.cond))]);
+  // Outcomes: archive lookup first; Gamma/UMA fallback for markets the archive never saw (retired
+  // wallets' markets), memoized per condition.
+  const resolvedCache = new Map<string, number | null>();
+  const yesOutcome = async (cond: string): Promise<number | null> => {
+    if (!resolvedCache.has(cond)) resolvedCache.set(cond, await client.getResolvedOutcome(cond).catch(() => null));
+    return resolvedCache.get(cond)!;
+  };
+  const pAll: { key: string; v: number; retired: boolean }[] = [];
+  let pUnresolved = 0, pNoPrice = 0;
+  for (const e of pEntries) {
+    const series = pPrices.get(e.cond);
+    const next = series?.find((p) => p.ts > e.dayTs && p.ts <= new Date(Date.parse(`${e.dayTs}T00:00:00Z`) + 5 * 86_400_000).toISOString().slice(0, 10));
+    if (!next || !series) { pNoPrice += 1; continue; }
+    let side = outcomeOf.get(`${e.cond}:${e.idx}`) ?? (outcomeOf.has(`${e.cond}:${1 - e.idx}`) ? 1 - outcomeOf.get(`${e.cond}:${1 - e.idx}`)! : null);
+    if (side === null) {
+      const yes = await yesOutcome(e.cond);
+      side = yes === null ? null : e.idx === 0 ? yes : 1 - yes;
+    }
+    if (side === null) { pUnresolved += 1; continue; }
+    const sidePrice = e.idx === 0 ? next.price : 1 - next.price;
+    if (sidePrice < MIN_PRICE || sidePrice > MAX_PRICE) continue;
+    pAll.push({ key: marketFamilyKey(e.market), v: copyPnl(Math.min(0.99, sidePrice + HAIRCUT), side), retired: retiredSet.has(e.addr) });
+  }
+  console.log(`  scored ${pAll.length} copies (${pUnresolved} unresolved, ${pNoPrice} no next-day price).`);
+  console.log(`  ALL promoted-by-cutoff  ${fmt(stats(clusterMean(pAll.map((x) => ({ key: x.key, v: x.v })))))}   <- survivorship-free level`);
+  console.log(`  still tracked           ${fmt(stats(clusterMean(pAll.filter((x) => !x.retired).map((x) => ({ key: x.key, v: x.v })))))}`);
+  console.log(`  since retired           ${fmt(stats(clusterMean(pAll.filter((x) => x.retired).map((x) => ({ key: x.key, v: x.v })))))}`);
+  console.log("\n(Sections above the survivorship-free one are board-archive-scoped, so their LEVELS are inflated.");
+  console.log(" Gross of fees/slippage beyond the haircut. The forward test remains the final arbiter.)");
 }
 
 // Market daily YES closes for a set of condition ids, cached to disk (Gamma id-batch → CLOB history).
