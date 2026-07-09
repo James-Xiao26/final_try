@@ -15,6 +15,7 @@ import { bestSkillScore, computeScoringOutcome, selectCandidateBatch, type Candi
 import { summarizeCrowdedMarkets, type CrowdClosedPosition, type CrowdOpenPosition } from "./marketCrowd.js";
 import { newEntriesFromActivity, summarizeFreshEntries, type NewEntry } from "./freshEntries.js";
 import { shouldSkipWallet, type WalletRecheckState, type WalletRecheckStatsRow } from "./walletRecheck.js";
+import { record as recordCopylistPredictions, score as scoreCopylistPredictions } from "./copylistForward.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -2801,6 +2802,17 @@ async function main(): Promise<void> {
     console.log(`Archived ${archivedCount} closed-position rows (append-only, ignoreDuplicates).`);
   } catch (reason) {
     console.warn(`Closed-position archive failed (non-fatal): ${describeError(reason)}`);
+  }
+
+  // Copylist forward test: lock today's candidates + settle due ones. Piggybacked on the daily full
+  // ingest (recent_trades was just rewritten above, so candidates are fresh) because the dedicated
+  // cron-job.org job silently never existed and the forward sample flatlined — the daily run is the
+  // reliability floor; an extra cron trigger is dedup-safe. Non-fatal either way.
+  try {
+    await recordCopylistPredictions();
+    await scoreCopylistPredictions();
+  } catch (reason) {
+    console.warn(`Copylist forward record/score failed (non-fatal): ${describeError(reason)}`);
   }
 
   // Precompute the Convergence ("crowded markets") ranked list so the web app reads a tiny cache

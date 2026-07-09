@@ -95,8 +95,8 @@ async function main(): Promise<void> {
   // strongest market (agreement, then edge), and within a game show markets strongest-first.
   const byGame = new Map<string, Live[]>();
   for (const l of live) (byGame.get(l.game) ?? byGame.set(l.game, []).get(l.game)!).push(l);
-  for (const g of byGame.values()) g.sort((a, b) => b.c.wallets - a.c.wallets || b.c.avgEliteEdge - a.c.avgEliteEdge || b.c.usd - a.c.usd);
-  const games = [...byGame.entries()].sort(([, a], [, b]) => b[0]!.c.wallets - a[0]!.c.wallets || b[0]!.c.avgEliteEdge - a[0]!.c.avgEliteEdge || b[0]!.c.usd - a[0]!.c.usd);
+  for (const g of byGame.values()) g.sort((a, b) => b.c.avgEliteEdge - a.c.avgEliteEdge || b.c.wallets - a.c.wallets || b.c.usd - a.c.usd);
+  const games = [...byGame.entries()].sort(([, a], [, b]) => b[0]!.c.avgEliteEdge - a[0]!.c.avgEliteEdge || b[0]!.c.wallets - a[0]!.c.wallets || b[0]!.c.usd - a[0]!.c.usd);
 
   console.log(`Feed: ${trades.length} board fills -> ${candidates.length} elite candidates -> ${live.length} still-open (dropped ${dropped} resolved/ended).`);
   console.log(`Grouped into ${games.length} distinct games/events, best-first. Each ▸ block is ONE game — its lines are different bets, pick one.\n`);
@@ -110,7 +110,7 @@ async function main(): Promise<void> {
       sides.sort((a, b) => b.c.wallets - a.c.wallets || b.c.usd - a.c.usd);
       return { top: sides[0]!, dissent: sides[1] ?? null };
     });
-    lines.sort((a, b) => b.top.c.wallets - a.top.c.wallets || b.top.c.avgEliteEdge - a.top.c.avgEliteEdge || b.top.c.usd - a.top.c.usd);
+    lines.sort((a, b) => b.top.c.avgEliteEdge - a.top.c.avgEliteEdge || b.top.c.wallets - a.top.c.wallets || b.top.c.usd - a.top.c.usd);
     console.log(`▸ ${game}   (resolves ${fmtResolve(lines[0]!.top.endDays)}, ${lines.length} elite market${lines.length > 1 ? "s" : ""})`);
     for (const { top, dissent } of lines) {
       const { c, bet, marketType } = top;

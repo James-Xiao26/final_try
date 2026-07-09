@@ -28,7 +28,10 @@ export interface Candidate {
 
 // Collapse fresh ELITE BUYs into one candidate per (market, side): distinct elite wallets on it, mean
 // elite edge, total $, $-weighted avg entry price, freshest trade. Only trades from wallets in the
-// `elite` map count. Pure so it's unit-testable. Ranked best-first: agreement, then edge, then size.
+// `elite` map count. Pure so it's unit-testable. Ranked best-first: EDGE, then agreement, then size —
+// the walk-forward policy search (backtestCopylist.ts) found edge-ranked top slices beat agreement-
+// ranked ones decisively out-of-time (+0.93 vs +0.41 $/$1 top-10%), and the in-band agreement
+// gradient is flat, so agreement is a tiebreak, not the signal.
 export function buildCandidates(trades: Trade[], elite: Map<string, WalletQuality>, nowMs: number, opts: { freshDays: number; minPrice: number; maxPrice: number; minLiquidity: number }): Candidate[] {
   const ageDays = (t: string): number => (nowMs - Date.parse(t)) / 86_400_000;
   const fresh = trades.filter(
@@ -56,7 +59,7 @@ export function buildCandidates(trades: Trade[], elite: Map<string, WalletQualit
       const avgEliteEdge = [...g.wallets].reduce((a, w) => a + (elite.get(w)?.edge ?? 0), 0) / g.wallets.size;
       return { conditionId: g.conditionId, outcomeIndex: g.outcomeIndex, question: g.question, side: (g.yes ? "YES" : "NO") as "YES" | "NO", wallets: g.wallets.size, avgEliteEdge, usd: g.usd, avgPrice: g.usd > 0 ? g.pSum / g.usd : 0, latestAgeDays: ageDays(g.latest) };
     })
-    .sort((a, b) => b.wallets - a.wallets || b.avgEliteEdge - a.avgEliteEdge || b.usd - a.usd);
+    .sort((a, b) => b.avgEliteEdge - a.avgEliteEdge || b.wallets - a.wallets || b.usd - a.usd);
 }
 
 // Profit on a $1 copy of a bet on `outcomeIndex` at `entryPrice`, given the market's YES(index 0)
