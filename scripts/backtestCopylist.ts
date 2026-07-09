@@ -22,6 +22,9 @@ loadEnv({ path: "../.env.local" });
 loadEnv();
 
 const ELITE_OPTS = { minFamilies: 8, minHalfFamilies: 3, minEdge: 0.03 };
+// Match the live copylist's price band (copyList.ts) so the walk-forward scores the SAME bets the
+// product surfaces — without it, cheap-longshot winners pay 1/entry and dominate the mean $/$1.
+const MIN_PRICE = 0.1, MAX_PRICE = 0.9;
 
 // $1 copy P/L: win => 1/entry − 1, loss => −1. Same as copyCandidates.copyPnlPerDollar but the archive
 // already stores `outcome` as THIS side's 0/1 settlement, so no YES-index gymnastics needed.
@@ -35,7 +38,10 @@ interface Row extends ArchiveRow {
 }
 
 function scorable(r: Row): boolean {
-  return r.outcome !== null && r.avg_price !== null && r.avg_price > 0 && !!r.market && isScorableMarket(r.market) && !!r.close_time;
+  return (
+    r.outcome !== null && r.avg_price !== null && r.avg_price >= MIN_PRICE && r.avg_price <= MAX_PRICE &&
+    !!r.market && isScorableMarket(r.market) && !!r.close_time
+  );
 }
 
 // Mean + t-stat of a sample vs null 0. Clustered variant averages within each key first (one obs per
@@ -105,6 +111,9 @@ async function main(): Promise<void> {
 
   // Agreement gradient on TEST: for each (condition_id, outcome_index) how many DISTINCT elite wallets
   // held it? Copylist's core claim is multi-wallet agreement copies better. Bucket 1 / 2 / 3+.
+  // ponytail: "agreement" here = held-same-market anytime in the test half, NOT co-timed within
+  // COPY_FRESH_DAYS like the live signal (archive has no entry timestamp, only close_time). So this
+  // OVERSTATES agreement vs the product — read the gradient's shape, not its absolute buckets.
   const byBet = new Map<string, Row[]>();
   for (const r of eliteTest) {
     if (!r.condition_id) continue;

@@ -12,6 +12,11 @@ supabase/.temp/
 # Throwaway local DB-inspection scripts (use the service-role key; never commit)
 scripts/_*.mjs
 
+# Research-backtest caches/outputs — regenerable from CLOB/Supabase, kept local for fast reruns
+scripts/backtestSmartMoneyHistory.json
+scripts/whaleExitCache.json
+scripts/convergedMarkets.csv
+
 # Installed agent skills (npx skills add ...) — local only
 .agents/
 .claude/skills/
