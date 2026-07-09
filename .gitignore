@@ -16,6 +16,7 @@ scripts/_*.mjs
 scripts/backtestSmartMoneyHistory.json
 scripts/whaleExitCache.json
 scripts/convergedMarkets.csv
+scripts/backtestDeadline.cache.json
 
 # Installed agent skills (npx skills add ...) — local only
 .agents/
