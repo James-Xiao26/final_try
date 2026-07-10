@@ -40,7 +40,10 @@ export interface Holding {
 
 // Collapse fresh ELITE BUYs into one candidate per (market, side): distinct elite wallets on it, mean
 // elite edge, total $, $-weighted avg entry price, freshest trade. Only trades from wallets in the
-// `elite` map count. Pure so it's unit-testable. Ranked best-first: agreement, then edge, then size.
+// `elite` map count. Pure so it's unit-testable. Ranked best-first: EDGE, then agreement, then size —
+// the walk-forward policy search (backtestCopylist.ts) found edge-ranked top slices beat agreement-
+// ranked ones decisively out-of-time (+0.93 vs +0.41 $/$1 top-10%), and the in-band agreement
+// gradient is flat, so agreement is a tiebreak, not the signal.
 // `gameStart` (optional): conditionId -> game kickoff (ms). A trade placed at/after its market's kickoff
 // is an in-game (live) bet and is dropped — only PRE-GAME entries count. Markets absent from the map
 // (futures/season markets with no single kickoff) keep all their trades.
@@ -76,7 +79,7 @@ export function buildCandidates(trades: Trade[], elite: Map<string, WalletQualit
       const avgEliteEdge = [...g.wallets].reduce((a, w) => a + (elite.get(w)?.edge ?? 0), 0) / g.wallets.size;
       return { conditionId: g.conditionId, outcomeIndex: g.outcomeIndex, question: g.question, side: (g.yes ? "YES" : "NO") as "YES" | "NO", wallets: g.wallets.size, avgEliteEdge, usd: g.usd, avgPrice: g.usd > 0 ? g.pSum / g.usd : 0, latestAgeDays: ageDays(g.latest) };
     })
-    .sort((a, b) => b.wallets - a.wallets || b.avgEliteEdge - a.avgEliteEdge || b.usd - a.usd);
+    .sort((a, b) => b.avgEliteEdge - a.avgEliteEdge || b.wallets - a.wallets || b.usd - a.usd);
 }
 
 // Agreement from CURRENT HOLDINGS: one candidate per (market, side) that elite wallets currently hold a

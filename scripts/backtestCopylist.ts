@@ -13,10 +13,16 @@
 // pre-cutoff but RESOLVED post-cutoff leaks a little look-ahead. Acceptable for a rough cut; the fix
 // (store entry time) isn't worth it until the forward test says the signal is even real.
 import { config as loadEnv } from "dotenv";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { strict as assert } from "node:assert";
 import { rankWallets, type ArchiveRow, type WalletQuality } from "./eliteWallets.js";
 import { isScorableMarket, marketFamilyKey } from "./metrics.js";
+import { classifyMarket } from "./specialty.js";
+import { PolymarketClient } from "./polymarket.js";
+import { dailyPointsFromHistory } from "./priceHistory.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -138,8 +144,269 @@ async function main(): Promise<void> {
   }
   console.log(`\n── PER-WALLET PERSISTENCE (train edge vs test copy $/$1, n=${perWallet.length} elite w/ >=5 test bets) ──`);
   console.log(`  correlation r = ${pearson(perWallet.map((p) => p.train), perWallet.map((p) => p.test)).toFixed(3)}`);
-  console.log("\n(Survivorship-scoped: archive = current board wallets, so LEVEL is inflated. Walk-forward");
-  console.log(" removes the circular 'selected on what I score' defect. Gross of fees/slippage.)");
+
+  // ── BEST-TRADES POLICY SEARCH ────────────────────────────────────────────────────────────────────
+  // The copylist shows a ranked list and the user copies the TOP few — so what matters isn't the mean
+  // of everything, it's whether some ranking's top slice is +EV out-of-time under retail costs. Model
+  // 1-share copying with a 2c haircut (you fill at ask, they filled mid-ish). Policies compete on the
+  // same test bets, clustered by market family. Score ties break arbitrarily but deterministically.
+  const HAIRCUT = 0.02;
+  interface Bet { key: string; entry: number; outcome: number; agree: number; maxEdge: number; meanEdge: number }
+  const bets: Bet[] = [];
+  for (const rows of byBet.values()) {
+    const first = rows[0]!;
+    if (!first.market) continue;
+    const copiers = [...new Set(rows.map((r) => r.address))];
+    const edges = copiers.map((a) => elite.get(a)?.edge ?? 0);
+    bets.push({
+      key: marketFamilyKey(first.market),
+      entry: rows.reduce((a, r) => a + r.avg_price!, 0) / rows.length,
+      outcome: first.outcome!,
+      agree: copiers.length,
+      maxEdge: Math.max(...edges),
+      meanEdge: edges.reduce((a, b) => a + b, 0) / edges.length
+    });
+  }
+  const pnlH = (b: Bet): number => copyPnl(Math.min(0.99, b.entry + HAIRCUT), b.outcome);
+  const policies: [string, (b: Bet) => number][] = [
+    ["max copier train edge", (b) => b.maxEdge],
+    ["mean copier train edge", (b) => b.meanEdge],
+    ["agreement (live rank)", (b) => b.agree],
+    ["agreement, then edge", (b) => b.agree * 10 + b.meanEdge]
+  ];
+  console.log(`\n── BEST-TRADES POLICY (test bets ranked, top slice copied @entry+${HAIRCUT * 100}c; family-clustered) ──`);
+  console.log(`  ${bets.length} test bets; ALL bets baseline: ${fmt(stats(clusterMean(bets.map((b) => ({ key: b.key, v: pnlH(b) })))))}`);
+  for (const [name, score] of policies) {
+    const ranked = [...bets].sort((a, b) => score(b) - score(a));
+    for (const frac of [0.1, 0.25]) {
+      const top = ranked.slice(0, Math.max(1, Math.floor(ranked.length * frac)));
+      const cl = clusterMean(top.map((b) => ({ key: b.key, v: pnlH(b) })));
+      console.log(`  ${name.padEnd(24)} top ${String(frac * 100).padStart(2)}%  ${fmt(stats(cl))}`);
+    }
+  }
+
+  // Where does the edge live? Category and entry-price sub-band splits of elite test copies (haircut).
+  console.log(`\n── ELITE TEST COPIES BY CATEGORY (family-clustered, @entry+${HAIRCUT * 100}c) ──`);
+  const byCat = new Map<string, { key: string; v: number }[]>();
+  for (const r of eliteTest) {
+    const cat = classifyMarket(r.market!) ?? "Other";
+    (byCat.get(cat) ?? byCat.set(cat, []).get(cat)!).push({ key: label(r), v: copyPnl(Math.min(0.99, r.avg_price! + HAIRCUT), r.outcome!) });
+  }
+  for (const [cat, rows] of [...byCat.entries()].sort((a, b) => b[1].length - a[1].length)) {
+    console.log(`  ${cat.padEnd(12)} ${fmt(stats(clusterMean(rows)))}`);
+  }
+  console.log(`\n── ELITE TEST COPIES BY ENTRY BAND (family-clustered, @entry+${HAIRCUT * 100}c) ──`);
+  for (const [lo, hi] of [[0.1, 0.3], [0.3, 0.5], [0.5, 0.7], [0.7, 0.9]] as const) {
+    const rows = eliteTest.filter((r) => r.avg_price! >= lo && r.avg_price! < hi).map((r) => ({ key: label(r), v: copyPnl(Math.min(0.99, r.avg_price! + HAIRCUT), r.outcome!) }));
+    console.log(`  ${lo.toFixed(1)}-${hi.toFixed(1)}       ${fmt(stats(clusterMean(rows)))}`);
+  }
+  // ── COPY AT MARKET PRICE (the "can YOU actually get it" test) ───────────────────────────────────
+  // Everything above prices the copy at the ELITE WALLET'S fill — which may be an in-game/latency fill
+  // a copier can never match (the suspected source of the too-good numbers: 95% win at ~50c). Here we
+  // reprice every elite test position at the MARKET's daily close D days before resolution — a price a
+  // copier could genuinely trade at — and ask if the position still profits. Survives → accessible
+  // edge. Dies → the "edge" is their fill, not their forecast, and copying cannot work.
+  const topWallets = new Set([...elite.values()].sort((a, b) => b.edge - a.edge).slice(0, 15).map((w) => w.address));
+  const wanted = eliteTest.filter((r) => r.condition_id);
+  const conds = [...new Set(wanted.map((r) => r.condition_id!))];
+  const priceMap = await loadMarketPrices(conds);
+  console.log(`\n── COPY AT MARKET PRICE, D days pre-resolution (+${HAIRCUT * 100}c; null = 0) ──`);
+  console.log(`  price series found for ${priceMap.size}/${conds.length} elite test markets`);
+  for (const D of [3, 7]) {
+    const all: { key: string; v: number }[] = [];
+    const top: { key: string; v: number }[] = [];
+    for (const r of wanted) {
+      const series = priceMap.get(r.condition_id!);
+      if (!series) continue;
+      const yes = priceAtDay(series, Date.parse(r.close_time!) - D * 86_400_000);
+      if (yes === null) continue;
+      const side = r.outcome_index === 0 ? yes : 1 - yes; // price of THEIR side at T−D
+      if (side < MIN_PRICE || side > MAX_PRICE) continue;
+      const v = copyPnl(Math.min(0.99, side + HAIRCUT), r.outcome!);
+      all.push({ key: marketFamilyKey(r.market!), v });
+      if (topWallets.has(r.address)) top.push({ key: marketFamilyKey(r.market!), v });
+    }
+    console.log(`  D=${D}  all elite        ${fmt(stats(clusterMean(all)))}`);
+    console.log(`  D=${D}  top-15 by edge   ${fmt(stats(clusterMean(top)))}`);
+  }
+  // Lookahead check: at T−D we "copy" a position the wallet may not have OPENED yet (no entry
+  // timestamps in the archive). For short-lived markets (sports games) that's clairvoyance — knowing
+  // Thursday which side the sharp buys on Sunday. Long-lived markets are mostly legitimate: a position
+  // held for weeks is observable in wallet_positions at T−D. So split D=7 by category and by market
+  // lifetime; if the edge lives only in short-lived/sports markets, it's lookahead, not copyable.
+  console.log(`\n── D=7 COPY-AT-MARKET SPLIT (where is it legitimate?) ──`);
+  const d7: { cat: string; life: number; key: string; v: number }[] = [];
+  for (const r of wanted) {
+    const series = priceMap.get(r.condition_id!);
+    if (!series || series.length < 2) continue;
+    const yes = priceAtDay(series, Date.parse(r.close_time!) - 7 * 86_400_000);
+    if (yes === null) continue;
+    const side = r.outcome_index === 0 ? yes : 1 - yes;
+    if (side < MIN_PRICE || side > MAX_PRICE) continue;
+    const life = (Date.parse(series[series.length - 1]!.ts) - Date.parse(series[0]!.ts)) / 86_400_000;
+    d7.push({ cat: classifyMarket(r.market!) ?? "Other", life, key: marketFamilyKey(r.market!), v: copyPnl(Math.min(0.99, side + HAIRCUT), r.outcome!) });
+  }
+  for (const cat of [...new Set(d7.map((x) => x.cat))].sort()) {
+    const rows = d7.filter((x) => x.cat === cat);
+    console.log(`  ${cat.padEnd(12)}            ${fmt(stats(clusterMean(rows)))}`);
+  }
+  for (const [label, pred] of [["life <= 30d (suspect)", (x: number) => x <= 30], ["life > 30d (cleaner)", (x: number) => x > 30], ["life > 60d (cleanest)", (x: number) => x > 60]] as const) {
+    const rows = d7.filter((x) => pred(x.life));
+    console.log(`  ${label.padEnd(22)}  ${fmt(stats(clusterMean(rows)))}`);
+  }
+  // ── TIMESTAMPED-ENTRY COPY (the cleanest construction available) ─────────────────────────────────
+  // /activity has REAL entry timestamps, killing the lookahead the archive can't resolve: copy each
+  // elite TEST-window BUY at the market's first daily close STRICTLY AFTER the entry day — a price
+  // that is guaranteed observable and post-dates the information ("elite wallet bought"). Selection
+  // is still train-only. The one residual confound is universe selection (the archive holds today's
+  // board wallets, whose presence correlates with test-window success).
+  console.log(`\n── TIMESTAMPED-ENTRY COPY: elite test-window BUYs @ next-day close +${HAIRCUT * 100}c (null = 0) ──`);
+  const outcomeOf = new Map<string, number>();
+  for (const r of clean) if (r.condition_id) outcomeOf.set(`${r.condition_id}:${r.outcome_index}`, r.outcome!);
+  const client = new PolymarketClient();
+  interface Entry { addr: string; cond: string; idx: number; dayTs: string; market: string }
+  const entries: Entry[] = [];
+  for (const addr of elite.keys()) {
+    const acts = await client.getActivity(addr).catch(() => []);
+    for (const a of acts) {
+      if (a.side !== "BUY" || !a.conditionId || a.timestamp * 1000 < cutoff) continue;
+      if (a.price < MIN_PRICE || a.price > MAX_PRICE || !a.market || !isScorableMarket(a.market)) continue;
+      entries.push({ addr, cond: a.conditionId, idx: a.outcomeIndex, dayTs: new Date(a.timestamp * 1000).toISOString().slice(0, 10), market: a.market });
+    }
+  }
+  console.log(`  ${entries.length} timestamped elite BUYs in the test window (last ~500 activities/wallet).`);
+  const entryPrices = await loadMarketPrices([...new Set(entries.map((e) => e.cond))]);
+  const tsAll: { key: string; v: number; life: number; top: boolean }[] = [];
+  let unresolved = 0, noPrice = 0;
+  for (const e of entries) {
+    const side = outcomeOf.get(`${e.cond}:${e.idx}`) ?? (outcomeOf.has(`${e.cond}:${1 - e.idx}`) ? 1 - outcomeOf.get(`${e.cond}:${1 - e.idx}`)! : null);
+    if (side === null) { unresolved += 1; continue; }
+    const series = entryPrices.get(e.cond);
+    const next = series?.find((p) => p.ts > e.dayTs && p.ts <= new Date(Date.parse(`${e.dayTs}T00:00:00Z`) + 5 * 86_400_000).toISOString().slice(0, 10));
+    if (!next || !series) { noPrice += 1; continue; }
+    const sidePrice = e.idx === 0 ? next.price : 1 - next.price;
+    if (sidePrice < MIN_PRICE || sidePrice > MAX_PRICE) continue;
+    const life = (Date.parse(series[series.length - 1]!.ts) - Date.parse(series[0]!.ts)) / 86_400_000;
+    tsAll.push({ key: marketFamilyKey(e.market), v: copyPnl(Math.min(0.99, sidePrice + HAIRCUT), side), life, top: topWallets.has(e.addr) });
+  }
+  console.log(`  scored ${tsAll.length} copies (${unresolved} unresolved, ${noPrice} no next-day price).`);
+  console.log(`  all elite            ${fmt(stats(clusterMean(tsAll.map((x) => ({ key: x.key, v: x.v })))))}`);
+  console.log(`  top-15 by train edge ${fmt(stats(clusterMean(tsAll.filter((x) => x.top).map((x) => ({ key: x.key, v: x.v })))))}`);
+  console.log(`  life > 30d           ${fmt(stats(clusterMean(tsAll.filter((x) => x.life > 30).map((x) => ({ key: x.key, v: x.v })))))}`);
+  console.log(`  life <= 30d          ${fmt(stats(clusterMean(tsAll.filter((x) => x.life <= 30).map((x) => ({ key: x.key, v: x.v })))))}`);
+  // ── SURVIVORSHIP-FREE UNIVERSE: promoted-by-cutoff candidates ────────────────────────────────────
+  // The last confound: the archive holds TODAY'S board wallets, whose presence correlates with test-
+  // window success. candidate_wallets fixes it — `promoted_at` timestamps the moment the system judged
+  // a wallet elite-grade (skill >= 4), and RETIRED failures stay in the table. Universe = every wallet
+  // promoted BEFORE the cutoff, winners and later-flameouts alike; copy their post-cutoff BUYs at
+  // next-day close. This is the honest historical estimate of the copy policy's level.
+  // Candidate promotions only began 2026-06-17 (the pipeline is young), so this test's cutoff is
+  // data-driven, not the archive median: select on promotions before 06-21 (includes the big 06-20
+  // batch), copy strictly after. Shorter window (~3 weeks), but the selection precedes every copy.
+  const PROMO_CUTOFF_MS = Date.parse("2026-06-21T00:00:00Z");
+  const { data: candData, error: candErr } = await supabase
+    .from("candidate_wallets")
+    .select("address, promoted_at, status")
+    .not("promoted_at", "is", null)
+    .lt("promoted_at", new Date(PROMO_CUTOFF_MS).toISOString());
+  if (candErr) throw candErr;
+  const promoted = (candData ?? []) as { address: string; status: string }[];
+  const retiredSet = new Set(promoted.filter((c) => c.status === "retired").map((c) => c.address));
+  console.log(`\n── SURVIVORSHIP-FREE COPY: ${promoted.length} wallets promoted pre-06-21 (${retiredSet.size} since RETIRED — failures included) ──`);
+  const pEntries: Entry[] = [];
+  for (const c of promoted) {
+    const acts = await client.getActivity(c.address).catch(() => []);
+    for (const a of acts) {
+      if (a.side !== "BUY" || !a.conditionId || a.timestamp * 1000 < PROMO_CUTOFF_MS) continue;
+      if (a.price < MIN_PRICE || a.price > MAX_PRICE || !a.market || !isScorableMarket(a.market)) continue;
+      pEntries.push({ addr: c.address, cond: a.conditionId, idx: a.outcomeIndex, dayTs: new Date(a.timestamp * 1000).toISOString().slice(0, 10), market: a.market });
+    }
+  }
+  console.log(`  ${pEntries.length} timestamped BUYs post-cutoff.`);
+  const pPrices = await loadMarketPrices([...new Set(pEntries.map((e) => e.cond))]);
+  // Outcomes: archive lookup first; Gamma/UMA fallback for markets the archive never saw (retired
+  // wallets' markets), memoized per condition.
+  const resolvedCache = new Map<string, number | null>();
+  const yesOutcome = async (cond: string): Promise<number | null> => {
+    if (!resolvedCache.has(cond)) resolvedCache.set(cond, await client.getResolvedOutcome(cond).catch(() => null));
+    return resolvedCache.get(cond)!;
+  };
+  const pAll: { key: string; v: number; retired: boolean }[] = [];
+  let pUnresolved = 0, pNoPrice = 0;
+  for (const e of pEntries) {
+    const series = pPrices.get(e.cond);
+    const next = series?.find((p) => p.ts > e.dayTs && p.ts <= new Date(Date.parse(`${e.dayTs}T00:00:00Z`) + 5 * 86_400_000).toISOString().slice(0, 10));
+    if (!next || !series) { pNoPrice += 1; continue; }
+    let side = outcomeOf.get(`${e.cond}:${e.idx}`) ?? (outcomeOf.has(`${e.cond}:${1 - e.idx}`) ? 1 - outcomeOf.get(`${e.cond}:${1 - e.idx}`)! : null);
+    if (side === null) {
+      const yes = await yesOutcome(e.cond);
+      side = yes === null ? null : e.idx === 0 ? yes : 1 - yes;
+    }
+    if (side === null) { pUnresolved += 1; continue; }
+    const sidePrice = e.idx === 0 ? next.price : 1 - next.price;
+    if (sidePrice < MIN_PRICE || sidePrice > MAX_PRICE) continue;
+    pAll.push({ key: marketFamilyKey(e.market), v: copyPnl(Math.min(0.99, sidePrice + HAIRCUT), side), retired: retiredSet.has(e.addr) });
+  }
+  console.log(`  scored ${pAll.length} copies (${pUnresolved} unresolved, ${pNoPrice} no next-day price).`);
+  console.log(`  ALL promoted-by-cutoff  ${fmt(stats(clusterMean(pAll.map((x) => ({ key: x.key, v: x.v })))))}   <- survivorship-free level`);
+  console.log(`  still tracked           ${fmt(stats(clusterMean(pAll.filter((x) => !x.retired).map((x) => ({ key: x.key, v: x.v })))))}`);
+  console.log(`  since retired           ${fmt(stats(clusterMean(pAll.filter((x) => x.retired).map((x) => ({ key: x.key, v: x.v })))))}`);
+  console.log("\n(Sections above the survivorship-free one are board-archive-scoped, so their LEVELS are inflated.");
+  console.log(" Gross of fees/slippage beyond the haircut. The forward test remains the final arbiter.)");
+}
+
+// Market daily YES closes for a set of condition ids, cached to disk (Gamma id-batch → CLOB history).
+async function loadMarketPrices(conds: string[]): Promise<Map<string, { ts: string; price: number }[]>> {
+  interface CacheShape { [cond: string]: { ts: string; price: number }[] }
+  const file = join(dirname(fileURLToPath(import.meta.url)), "backtestCopylistPrices.cache.json");
+  const cache: CacheShape = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as CacheShape) : {};
+  const missing = conds.filter((c) => !(c in cache));
+  if (missing.length > 0) {
+    console.log(`\nFetching market price series for ${missing.length} markets (cached: ${conds.length - missing.length})…`);
+    const client = new PolymarketClient();
+    // Gamma: resolve conditionId -> YES token id, 20 ids per request.
+    const tokenOf = new Map<string, string>();
+    for (let i = 0; i < missing.length; i += 20) {
+      const batch = missing.slice(i, i + 20);
+      // closed=true is required — Gamma hides resolved markets by default (same gotcha as fetchLiveMarket).
+      const url = `https://gamma-api.polymarket.com/markets?limit=100&closed=true&${batch.map((c) => `condition_ids=${c}`).join("&")}`;
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          for (const m of (await res.json()) as Record<string, unknown>[]) {
+            try {
+              const toks = JSON.parse(String(m.clobTokenIds ?? "[]")) as string[];
+              if (toks[0]) tokenOf.set(String(m.conditionId), toks[0]);
+            } catch { /* skip */ }
+          }
+        }
+      } catch { /* skip batch */ }
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    let done = 0;
+    for (const c of missing) {
+      const tok = tokenOf.get(c);
+      cache[c] = tok ? dailyPointsFromHistory(await client.getPriceHistory(tok).catch(() => []), 3650, Date.now()) : [];
+      done += 1;
+      if (done % 250 === 0) { writeFileSync(file, JSON.stringify(cache)); console.log(`  ${done}/${missing.length}`); }
+    }
+    writeFileSync(file, JSON.stringify(cache));
+  }
+  const map = new Map<string, { ts: string; price: number }[]>();
+  for (const c of conds) if ((cache[c]?.length ?? 0) >= 2) map.set(c, cache[c]!);
+  return map;
+}
+
+// Last daily close at or before the target day, within 5d staleness (same rule as backtestDeadline).
+function priceAtDay(prices: { ts: string; price: number }[], targetMs: number): number | null {
+  const targetTs = new Date(targetMs).toISOString().slice(0, 10);
+  const floorTs = new Date(targetMs - 5 * 86_400_000).toISOString().slice(0, 10);
+  let best: number | null = null;
+  for (const p of prices) {
+    if (p.ts <= targetTs && p.ts >= floorTs) best = p.price;
+    if (p.ts > targetTs) break;
+  }
+  return best;
 }
 
 function pearson(xs: number[], ys: number[]): number {

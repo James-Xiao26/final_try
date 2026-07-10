@@ -48,7 +48,7 @@ async function fetchTrades(): Promise<Trade[]> {
   return rows;
 }
 
-async function record(): Promise<void> {
+export async function record(): Promise<void> {
   // STRICTLY SPORTS — matches copyList.ts: sports-only elite pool + sports-only market gate below.
   const [elite, trades] = await Promise.all([loadEliteWallets(supabase, ELITE_OPTS, (r) => isSportsText(r.market, r.event_slug)), fetchTrades()]);
   const now = Date.now();
@@ -108,12 +108,13 @@ interface Pred {
   market: string | null;
   entry_price: number;
   participant_count: number;
+  avg_elite_edge: number | null;
   end_date: string | null;
   recorded_at: string;
   resolved_outcome: number | null;
 }
 
-async function score(): Promise<void> {
+export async function score(): Promise<void> {
   const { data: pendingData, error: pendingErr } = await supabase
     .from("copylist_predictions")
     .select("condition_id, outcome_index, end_date, recorded_at")
@@ -143,7 +144,7 @@ async function score(): Promise<void> {
 
   const { data: resolvedData, error: resolvedErr } = await supabase
     .from("copylist_predictions")
-    .select("condition_id, outcome_index, market, entry_price, participant_count, end_date, recorded_at, resolved_outcome")
+    .select("condition_id, outcome_index, market, entry_price, participant_count, avg_elite_edge, end_date, recorded_at, resolved_outcome")
     .not("resolved_outcome", "is", null);
   if (resolvedErr) throw resolvedErr;
   const resolved = (resolvedData ?? []) as Pred[];
@@ -166,6 +167,14 @@ async function score(): Promise<void> {
   summarize("1 wallet", resolved.filter((r) => r.participant_count === 1));
   summarize("2 wallets", resolved.filter((r) => r.participant_count === 2));
   summarize("3+ wallets", resolved.filter((r) => r.participant_count >= 3));
+  // The walk-forward's strongest survivor was per-wallet edge, not agreement — slice by the copiers'
+  // historical edge (frozen at record time) so the forward test judges the edge-ranked policy directly.
+  console.log(`  --- does copier edge help? (edge tertiles among resolved) ---`);
+  const byEdge = [...resolved].sort((a, b) => (b.avg_elite_edge ?? 0) - (a.avg_elite_edge ?? 0));
+  const third = Math.ceil(byEdge.length / 3);
+  summarize("high-edge third", byEdge.slice(0, third));
+  summarize("mid third", byEdge.slice(third, 2 * third));
+  summarize("low-edge third", byEdge.slice(2 * third));
   console.log(`\n(Still gross of fees/slippage; entry_price is the copylist avg, your real fill may differ a few cents.)`);
 }
 
@@ -174,7 +183,10 @@ async function main(): Promise<void> {
   else await record();
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+// CLI entry only — ingest.ts imports record/score for the daily piggyback, which must not auto-run main.
+if (process.argv[1]?.replace(/\\/g, "/").includes("copylistForward")) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

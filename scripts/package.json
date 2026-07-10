@@ -19,6 +19,7 @@
     "backtest:whaleexit": "tsx backtestWhaleExit.ts",
     "backtest:crosstheme": "tsx crossThemePersistence.ts",
     "backtest:copylist": "tsx backtestCopylist.ts",
+    "backtest:deadline": "tsx backtestDeadline.ts",
     "webhook": "tsx server.ts",
     "probe": "tsx probeClosedPositions.ts",
     "typecheck": "tsc --noEmit",
