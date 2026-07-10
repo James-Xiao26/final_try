@@ -27,6 +27,7 @@ export interface ArchiveRow {
   avg_price: number | null;
   outcome: number | null;
   close_time: string | null;
+  event_slug: string | null;
 }
 
 export interface WalletQuality {
@@ -62,6 +63,37 @@ export interface RankOpts {
   minEdge: number; // overall shrunk-edge floor (per-share profit over entry)
 }
 
+export interface WalletEval extends Omit<WalletQuality, "address"> {
+  firstHalfFamilies: number;
+  secondHalfFamilies: number;
+}
+
+// The raw quality of ONE wallet's resolved positions: overall shrunk family-edge + family count, plus the
+// same edge AND family count for each time-half (median close-time split) for the consistency check. No
+// gating — callers apply their own thresholds via `passesGate`. Exported so the sports scout can vet
+// discovered (off-leaderboard) wallets with exactly the math the board-elite ranking uses.
+export function walletQuality(rows: ArchiveRow[]): WalletEval {
+  const overall = shrunkFamilyEdge(rows);
+  const dated = rows.filter((r) => r.close_time).sort((a, b) => Date.parse(a.close_time!) - Date.parse(b.close_time!));
+  const mid = Math.floor(dated.length / 2);
+  const first = shrunkFamilyEdge(dated.slice(0, mid));
+  const second = shrunkFamilyEdge(dated.slice(mid));
+  return { edge: overall.edge, families: overall.families, firstHalfEdge: first.edge, secondHalfEdge: second.edge, firstHalfFamilies: first.families, secondHalfFamilies: second.families };
+}
+
+// Elite gate: strong enough overall, enough sample in each half, and POSITIVE edge in both halves
+// (consistency). Shared by the board ranking and the sports scout so both mean the same thing by "elite".
+export function passesGate(q: WalletEval, opts: RankOpts): boolean {
+  return (
+    q.families >= opts.minFamilies &&
+    q.edge >= opts.minEdge &&
+    q.firstHalfFamilies >= opts.minHalfFamilies &&
+    q.secondHalfFamilies >= opts.minHalfFamilies &&
+    q.firstHalfEdge > 0 &&
+    q.secondHalfEdge > 0
+  );
+}
+
 // Rank wallets: keep only those clearing the sample + edge floors AND positive in BOTH time halves,
 // sorted best edge first. Pure — unit-tested below.
 export function rankWallets(rows: ArchiveRow[], opts: RankOpts): WalletQuality[] {
@@ -70,29 +102,25 @@ export function rankWallets(rows: ArchiveRow[], opts: RankOpts): WalletQuality[]
 
   const out: WalletQuality[] = [];
   for (const [address, wr] of byWallet) {
-    const overall = shrunkFamilyEdge(wr);
-    if (overall.families < opts.minFamilies || overall.edge < opts.minEdge) continue;
-    const dated = wr.filter((r) => r.close_time).sort((a, b) => Date.parse(a.close_time!) - Date.parse(b.close_time!));
-    const mid = Math.floor(dated.length / 2);
-    const first = shrunkFamilyEdge(dated.slice(0, mid));
-    const second = shrunkFamilyEdge(dated.slice(mid));
-    if (first.families < opts.minHalfFamilies || second.families < opts.minHalfFamilies) continue;
-    if (first.edge <= 0 || second.edge <= 0) continue; // consistency gate
-    out.push({ address, edge: overall.edge, families: overall.families, firstHalfEdge: first.edge, secondHalfEdge: second.edge });
+    const q = walletQuality(wr);
+    if (passesGate(q, opts)) out.push({ address, edge: q.edge, families: q.families, firstHalfEdge: q.firstHalfEdge, secondHalfEdge: q.secondHalfEdge });
   }
   return out.sort((a, b) => b.edge - a.edge);
 }
 
-// Load the archive (paged) and return the elite wallets as address -> quality.
+// Load the archive (paged) and return the elite wallets as address -> quality. An optional `rowFilter`
+// restricts which resolved positions count toward a wallet's edge — pass an isSportsText gate to rank
+// wallets purely on their SPORTS history, i.e. select the best sports bettors (see copyList.ts).
 export async function loadEliteWallets(
   supabase: { from: (t: string) => any },
-  opts: RankOpts
+  opts: RankOpts,
+  rowFilter?: (row: ArchiveRow) => boolean
 ): Promise<Map<string, WalletQuality>> {
   const rows: ArchiveRow[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
       .from("closed_positions_archive")
-      .select("address, market, avg_price, outcome, close_time")
+      .select("address, market, avg_price, outcome, close_time, event_slug")
       .not("outcome", "is", null)
       .range(from, from + 999);
     if (error) throw error;
@@ -100,7 +128,8 @@ export async function loadEliteWallets(
     rows.push(...batch);
     if (batch.length < 1000) break;
   }
+  const scoped = rowFilter ? rows.filter(rowFilter) : rows;
   const map = new Map<string, WalletQuality>();
-  for (const w of rankWallets(rows, opts)) map.set(w.address, w);
+  for (const w of rankWallets(scoped, opts)) map.set(w.address, w);
   return map;
 }

@@ -27,6 +27,7 @@ import { strict as assert } from "node:assert";
 import { PolymarketClient } from "./polymarket.js";
 import { loadEliteWallets, type WalletQuality } from "./eliteWallets.js";
 import { buildCandidates, type Trade, type Candidate } from "./copyCandidates.js";
+import { isSportsText } from "./sports.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -43,6 +44,7 @@ const FRESH_DAYS = Number(process.env.COPY_FRESH_DAYS ?? 3); // only trades this
 const MIN_PRICE = 0.1; // skip near-decided extremes (no edge, wide relative spread)
 const MAX_PRICE = 0.9;
 const MIN_LIQUIDITY_USD = Number(process.env.COPY_MIN_LIQ ?? 100); // total sharp $ into the side — a liquidity/spread proxy
+const ENRICH_MAX = Number(process.env.COPY_ENRICH_MAX ?? 250); // how many top candidates to Gamma-enrich + sports-gate
 // Elite-wallet gates (see eliteWallets.ts). Lower COPY_MIN_EDGE to widen the pool on a thin day.
 const ELITE_OPTS = {
   minFamilies: Number(process.env.COPY_MIN_FAMILIES ?? 8),
@@ -52,12 +54,19 @@ const ELITE_OPTS = {
 
 async function main(): Promise<void> {
   selfCheck();
-  const elite = await loadEliteWallets(supabase, ELITE_OPTS);
-  console.log(`Elite wallets (deep-archive edge>=${ELITE_OPTS.minEdge}/sh, consistent over time, >=${ELITE_OPTS.minFamilies} families): ${elite.size}`);
+  // STRICTLY SPORTS: rank wallets on their sports-only archive history, so `elite` = the best SPORTS
+  // bettors (proven, consistent forecasting edge on sports markets), not all-category leaders.
+  const elite = await loadEliteWallets(supabase, ELITE_OPTS, (r) => isSportsText(r.market, r.event_slug));
+  console.log(`Best SPORTS bettors (sports-only deep-archive edge>=${ELITE_OPTS.minEdge}/sh, consistent over time, >=${ELITE_OPTS.minFamilies} sports families): ${elite.size}`);
   if (elite.size === 0) {
-    console.log("No wallets clear the elite gate — lower COPY_MIN_EDGE or backfill the archive (archiveBackfill.ts).");
+    console.log("No wallets clear the sports elite gate — lower COPY_MIN_EDGE/COPY_MIN_FAMILIES or backfill the archive (archiveBackfill.ts).");
     return;
   }
+  console.log("\nTop sports bettors to follow (address · sports edge/share · sports families):");
+  for (const w of [...elite.values()].sort((a, b) => b.edge - a.edge).slice(0, 15)) {
+    console.log(`  ${w.address}  +${w.edge.toFixed(3)}/sh  ${w.families} fam`);
+  }
+  console.log("");
 
   const trades: Trade[] = [];
   for (let from = 0; ; from += 1000) {
@@ -68,20 +77,40 @@ async function main(): Promise<void> {
     if (batch.length < 1000) break;
   }
 
-  const candidates = buildCandidates(trades, elite, Date.now(), { freshDays: FRESH_DAYS, minPrice: MIN_PRICE, maxPrice: MAX_PRICE, minLiquidity: MIN_LIQUIDITY_USD });
-
-  // Enrich with Gamma: the exact side label (outcomes[outcomeIndex] — "Over"/team/"Yes", NOT a bare
-  // YES/NO), the event/game grouping, and drop markets already resolved or past their end date.
   const client = new PolymarketClient();
   const now = Date.now();
-  interface Live { c: Candidate; bet: string; marketType: string; game: string; endDays: number }
-  const live: Live[] = [];
+
+  // First pass ranks candidate markets so we know which to Gamma-enrich. Enriching gives us each market's
+  // kickoff (gameStartTime); a SECOND buildCandidates pass then drops in-game (live) entries so only
+  // PRE-GAME bets count. Two passes because kickoff is per-market Gamma data, unknown until we enrich.
+  interface Brief { outcomes: string[]; endDate: string | null; eventTitle: string | null; groupItemTitle: string | null }
+  const first = buildCandidates(trades, elite, now, { freshDays: FRESH_DAYS, minPrice: MIN_PRICE, maxPrice: MAX_PRICE, minLiquidity: MIN_LIQUIDITY_USD });
+  const briefs = new Map<string, Brief>(); // enriched + kept (sports, open) markets
+  const gameStart = new Map<string, number>(); // conditionId -> kickoff ms (single-game markets only)
   let dropped = 0;
-  for (const c of candidates.slice(0, 80)) {
+  let nonSports = 0;
+  for (const c of first.slice(0, ENRICH_MAX)) {
+    if (briefs.has(c.conditionId)) continue; // one Gamma call per market, not per side
     const brief = await client.getMarketBrief(c.conditionId).catch(() => null);
     if (!brief || brief.resolved) { dropped += 1; continue; }
     const endMs = brief.endDate ? Date.parse(brief.endDate) : NaN;
     if (!Number.isNaN(endMs) && endMs <= now) { dropped += 1; continue; } // already ended
+    // STRICTLY SPORTS market gate — classify the richest text Gamma gives us (event title catches soccer/
+    // World Cup games whose bare question, e.g. "Will Argentina win?", has no sports keyword).
+    if (!isSportsText(brief.eventTitle, brief.groupItemTitle, c.question)) { nonSports += 1; continue; }
+    briefs.set(c.conditionId, brief);
+    const startMs = brief.gameStartTime ? Date.parse(brief.gameStartTime) : NaN;
+    if (!Number.isNaN(startMs)) gameStart.set(c.conditionId, startMs); // single game -> pre-game cutoff
+  }
+
+  // Second pass: pre-game only. Re-aggregate from trades placed BEFORE each market's kickoff.
+  const candidates = buildCandidates(trades, elite, now, { freshDays: FRESH_DAYS, minPrice: MIN_PRICE, maxPrice: MAX_PRICE, minLiquidity: MIN_LIQUIDITY_USD }, gameStart);
+  interface Live { c: Candidate; bet: string; marketType: string; game: string; endDays: number }
+  const live: Live[] = [];
+  for (const c of candidates) {
+    const brief = briefs.get(c.conditionId);
+    if (!brief) continue; // not enriched/kept (non-sports, resolved, ended, or below the enrich cap)
+    const endMs = brief.endDate ? Date.parse(brief.endDate) : NaN;
     const bet = brief.outcomes[c.outcomeIndex] ?? c.side; // exact label, fall back to YES/NO
     // Game = Polymarket's event title stem (before " - "), its authoritative grouping. Falls back to
     // the market question when a market has no event, so standalone markets stay their own group.
@@ -89,6 +118,7 @@ async function main(): Promise<void> {
     const marketType = brief.groupItemTitle ?? c.question;
     live.push({ c, bet, marketType, game, endDays: Number.isNaN(endMs) ? NaN : (endMs - now) / 86_400_000 });
   }
+  const inGameMarkets = [...gameStart.keys()].filter((id) => !candidates.some((c) => c.conditionId === id)).length;
 
   // Group by game/event so one game occupies ONE slot (not 5). Distinct bet TYPES within a game stay
   // separate lines — never merged — so O/U isn't confused with the moneyline. Rank games by their single
@@ -98,7 +128,8 @@ async function main(): Promise<void> {
   for (const g of byGame.values()) g.sort((a, b) => b.c.wallets - a.c.wallets || b.c.avgEliteEdge - a.c.avgEliteEdge || b.c.usd - a.c.usd);
   const games = [...byGame.entries()].sort(([, a], [, b]) => b[0]!.c.wallets - a[0]!.c.wallets || b[0]!.c.avgEliteEdge - a[0]!.c.avgEliteEdge || b[0]!.c.usd - a[0]!.c.usd);
 
-  console.log(`Feed: ${trades.length} board fills -> ${candidates.length} elite candidates -> ${live.length} still-open (dropped ${dropped} resolved/ended).`);
+  console.log(`Feed: ${trades.length} board fills -> ${first.length} sports-elite candidates -> ${live.length} still-open sports markets (dropped ${dropped} resolved/ended, ${nonSports} non-sports, ${inGameMarkets} fully in-game).`);
+  console.log(`PRE-GAME ONLY: entries placed after a game's kickoff (gameStartTime) are excluded.`);
   console.log(`Grouped into ${games.length} distinct games/events, best-first. Each ▸ block is ONE game — its lines are different bets, pick one.\n`);
   const fmtResolve = (d: number): string => (Number.isNaN(d) ? "?" : d < 1 ? "<1d" : `${d.toFixed(0)}d`);
   for (const [game, markets] of games.slice(0, 20)) {

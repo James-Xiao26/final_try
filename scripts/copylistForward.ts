@@ -16,6 +16,7 @@ import { createClient } from "@supabase/supabase-js";
 import { PolymarketClient } from "./polymarket.js";
 import { loadEliteWallets } from "./eliteWallets.js";
 import { buildCandidates, copyPnlPerDollar, type Trade } from "./copyCandidates.js";
+import { isSportsText } from "./sports.js";
 
 loadEnv({ path: "../.env.local" });
 loadEnv();
@@ -48,23 +49,40 @@ async function fetchTrades(): Promise<Trade[]> {
 }
 
 async function record(): Promise<void> {
-  const [elite, trades] = await Promise.all([loadEliteWallets(supabase, ELITE_OPTS), fetchTrades()]);
-  const candidates = buildCandidates(trades, elite, Date.now(), { freshDays: FRESH_DAYS, minPrice: 0.1, maxPrice: 0.9, minLiquidity: MIN_LIQUIDITY_USD });
+  // STRICTLY SPORTS — matches copyList.ts: sports-only elite pool + sports-only market gate below.
+  const [elite, trades] = await Promise.all([loadEliteWallets(supabase, ELITE_OPTS, (r) => isSportsText(r.market, r.event_slug)), fetchTrades()]);
+  const now = Date.now();
+  const client = new PolymarketClient();
+
+  // First pass to know which markets to enrich; second pass drops in-game entries so only PRE-GAME bets
+  // are recorded (matches copyList.ts — kickoff is per-market Gamma data, unknown until we enrich).
+  const first = buildCandidates(trades, elite, now, { freshDays: FRESH_DAYS, minPrice: 0.1, maxPrice: 0.9, minLiquidity: MIN_LIQUIDITY_USD });
+  const gameStart = new Map<string, number>();
+  const briefs = new Map<string, { outcomes: string[]; endDate: string | null }>();
+  let skipped = 0;
+  for (const c of first) {
+    if (briefs.has(c.conditionId)) continue; // one Gamma call per market
+    const brief = await client.getMarketBrief(c.conditionId).catch(() => null);
+    if (!brief || brief.resolved) { skipped += 1; continue; }
+    const endMs = brief.endDate ? Date.parse(brief.endDate) : NaN;
+    if (!Number.isNaN(endMs) && endMs <= now) { skipped += 1; continue; } // already ended
+    if (!isSportsText(brief.eventTitle, brief.groupItemTitle, c.question)) { skipped += 1; continue; } // strictly sports
+    briefs.set(c.conditionId, { outcomes: brief.outcomes, endDate: brief.endDate });
+    const startMs = brief.gameStartTime ? Date.parse(brief.gameStartTime) : NaN;
+    if (!Number.isNaN(startMs)) gameStart.set(c.conditionId, startMs);
+  }
+  const candidates = buildCandidates(trades, elite, now, { freshDays: FRESH_DAYS, minPrice: 0.1, maxPrice: 0.9, minLiquidity: MIN_LIQUIDITY_USD }, gameStart);
 
   const { data: existingData, error: existingErr } = await supabase.from("copylist_predictions").select("condition_id, outcome_index");
   if (existingErr) throw existingErr;
   const existing = new Set((existingData ?? []).map((r: { condition_id: string; outcome_index: number }) => `${r.condition_id}:${r.outcome_index}`));
 
-  const client = new PolymarketClient();
   interface Insert { condition_id: string; outcome_index: number; market: string | null; bet_label: string | null; entry_price: number; participant_count: number; avg_elite_edge: number; end_date: string | null }
   const inserts: Insert[] = [];
-  let skipped = 0;
   for (const c of candidates) {
     if (existing.has(`${c.conditionId}:${c.outcomeIndex}`)) continue; // locked already — never revise
-    const brief = await client.getMarketBrief(c.conditionId).catch(() => null);
-    if (!brief || brief.resolved) { skipped += 1; continue; }
-    const endMs = brief.endDate ? Date.parse(brief.endDate) : NaN;
-    if (!Number.isNaN(endMs) && endMs <= Date.now()) { skipped += 1; continue; } // already ended
+    const brief = briefs.get(c.conditionId);
+    if (!brief) continue; // not enriched/kept (non-sports, resolved, ended)
     inserts.push({
       condition_id: c.conditionId,
       outcome_index: c.outcomeIndex,

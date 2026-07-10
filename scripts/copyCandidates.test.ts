@@ -1,7 +1,29 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildCandidates, copyPnlPerDollar, type Trade } from "./copyCandidates.js";
+import { buildCandidates, buildHoldingCandidates, copyPnlPerDollar, type Trade, type Holding } from "./copyCandidates.js";
 import type { WalletQuality } from "./eliteWallets.js";
+
+// --- buildHoldingCandidates: agreement from current elite holdings, priced at cur_price ---
+test("buildHoldingCandidates aggregates elite holders of a side; pays current price, notes their entry", () => {
+  const elite = new Map<string, WalletQuality>([
+    ["a", { address: "a", edge: 0.08, families: 10, firstHalfEdge: 0.05, secondHalfEdge: 0.06 }],
+    ["b", { address: "b", edge: 0.04, families: 9, firstHalfEdge: 0.04, secondHalfEdge: 0.05 }]
+  ]);
+  const h = (address: string, cond: string, oi: number, size: number, entry: number, cur: number): Holding => ({ address, condition_id: cond, market: `Market ${cond}`, outcome_index: oi, size, avg_price: entry, cur_price: cur });
+  const holdings: Holding[] = [
+    h("a", "m1", 0, 1000, 0.2, 0.35), // elite, cost $200, cur 0.35
+    h("b", "m1", 0, 500, 0.3, 0.35), // 2nd elite same side -> wallets=2, cost $150
+    h("c", "m1", 0, 1000, 0.2, 0.35), // NON-elite -> ignored
+    h("a", "m2", 0, 10, 0.2, 0.35), // cost $2 < dust -> dropped
+    h("a", "m3", 0, 1000, 0.9, 0.97) // cur 0.97 > maxPrice -> dropped
+  ];
+  const out = buildHoldingCandidates(holdings, elite, { minPrice: 0.1, maxPrice: 0.9, minLiquidity: 100, dustUsd: 10 });
+  assert.equal(out.length, 1);
+  assert.equal(out[0]!.wallets, 2);
+  assert.ok(Math.abs(out[0]!.avgPrice - 0.35) < 1e-9); // pay current price
+  assert.ok(Math.abs(out[0]!.theirAvgEntry! - (0.2 * 200 + 0.3 * 150) / 350) < 1e-9); // cost-weighted entry
+  assert.ok(Math.abs(out[0]!.usd - 350) < 1e-9);
+});
 
 // --- buildCandidates: only elite wallets, fresh BUYs, price band, liquidity floor; ranked ---
 test("buildCandidates keeps only fresh elite BUYs and aggregates a market-side", () => {
@@ -26,6 +48,23 @@ test("buildCandidates keeps only fresh elite BUYs and aggregates a market-side",
   assert.equal(out[0]!.side, "YES");
   assert.ok(Math.abs(out[0]!.avgPrice - (0.6 * 200 + 0.7 * 100) / 300) < 1e-9);
   assert.ok(Math.abs(out[0]!.avgEliteEdge - (0.08 + 0.05) / 2) < 1e-9);
+});
+
+test("buildCandidates drops in-game bets when a gameStart is known, keeps pre-game", () => {
+  const now = Date.parse("2026-07-05T12:00:00Z");
+  const kickoff = Date.parse("2026-07-05T00:00:00Z"); // game started 12h ago
+  const mk = (address: string, cond: string, price: number, tradedAt: string): Trade => ({ address, condition_id: cond, market: `Market ${cond}`, outcome_index: 0, side: "BUY", price, usdc_size: 500, traded_at: tradedAt });
+  const elite = new Map<string, WalletQuality>(["a", "b"].map((x) => [x, { address: x, edge: 0.05, families: 9, firstHalfEdge: 0.01, secondHalfEdge: 0.01 }]));
+  const trades: Trade[] = [
+    mk("a", "game", 0.5, "2026-07-04T20:00:00Z"), // pre-kickoff -> counts
+    mk("b", "game", 0.5, "2026-07-05T01:00:00Z"), // AFTER kickoff (live) -> dropped
+    mk("a", "fut", 0.5, "2026-07-05T01:00:00Z") // futures: not in gameStart map -> counts
+  ];
+  const gameStart = new Map<string, number>([["game", kickoff]]);
+  const out = buildCandidates(trades, elite, now, { freshDays: 3, minPrice: 0.1, maxPrice: 0.9, minLiquidity: 100 }, gameStart);
+  const game = out.find((c) => c.conditionId === "game")!;
+  assert.equal(game.wallets, 1); // only the pre-kickoff wallet
+  assert.ok(out.some((c) => c.conditionId === "fut")); // futures untouched
 });
 
 test("buildCandidates ranks more-agreement first", () => {

@@ -622,13 +622,14 @@ export function mapEventCandidates(record: JsonRecord): EventSummary[] {
 }
 
 export class PolymarketClient {
-  async getClosedPositions(address: string, maxDays = Math.max(...CONFIG.HORIZONS)): Promise<ClosedPosition[]> {
+  async getClosedPositions(address: string, maxDays = Math.max(...CONFIG.HORIZONS), maxPages = CONFIG.MAX_CLOSED_POSITION_PAGES): Promise<ClosedPosition[]> {
     // Positions older than maxDays are discarded downstream, so stop paginating once we cross that
     // boundary (the API returns newest-first). Defaults to the largest scoring horizon (the daily
-    // ingest's needs); the one-off archive backfill passes a wider window for deeper history.
+    // ingest's needs); the one-off archive backfill passes a wider window for deeper history. `maxPages`
+    // caps pagination cost for callers (the sports scout) that only need a sample for a shrunk-edge estimate.
     const cutoffMs = Date.now() - maxDays * CONFIG.SECONDS_PER_DAY * CONFIG.MS_PER_SECOND;
     const positions: ClosedPosition[] = [];
-    for (let pageIndex = 0; pageIndex < CONFIG.MAX_CLOSED_POSITION_PAGES; pageIndex += 1) {
+    for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
       const params = new URLSearchParams({
         user: address,
         limit: String(CONFIG.CLOSED_POSITION_PAGE_SIZE),
@@ -722,7 +723,7 @@ export class PolymarketClient {
   // tool: label the exact bet, group markets by game, and drop already-decided ones. Queries WITHOUT
   // closed=true so still-open markets are returned (Gamma includes open by default); a null return = no
   // open market (closed/hidden/unknown) and the caller drops it.
-  async getMarketBrief(conditionId: string): Promise<{ outcomes: string[]; endDate: string | null; resolved: boolean; eventTitle: string | null; groupItemTitle: string | null } | null> {
+  async getMarketBrief(conditionId: string): Promise<{ outcomes: string[]; endDate: string | null; resolved: boolean; eventTitle: string | null; groupItemTitle: string | null; gameStartTime: string | null } | null> {
     const params = new URLSearchParams({ condition_ids: conditionId });
     const response = await fetchJson("/markets", params, "general", CONFIG.GAMMA_API_BASE);
     const first = asArray(response).filter(isRecord)[0];
@@ -733,7 +734,11 @@ export class PolymarketClient {
       endDate: readString(first, ["endDate", "end_date"]) || null,
       resolved: first.umaResolutionStatus === "resolved" || first.closed === true,
       eventTitle: (events[0] && readString(events[0], ["title"])) || null,
-      groupItemTitle: readString(first, ["groupItemTitle"]) || null
+      groupItemTitle: readString(first, ["groupItemTitle"]) || null,
+      // Single-game markets carry the real kickoff here; futures/season markets have none. Used by the
+      // copy list to drop in-game (live) entries so only PRE-GAME bets count. Format is Gamma's loose
+      // "YYYY-MM-DD HH:MM:SS+00", which Date.parse handles.
+      gameStartTime: readString(first, ["gameStartTime", "game_start_time"]) || null
     };
   }
 
@@ -768,6 +773,35 @@ export class PolymarketClient {
       }
     }
     return [...found];
+  }
+
+  // One page of open sports events (Gamma, tag_slug=sports) with their markets inlined. Lets the sports
+  // scout enumerate upcoming game markets + metadata straight from Polymarket, independent of our
+  // (leaderboard-scoped) caches. General lane, Gamma host.
+  async getSportsEvents(limit: number, offset: number): Promise<JsonRecord[]> {
+    // Most-liquid first: front-loads the marquee upcoming games (a World Cup match, a Wimbledon match, a
+    // big Dota/MLB game) so the scout reaches copyable games without paging the long tail of thin ITF
+    // matches and season futures. Gamma caps a page at ~100.
+    const params = new URLSearchParams({ closed: "false", limit: String(limit), offset: String(offset), tag_slug: "sports", order: "liquidity", ascending: "false" });
+    return asArray(await fetchJson("/events", params, "general", CONFIG.GAMMA_API_BASE)).filter(isRecord);
+  }
+
+  // Current holders of one market WITH their side (outcomeIndex) and shares held — richer than
+  // getTopHolders (addresses only), so the scout can aggregate per-side agreement. Data API /holders,
+  // general lane. Holders come sorted by size; `limit` caps per outcome token.
+  async getMarketHolders(conditionId: string, limit = 20): Promise<{ address: string; outcomeIndex: number; shares: number }[]> {
+    const params = new URLSearchParams({ market: conditionId, limit: String(limit) });
+    const out: { address: string; outcomeIndex: number; shares: number }[] = [];
+    for (const group of asArray(await fetchJson("/holders", params))) {
+      const holders = Array.isArray(group.holders) ? group.holders : [];
+      for (const holder of holders) {
+        if (!isRecord(holder)) continue;
+        const address = readString(holder, ["proxyWallet", "user", "wallet", "address"]).toLowerCase();
+        if (!address) continue;
+        out.push({ address, outcomeIndex: readNumber(holder, ["outcomeIndex"]), shares: readNumber(holder, ["amount", "shares", "size"]) });
+      }
+    }
+    return out;
   }
 
   async getTotalValue(address: string): Promise<number> {

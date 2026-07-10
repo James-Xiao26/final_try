@@ -9,7 +9,8 @@ const row = (address: string, fam: string, outcome: number, price: number, day: 
   market: `${fam} market outcome`,
   avg_price: price,
   outcome,
-  close_time: new Date(2026, 0, day).toISOString()
+  close_time: new Date(2026, 0, day).toISOString(),
+  event_slug: null
 });
 
 const OPTS = { minFamilies: 6, minHalfFamilies: 3, minEdge: 0.02 };
