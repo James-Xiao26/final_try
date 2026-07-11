@@ -28,7 +28,9 @@ test("buildBets aggregates only GOOD wallets per (game, side); dedups wallets, s
   assert.equal(home.price, 0.6);
   const away = bets.find((b) => b.outcomeIndex === 1)!;
   assert.equal(away.wallets, 1);
-  assert.equal(bets[0]!.outcomeIndex, 0); // Home ranks first (more agreement)
+  // Away mean edge 0.10 (1 wallet) > Home mean edge 0.08 (2 wallets): edge-first ranking puts Away first;
+  // agreement is only a tiebreak (the walk-forward finding wired into buildBets).
+  assert.equal(bets[0]!.outcomeIndex, 1);
 });
 
 test("buildBets ignores holdings whose game isn't in the upcoming set", () => {

@@ -12,9 +12,12 @@
 //     family-collapsed, Bayesian-shrunk, consistent-in-both-halves math the board-elite ranking uses
 //     (eliteWallets.walletQuality + passesGate). Evaluations are cached to sportsScouts.json so reruns
 //     are cheap.
-//   * Surfaces the games where vetted wallets currently hold a side, ranked by agreement × edge. The
-//     vetting gate RELAXES step by step until at least MIN_BETS bets show, so the list is (almost) never
-//     blank while any upcoming sports game has holders.
+//   * Surfaces the games where vetted wallets currently hold a side, ranked EDGE-first (agreement is
+//     only a tiebreak). The walk-forward backtest (backtestCopylist.ts) found edge-ranked top slices beat
+//     agreement-ranked ones decisively out-of-time (+0.93 vs +0.41 $/$1 top-10%) and the in-band
+//     agreement gradient is flat — so mean vetted-wallet edge is the signal, wallet count is the tiebreak.
+//     The vetting gate RELAXES step by step until at least MIN_BETS bets show, so the list is (almost)
+//     never blank while any upcoming sports game has holders.
 //
 // This is a discovery/ranking tool, NOT proven alpha — the copylist forward test is the arbiter.
 import { config as loadEnv } from "dotenv";
@@ -171,7 +174,7 @@ export function buildBets(held: HeldSide[], gamesById: Map<string, GameMarket>, 
     // Best-of-the-best: keep only bets with a known price inside the copyable band. A null price is
     // uncopyable (no entry to mirror); an extreme price is a longshot/lock, not real forecasting edge.
     .filter((b) => !bounds || (b.price !== null && b.price >= bounds.minPrice && b.price <= bounds.maxPrice))
-    .sort((x, y) => y.wallets - x.wallets || y.avgEdge - x.avgEdge || y.g.liquidity - x.g.liquidity || y.usd - x.usd);
+    .sort((x, y) => y.avgEdge - x.avgEdge || y.wallets - x.wallets || y.g.liquidity - x.g.liquidity || y.usd - x.usd);
 }
 
 async function main(): Promise<void> {
@@ -252,7 +255,7 @@ async function main(): Promise<void> {
   const stem = (t: string): string => t.split(" - ")[0]!.trim();
   const byEvent = new Map<string, Bet[]>();
   for (const b of chosen.bets) { const k = stem(b.g.eventTitle); (byEvent.get(k) ?? byEvent.set(k, []).get(k)!).push(b); }
-  const events = [...byEvent.entries()].sort(([, a], [, b]) => Math.max(...b.map((x) => x.wallets)) - Math.max(...a.map((x) => x.wallets)) || b[0]!.avgEdge - a[0]!.avgEdge);
+  const events = [...byEvent.entries()].sort(([, a], [, b]) => Math.max(...b.map((x) => x.avgEdge)) - Math.max(...a.map((x) => x.avgEdge)) || Math.max(...b.map((x) => x.wallets)) - Math.max(...a.map((x) => x.wallets)));
   const fmtIn = (ms: number): string => { const h = (ms - now) / 3_600_000; return h < 1 ? "<1h" : h < 24 ? `${h.toFixed(0)}h` : `${(h / 24).toFixed(0)}d`; };
   console.log(`\n=== SPORTS BETS TO TAKE — best-of-the-best, all pre-game, best-first (top ${PER_EVENT_MAX}/game) ===\n`);
   for (const [event, bets] of events.slice(0, 25)) {
@@ -262,12 +265,12 @@ async function main(): Promise<void> {
     const byMarket = new Map<string, Bet[]>();
     for (const b of bets) (byMarket.get(b.g.conditionId) ?? byMarket.set(b.g.conditionId, []).get(b.g.conditionId)!).push(b);
     const lines = [...byMarket.values()].map((sides) => {
-      sides.sort((a, b) => b.wallets - a.wallets || b.avgEdge - a.avgEdge || b.usd - a.usd);
+      sides.sort((a, b) => b.avgEdge - a.avgEdge || b.wallets - a.wallets || b.usd - a.usd);
       return sides[0]!;
     });
-    lines.sort((a, b) => b.wallets - a.wallets || b.avgEdge - a.avgEdge || b.usd - a.usd);
+    lines.sort((a, b) => b.avgEdge - a.avgEdge || b.wallets - a.wallets || b.usd - a.usd);
     // Always keep the strongest line (never-blank); secondary lines only if >1 wallet backs them — a lone
-    // wallet is a single opinion, not the multi-wallet agreement this list ranks on.
+    // wallet on a secondary market is a single opinion, not worth surfacing as an extra angle.
     const shown = lines.slice(0, PER_EVENT_MAX).filter((b, i) => i === 0 || b.wallets >= 2);
     const liq = Math.round(Math.max(...bets.map((b) => b.g.liquidity)));
     const more = lines.length - shown.length;
