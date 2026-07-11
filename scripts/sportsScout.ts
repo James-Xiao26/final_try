@@ -257,6 +257,7 @@ async function main(): Promise<void> {
   for (const b of chosen.bets) { const k = stem(b.g.eventTitle); (byEvent.get(k) ?? byEvent.set(k, []).get(k)!).push(b); }
   const events = [...byEvent.entries()].sort(([, a], [, b]) => Math.max(...b.map((x) => x.avgEdge)) - Math.max(...a.map((x) => x.avgEdge)) || Math.max(...b.map((x) => x.wallets)) - Math.max(...a.map((x) => x.wallets)));
   const fmtIn = (ms: number): string => { const h = (ms - now) / 3_600_000; return h < 1 ? "<1h" : h < 24 ? `${h.toFixed(0)}h` : `${(h / 24).toFixed(0)}d`; };
+  const toRecord: Bet[] = []; // every bet actually printed, in display order — the forward test locks these
   console.log(`\n=== SPORTS BETS TO TAKE — best-of-the-best, all pre-game, best-first (top ${PER_EVENT_MAX}/game) ===\n`);
   for (const [event, bets] of events.slice(0, 25)) {
     // Collapse opposite sides of the SAME market (same conditionId) to one line — keep the side the vetted
@@ -280,11 +281,35 @@ async function main(): Promise<void> {
       const type = stem(b.g.question) === event ? "" : ` · ${b.g.question.slice(0, 26)}`;
       const px = b.price === null ? "?" : b.price.toFixed(2);
       console.log(`    bet ${bet.slice(0, 16).padEnd(16)} @${px.padEnd(4)} ${String(b.wallets).padStart(2)}w  +${b.avgEdge.toFixed(3)}/sh  $${Math.round(b.usd).toString().padStart(6)}${type}`);
+      toRecord.push(b);
     }
   }
   console.log(`\nPay near the shown price or skip (spread). "w" = distinct vetted wallets holding that side pre-game;`);
   console.log(`edge/sh = their historical sports profit per share (proxy). Only the top ${PER_EVENT_MAX} markets per game are shown —`);
   console.log(`take the top line; others are correlated angles on the same match. Discovery + eval cached in sportsScouts.json.`);
+
+  // FORWARD TEST: lock every pick shown above into copylist_predictions (source='scout'), frozen at the
+  // CURRENT price — exactly what a follower of this list pays. First sighting wins (never revised);
+  // copylistForward --score settles them after resolution. This makes the list the user actually bets
+  // from a measured signal instead of an untested one. SCOUT_NO_RECORD=1 skips (dry experiments).
+  if (process.env.SCOUT_NO_RECORD !== "1" && toRecord.length > 0) {
+    const rows = toRecord.map((b, i) => ({
+      condition_id: b.g.conditionId,
+      outcome_index: b.outcomeIndex,
+      market: stem(b.g.question) === stem(b.g.eventTitle) ? b.g.eventTitle : `${stem(b.g.eventTitle)} · ${b.g.question}`,
+      bet_label: b.g.outcomes[b.outcomeIndex] ?? `outcome ${b.outcomeIndex}`,
+      entry_price: b.price!, // band filter guarantees non-null; scout has no elite-fill price, current = both
+      copy_price: b.price!,
+      participant_count: b.wallets,
+      avg_elite_edge: b.avgEdge,
+      edge_rank: i + 1, // display order = the pre-registered "take the top rows" policy
+      source: "scout",
+      end_date: Number.isFinite(b.g.endMs) ? new Date(b.g.endMs).toISOString() : null
+    }));
+    const { error } = await supabase.from("copylist_predictions").upsert(rows, { onConflict: "condition_id,outcome_index", ignoreDuplicates: true });
+    if (error) console.error(`Forward-test recording failed (list above is unaffected): ${error.message}`);
+    else console.log(`Forward test: locked ${rows.length} shown picks (new ones only; already-locked rows never revised).`);
+  }
 }
 
 async function loadBoardAddresses(): Promise<Set<string>> {

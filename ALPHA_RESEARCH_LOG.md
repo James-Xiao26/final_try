@@ -390,3 +390,31 @@ settles via Gamma/UMA and prints win rate + mean $/$1 OVERALL and BY agreement b
 beat 1 out-of-sample?). Shares `buildCandidates`/`copyPnlPerDollar` (extracted to `copyCandidates.ts`)
 with the live tool, so it tests exactly what `copylist` shows. Needs migration 032 applied + two daily
 cron-job.org jobs. This is the arbiter for the copylist signal; the in-sample +30% is NOT.
+
+---
+
+## 12. Forward-test honesty upgrade (2026-07-11) — score what a FOLLOWER actually gets
+
+First real scorecard read (26 settled): ALL copies −0.150 $/$1, win 34.6% — copying the whole list
+loses. The post-hoc high-edge tertile showed +0.274 (n=9), but scanning fixed edge thresholds on the
+same 26 resolved rows flips the sign (edge≥0.10 → −0.067) — the slice is noise-sensitive at this n, and
+picking a threshold by peeking at outcomes is exactly the §4f mistake. So three changes (migration 033):
+
+1. **`copy_price`** — the forward test froze `entry_price` = the ELITE WALLETS' own fill. By the time
+   the list surfaces a bet the market has often moved toward it, so scoring at their fill flatters the
+   copier. Now the CURRENT market price at record time (Gamma `outcomePrices`) is frozen too, and the
+   scorecard's headline is $/$1 **at the copy price** — the number a follower actually gets. Elite-fill
+   $/$1 stays as a reference line; the gap between the two ≈ the cost of being late.
+2. **`edge_rank`** — 1-based position in the edge-ranked list, frozen at record time. Pre-registers the
+   real betting policy ("take the top rows") so it can be scored without post-hoc slicing.
+3. **`source`** ('board' | 'scout') — **the live `pnpm copylist` tool (sportsScout: discovered
+   off-board wallets, holder-vetted) was never being forward-tested at all**; copylistForward records
+   the older board-elite signal. Real bets are placed from the scout list → untested signal. Now every
+   pick sportsScout PRINTS is auto-locked into `copylist_predictions` with `source='scout'` at the shown
+   (current) price, in display order (`SCOUT_NO_RECORD=1` skips). The scorecard splits by source, so the
+   two signals are judged separately. First-sighting-wins is unchanged; scout rows fail soft if the
+   migration isn't applied.
+
+Deployment rule stays: NOTHING here is proven edge. The bar before real-money scaling: the
+**scout-source, copy-price, top-rank slice must be positive on ≥30 settled predictions spanning
+multiple sports/weeks**. Until then bets are $1-sized data generation.
