@@ -23,6 +23,7 @@ export default async function HomePage() {
   ]);
 
   return (
+    <>
     <main className="page">
       <div className="act-page-head">
         <div>
@@ -42,5 +43,21 @@ export default async function HomePage() {
 
       <FreshEntriesPanel />
     </main>
+    <footer className="ea-foot">
+      <div className="ea-foot-inner">
+        <div className="c">
+          <span className="g">WHALE</span>WATCHER · Hydrophone Console · © 2026
+        </div>
+        <nav className="ea-foot-links">
+          <a href="https://discord.gg/dTrRCmygNU" target="_blank" rel="noreferrer">
+            Discord
+          </a>
+          <a href="https://polymarket.com" target="_blank" rel="noreferrer">
+            Polymarket
+          </a>
+        </nav>
+      </div>
+    </footer>
+    </>
   );
 }
